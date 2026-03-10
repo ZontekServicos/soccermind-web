@@ -1,0 +1,46 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Soccer Mind Custom Styles */
+@layer utilities {
+  .glow-blue {
+    box-shadow: 0 0 20px rgba(0, 194, 255, 0.5);
+  }
+  
+  .glow-purple {
+    box-shadow: 0 0 20px rgba(122, 92, 255, 0.5);
+  }
+  
+  .glow-green {
+    box-shadow: 0 0 20px rgba(0, 255, 156, 0.5);
+  }
+  
+  .glow-red {
+    box-shadow: 0 0 20px rgba(255, 77, 79, 0.5);
+  }
+}
+
+/* Smooth scrolling */
+* {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0A1B35;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #00C2FF;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00a8e0;
+}
