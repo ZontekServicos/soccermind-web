@@ -21,7 +21,7 @@ export default function Reports() {
 
     async function loadPlayers() {
       try {
-        const response = await getPlayers();
+        const response = await getPlayers(1, 100);
         if (!active) {
           return;
         }
@@ -79,14 +79,14 @@ export default function Reports() {
   }, [playerA.id, playerA.name]);
 
   const handlePlayerAChange = useCallback((value: string) => {
-    const player = players.find((item) => item.name === value);
+    const player = players.find((item) => item.id === value);
     if (player) {
       setPlayerA(player);
     }
   }, [players]);
 
   const handlePlayerBChange = useCallback((value: string) => {
-    const player = players.find((item) => item.name === value);
+    const player = players.find((item) => item.id === value);
     if (player) {
       setPlayerB(player);
     }
@@ -203,13 +203,13 @@ function PlayerSelector({ label, value, onChange, variant, ariaLabel, players }:
         <div className="w-2 h-2 rounded-full" style={{ background: dotColor }} />
         {label}
       </label>
-      <Select value={value} onValueChange={onChange}>
+      <Select value={players.find((player) => player.name === value)?.id ?? ""} onValueChange={onChange}>
         <SelectTrigger className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border rounded-[14px] h-14 px-4 transition-all hover:border-opacity-60 focus:shadow-[0_0_0_3px_rgba(0,194,255,0.1)]" style={{ borderColor }} aria-label={ariaLabel}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
-          {players.map((player, index) => (
-            <SelectItem key={`${player.name}-${player.club}-${index}`} value={player.name} className="hover:bg-[rgba(255,255,255,0.05)] focus:bg-[rgba(255,255,255,0.05)]">
+          {players.map((player) => (
+            <SelectItem key={player.id} value={player.id} className="hover:bg-[rgba(255,255,255,0.05)] focus:bg-[rgba(255,255,255,0.05)]">
               {player.name} • {player.club}
             </SelectItem>
           ))}

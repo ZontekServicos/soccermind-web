@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { ArrowLeft, TrendingUp, Shield } from "lucide-react";
+import { ArrowLeft, TrendingUp, Shield, Star } from "lucide-react";
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from "recharts";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { mapApiPlayerToCard, mapApiPlayerToProfile, type PlayerCardModel, type PlayerProfileModel } from "../mappers/player.mapper";
 import { getPlayer, getPlayerProjection, getSimilarPlayers } from "../services/players";
+import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 
 export default function PlayerDetails() {
   const { id } = useParams();
@@ -13,8 +14,47 @@ export default function PlayerDetails() {
   const [player, setPlayer] = useState<PlayerProfileModel | null>(null);
   const [similarPlayers, setSimilarPlayers] = useState<PlayerCardModel[]>([]);
   const [projection, setProjection] = useState<Record<string, unknown> | null>(null);
+  const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadWatchlistState() {
+      if (!id) {
+        return;
+      }
+
+      try {
+        const response = await getWatchlist();
+        if (!active) {
+          return;
+        }
+
+        const exists = Array.isArray(response.data)
+          ? response.data.some(
+              (item) =>
+                item &&
+                typeof item === "object" &&
+                "playerId" in item &&
+                String(item.playerId) === id,
+            )
+          : false;
+        setIsInWatchlist(exists);
+      } catch {
+        if (active) {
+          setIsInWatchlist(false);
+        }
+      }
+    }
+
+    loadWatchlistState();
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   useEffect(() => {
     let active = true;
@@ -79,8 +119,37 @@ export default function PlayerDetails() {
     const projectionData = projection || {};
     const projections = Array.isArray(projectionData.projections) ? projectionData.projections : [];
     const nextProjection = projections[0] as Record<string, unknown> | undefined;
-    return Number(nextProjection?.overall ?? projectionData.potential ?? player?.potential ?? 0);
+    return Number(
+      nextProjection?.overall ??
+        projectionData.projectedPeak ??
+        projectionData.potential ??
+        player?.potential ??
+        0,
+    );
   }, [player?.potential, projection]);
+
+  const handleWatchlistToggle = async () => {
+    if (!player) {
+      return;
+    }
+
+    try {
+      if (isInWatchlist) {
+        await removeFromWatchlist(player.id);
+        setIsInWatchlist(false);
+        return;
+      }
+
+      await addToWatchlist({ playerId: player.id });
+      setIsInWatchlist(true);
+    } catch (watchlistError) {
+      setError(
+        watchlistError instanceof Error
+          ? watchlistError.message
+          : "Erro ao atualizar watchlist",
+      );
+    }
+  };
 
   if (loading) {
     return (
@@ -234,6 +303,22 @@ export default function PlayerDetails() {
                   <p className="text-xs text-gray-400 mb-1">Valor</p>
                   <p className="text-3xl text-[#00FF9C]">{player.marketValue}</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleWatchlistToggle}
+                  className={`rounded-lg border px-5 py-4 text-center transition-colors ${
+                    isInWatchlist
+                      ? "border-[#fbbf24] bg-[#fbbf24]/12 text-[#fbbf24]"
+                      : "border-[rgba(255,255,255,0.08)] bg-[#07142A] text-gray-300 hover:border-[#fbbf24]/50"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4" fill={isInWatchlist ? "currentColor" : "none"} />
+                    <span className="text-xs font-semibold">
+                      {isInWatchlist ? "Na Watchlist" : "Salvar"}
+                    </span>
+                  </div>
+                </button>
               </div>
             </div>
 

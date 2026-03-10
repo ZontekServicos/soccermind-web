@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, TrendingUp, ArrowUpDown, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, TrendingUp, ArrowUpDown, Users, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { mapApiPlayerToCard, type PlayerCardModel } from "../mappers/player.mapper";
 import { getPlayers, searchPlayers } from "../services/players";
+import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 
 type SortBy = "overall" | "potential" | "age";
 type SortOrder = "asc" | "desc";
@@ -18,6 +19,7 @@ interface PaginationMeta {
 export default function PlayersRanking() {
   const navigate = useNavigate();
   const [players, setPlayers] = useState<PlayerCardModel[]>([]);
+  const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("overall");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -31,29 +33,94 @@ export default function PlayersRanking() {
   useEffect(() => {
     let active = true;
 
+    async function loadWatchlist() {
+      try {
+        const response = await getWatchlist();
+        if (!active) {
+          return;
+        }
+
+        const ids = new Set(
+          Array.isArray(response.data)
+            ? response.data
+                .map((item) =>
+                  item && typeof item === "object" && "playerId" in item ? String(item.playerId) : null,
+                )
+                .filter((item): item is string => Boolean(item))
+            : [],
+        );
+        setWatchlistIds(ids);
+      } catch {
+        if (active) {
+          setWatchlistIds(new Set());
+        }
+      }
+    }
+
+    loadWatchlist();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
     async function loadPlayers() {
       setLoading(true);
       try {
-        const response = searchTerm.trim()
-          ? await searchPlayers({ query: searchTerm.trim(), page, limit })
+        const trimmedSearch = searchTerm.trim().toLowerCase();
+        const response = trimmedSearch
+          ? await searchPlayers({ page: 1, limit: 100 })
           : await getPlayers(page, limit);
 
         if (!active) {
           return;
         }
 
-        const nextPlayers = Array.isArray(response.data)
-          ? response.data.map((player, index) => {
+        const rawPlayers = Array.isArray(response.data) ? response.data : [];
+        const filteredSource = trimmedSearch
+          ? rawPlayers.filter((player) => {
+              const item = player as Record<string, unknown>;
+              const name = String(item.name ?? "").toLowerCase();
+              const team = String(item.team ?? "").toLowerCase();
+              const position = String(item.position ?? "").toLowerCase();
+              const positions = Array.isArray(item.positions)
+                ? item.positions.map((value) => String(value).toLowerCase())
+                : [];
+
+              return (
+                name.includes(trimmedSearch) ||
+                team.includes(trimmedSearch) ||
+                position.includes(trimmedSearch) ||
+                positions.some((value) => value.includes(trimmedSearch))
+              );
+            })
+          : rawPlayers;
+
+        const paginatedPlayers = trimmedSearch
+          ? filteredSource.slice((page - 1) * limit, page * limit)
+          : filteredSource;
+
+        const nextPlayers = paginatedPlayers.map((player, index) => {
               const mapped = mapApiPlayerToCard(player as Record<string, unknown>);
               return {
                 ...mapped,
                 id: mapped.id || `${mapped.name}-${index}`,
               };
-            })
-          : [];
+            });
 
         setPlayers(nextPlayers);
-        setMeta((response.meta || {}) as PaginationMeta);
+        setMeta(
+          trimmedSearch
+            ? {
+                page,
+                total: filteredSource.length,
+                totalPages: Math.max(1, Math.ceil(filteredSource.length / limit)),
+              }
+            : ((response.meta || {}) as PaginationMeta),
+        );
         setError(null);
       } catch (fetchError) {
         if (!active) {
@@ -118,6 +185,29 @@ export default function PlayersRanking() {
     } else {
       setSortBy(field);
       setSortOrder("desc");
+    }
+  };
+
+  const handleWatchlistToggle = async (player: PlayerCardModel) => {
+    try {
+      if (watchlistIds.has(player.id)) {
+        await removeFromWatchlist(player.id);
+        setWatchlistIds((current) => {
+          const next = new Set(current);
+          next.delete(player.id);
+          return next;
+        });
+        return;
+      }
+
+      await addToWatchlist({ playerId: player.id });
+      setWatchlistIds((current) => new Set(current).add(player.id));
+    } catch (watchlistError) {
+      setError(
+        watchlistError instanceof Error
+          ? watchlistError.message
+          : "Erro ao atualizar watchlist",
+      );
     }
   };
 
@@ -267,15 +357,30 @@ export default function PlayersRanking() {
                       <div className="w-28 text-right text-sm text-[#00FF9C] font-semibold tabular-nums">{player.marketValue}</div>
 
                       <div className="w-32 flex justify-center">
-                        <button
-                          className="px-4 py-2 bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[10px] text-xs font-semibold transition-all opacity-0 group-hover:opacity-100 shadow-[0_2px_8px_rgba(0,194,255,0.3)] hover:shadow-[0_4px_12px_rgba(0,194,255,0.4)]"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            navigate(`/players/${player.id}`);
-                          }}
-                        >
-                          Ver Detalhes
-                        </button>
+                        <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-[10px] border transition-all ${
+                              watchlistIds.has(player.id)
+                                ? "border-[#fbbf24] bg-[#fbbf24]/15 text-[#fbbf24]"
+                                : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300"
+                            }`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleWatchlistToggle(player);
+                            }}
+                          >
+                            <Star className="h-4 w-4" fill={watchlistIds.has(player.id) ? "currentColor" : "none"} />
+                          </button>
+                          <button
+                            className="px-4 py-2 bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[10px] text-xs font-semibold transition-all shadow-[0_2px_8px_rgba(0,194,255,0.3)] hover:shadow-[0_4px_12px_rgba(0,194,255,0.4)]"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              navigate(`/players/${player.id}`);
+                            }}
+                          >
+                            Ver Detalhes
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

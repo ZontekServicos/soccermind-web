@@ -88,7 +88,7 @@ export const API_FEATURES = {
   /**
    * Enable API for reports
    */
-  REPORTS: true,
+  REPORTS: false,
 
   /**
    * Enable API for transfer simulation

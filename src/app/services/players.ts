@@ -6,10 +6,19 @@ export async function getPlayers(page = 1, limit = 20) {
 
 export async function searchPlayers(params: Record<string, string | number | undefined>) {
   const searchParams = new URLSearchParams();
+  const keyMap: Record<string, string> = {
+    minAge: "ageMin",
+    maxAge: "ageMax",
+    minOverall: "overallMin",
+    maxOverall: "overallMax",
+  };
 
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") {
-      searchParams.set(key, String(value));
+      const targetKey = keyMap[key] || key;
+      if (targetKey !== "query") {
+        searchParams.set(targetKey, String(value));
+      }
     }
   });
 
@@ -36,6 +45,6 @@ export async function getPlayerNotes(id: string) {
 export async function createPlayerNote(id: string, payload: { content: string }) {
   return apiFetch<unknown>(`/player/${id}/notes`, {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ note: payload.content }),
   });
 }

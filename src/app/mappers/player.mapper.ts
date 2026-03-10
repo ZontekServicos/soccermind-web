@@ -16,6 +16,13 @@ export interface ApiPlayerLike {
   attributes?: Record<string, number | null | undefined> | null;
 }
 
+interface ApiPlayerProfileLike extends ApiPlayerLike {
+  player?: ApiPlayerLike | null;
+  technical?: Record<string, number | null | undefined> | null;
+  physical?: Record<string, number | null | undefined> | null;
+  mental?: Record<string, number | null | undefined> | null;
+}
+
 export interface PlayerCardModel {
   id: string;
   name: string;
@@ -109,6 +116,14 @@ function formatMarketValue(value: number | string | null | undefined) {
   return `€${numericValue.toFixed(0)}`;
 }
 
+function resolvePlayerSource(player: ApiPlayerLike | ApiPlayerProfileLike) {
+  if (player && typeof player === "object" && "player" in player && player.player) {
+    return player.player;
+  }
+
+  return player;
+}
+
 function normalizedAttributes(attributes?: Record<string, number | null | undefined> | null) {
   const source = attributes || {};
   return {
@@ -155,29 +170,40 @@ function normalizedAttributes(attributes?: Record<string, number | null | undefi
 }
 
 export function mapApiPlayerToCard(player: ApiPlayerLike): PlayerCardModel {
-  const positions = player.positions?.filter(Boolean) || [];
-  const attributes = normalizedAttributes(player.attributes);
+  const source = resolvePlayerSource(player);
+  const positions = source.positions?.filter(Boolean) || [];
+  const attributes = normalizedAttributes(source.attributes);
 
   return {
-    id: player.id || player.name || "unknown-player",
-    name: player.name || "Jogador sem nome",
-    position: player.position || positions[0] || "N/A",
+    id: source.id || source.name || "unknown-player",
+    name: source.name || "Jogador sem nome",
+    position: source.position || positions[0] || "N/A",
     positions,
-    team: player.team || "Sem clube",
-    league: player.league || "N/A",
-    nationality: player.nationality || "N/A",
-    age: toNumber(player.age, 0),
-    overall: toNumber(player.overall, 0),
-    potential: toNumber(player.potential, toNumber(player.overall, 0)),
-    marketValue: formatMarketValue(player.marketValue),
-    image: player.image || null,
+    team: source.team || "Sem clube",
+    league: source.league || "N/A",
+    nationality: source.nationality || "N/A",
+    age: toNumber(source.age, 0),
+    overall: toNumber(source.overall, 0),
+    potential: toNumber(source.potential, toNumber(source.overall, 0)),
+    marketValue: formatMarketValue(source.marketValue),
+    image: source.image || null,
     attributes,
   };
 }
 
-export function mapApiPlayerToProfile(player: ApiPlayerLike): PlayerProfileModel {
-  const card = mapApiPlayerToCard(player);
-  const attrs = card.attributes;
+export function mapApiPlayerToProfile(player: ApiPlayerLike | ApiPlayerProfileLike): PlayerProfileModel {
+  const source = resolvePlayerSource(player);
+  const attrs = normalizedAttributes({
+    ...(source.attributes || {}),
+    ...(player.attributes || {}),
+    ...(player.technical || {}),
+    ...(player.physical || {}),
+    ...(player.mental || {}),
+  });
+  const card = mapApiPlayerToCard({
+    ...source,
+    attributes: attrs,
+  });
 
   return {
     ...card,

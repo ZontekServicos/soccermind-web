@@ -23,14 +23,14 @@ export default function Compare() {
   const [compareError, setCompareError] = useState<string | null>(null);
   const [comparisonData, setComparisonData] = useState<ReturnType<typeof mapCompareResponse> | null>(null);
 
-  const playersByName = useMemo(() => new Map(players.map((player) => [player.name, player])), [players]);
+  const playersById = useMemo(() => new Map(players.map((player) => [player.id, player])), [players]);
 
   useEffect(() => {
     let active = true;
 
     async function loadPlayers() {
       try {
-        const response = await getPlayers();
+        const response = await getPlayers(1, 100);
         if (!active) {
           return;
         }
@@ -101,24 +101,27 @@ export default function Compare() {
     return () => {
       active = false;
     };
-  }, [playerA.name, playerB.name]);
+  }, [playerA.id, playerB.id, playerA.name, playerB.name]);
+
+  const displayPlayerA = comparisonData?.playerA ?? playerA;
+  const displayPlayerB = comparisonData?.playerB ?? playerB;
 
   const radarData = comparisonData?.radarData || [
-    { attribute: "Pace", A: playerA.stats.pace, B: playerB.stats.pace },
-    { attribute: "Shooting", A: playerA.stats.shooting, B: playerB.stats.shooting },
-    { attribute: "Passing", A: playerA.stats.passing, B: playerB.stats.passing },
-    { attribute: "Dribbling", A: playerA.stats.dribbling, B: playerB.stats.dribbling },
-    { attribute: "Defending", A: playerA.stats.defending, B: playerB.stats.defending },
-    { attribute: "Physical", A: playerA.stats.physical, B: playerB.stats.physical },
+    { attribute: "Pace", A: displayPlayerA.stats.pace, B: displayPlayerB.stats.pace },
+    { attribute: "Shooting", A: displayPlayerA.stats.shooting, B: displayPlayerB.stats.shooting },
+    { attribute: "Passing", A: displayPlayerA.stats.passing, B: displayPlayerB.stats.passing },
+    { attribute: "Dribbling", A: displayPlayerA.stats.dribbling, B: displayPlayerB.stats.dribbling },
+    { attribute: "Defending", A: displayPlayerA.stats.defending, B: displayPlayerB.stats.defending },
+    { attribute: "Physical", A: displayPlayerA.stats.physical, B: displayPlayerB.stats.physical },
   ];
 
   const comparisonStats = comparisonData?.comparisonStats || [
-    { name: "Pace", a: playerA.stats.pace, b: playerB.stats.pace },
-    { name: "Shooting", a: playerA.stats.shooting, b: playerB.stats.shooting },
-    { name: "Passing", a: playerA.stats.passing, b: playerB.stats.passing },
-    { name: "Dribbling", a: playerA.stats.dribbling, b: playerB.stats.dribbling },
-    { name: "Defending", a: playerA.stats.defending, b: playerB.stats.defending },
-    { name: "Physical", a: playerA.stats.physical, b: playerB.stats.physical },
+    { name: "Pace", a: displayPlayerA.stats.pace, b: displayPlayerB.stats.pace },
+    { name: "Shooting", a: displayPlayerA.stats.shooting, b: displayPlayerB.stats.shooting },
+    { name: "Passing", a: displayPlayerA.stats.passing, b: displayPlayerB.stats.passing },
+    { name: "Dribbling", a: displayPlayerA.stats.dribbling, b: displayPlayerB.stats.dribbling },
+    { name: "Defending", a: displayPlayerA.stats.defending, b: displayPlayerB.stats.defending },
+    { name: "Physical", a: displayPlayerA.stats.physical, b: displayPlayerB.stats.physical },
   ];
 
   return (
@@ -145,13 +148,18 @@ export default function Compare() {
                   <div className="w-2 h-2 rounded-full bg-[#00C2FF]" />
                   Jogador A
                 </label>
-                <Select value={playerA.name} onValueChange={(value) => setPlayerA(playersByName.get(value) ?? EMPTY_PLAYER)} open={selectAOpen} onOpenChange={setSelectAOpen}>
+                <Select
+                  value={playerA.id}
+                  onValueChange={(value) => setPlayerA(playersById.get(value) ?? EMPTY_PLAYER)}
+                  open={selectAOpen}
+                  onOpenChange={setSelectAOpen}
+                >
                   <SelectTrigger className={`bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border rounded-[14px] h-14 px-4 transition-all ${selectAOpen ? "border-[#00C2FF] shadow-[0_0_0_3px_rgba(0,194,255,0.1)]" : "border-[rgba(0,194,255,0.3)] hover:border-[rgba(0,194,255,0.5)]"}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A1B35] border-[rgba(0,194,255,0.3)]">
-                    {players.map((player, index) => (
-                      <SelectItem key={`${player.name}-${player.club}-${index}`} value={player.name} className="hover:bg-[rgba(0,194,255,0.1)] focus:bg-[rgba(0,194,255,0.1)]">
+                    {players.map((player) => (
+                      <SelectItem key={player.id} value={player.id} className="hover:bg-[rgba(0,194,255,0.1)] focus:bg-[rgba(0,194,255,0.1)]">
                         {player.name} • {player.club}
                       </SelectItem>
                     ))}
@@ -164,13 +172,18 @@ export default function Compare() {
                   <div className="w-2 h-2 rounded-full bg-[#7A5CFF]" />
                   Jogador B
                 </label>
-                <Select value={playerB.name} onValueChange={(value) => setPlayerB(playersByName.get(value) ?? EMPTY_PLAYER)} open={selectBOpen} onOpenChange={setSelectBOpen}>
+                <Select
+                  value={playerB.id}
+                  onValueChange={(value) => setPlayerB(playersById.get(value) ?? EMPTY_PLAYER)}
+                  open={selectBOpen}
+                  onOpenChange={setSelectBOpen}
+                >
                   <SelectTrigger className={`bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border rounded-[14px] h-14 px-4 transition-all ${selectBOpen ? "border-[#7A5CFF] shadow-[0_0_0_3px_rgba(122,92,255,0.1)]" : "border-[rgba(122,92,255,0.3)] hover:border-[rgba(122,92,255,0.5)]"}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A1B35] border-[rgba(122,92,255,0.3)]">
-                    {players.map((player, index) => (
-                      <SelectItem key={`${player.name}-${player.club}-${index}`} value={player.name} className="hover:bg-[rgba(122,92,255,0.1)] focus:bg-[rgba(122,92,255,0.1)]">
+                    {players.map((player) => (
+                      <SelectItem key={player.id} value={player.id} className="hover:bg-[rgba(122,92,255,0.1)] focus:bg-[rgba(122,92,255,0.1)]">
                         {player.name} • {player.club}
                       </SelectItem>
                     ))}
@@ -180,8 +193,8 @@ export default function Compare() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-              <PlayerComparisonCard player={playerA} variant="A" />
-              <PlayerComparisonCard player={playerB} variant="B" />
+              <PlayerComparisonCard player={displayPlayerA} variant="A" />
+              <PlayerComparisonCard player={displayPlayerB} variant="B" />
             </div>
 
             <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[20px] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)] mb-10">
@@ -196,8 +209,8 @@ export default function Compare() {
                     <RadarChart data={radarData}>
                       <PolarGrid stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
                       <PolarAngleAxis dataKey="attribute" stroke="#94a3b8" style={{ fontSize: "13px", fontWeight: 500 }} />
-                      <Radar name={playerA.name} dataKey="A" stroke="#00C2FF" fill="#00C2FF" fillOpacity={0.2} strokeWidth={2.5} />
-                      <Radar name={playerB.name} dataKey="B" stroke="#7A5CFF" fill="#7A5CFF" fillOpacity={0.2} strokeWidth={2.5} />
+                      <Radar name={displayPlayerA.name} dataKey="A" stroke="#00C2FF" fill="#00C2FF" fillOpacity={0.2} strokeWidth={2.5} />
+                      <Radar name={displayPlayerB.name} dataKey="B" stroke="#7A5CFF" fill="#7A5CFF" fillOpacity={0.2} strokeWidth={2.5} />
                       <Legend wrapperStyle={{ fontSize: "13px", paddingTop: "20px" }} iconType="circle" />
                     </RadarChart>
                   </ResponsiveContainer>
@@ -219,23 +232,23 @@ export default function Compare() {
                   <div className="grid grid-cols-2 gap-6 pt-2">
                     <div className="flex flex-col items-center">
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Jogador A</p>
-                      <CapitalGauge value={playerA.capitalEfficiency} size="xs" showLabel />
+                      <CapitalGauge value={displayPlayerA.capitalEfficiency} size="xs" showLabel />
                     </div>
                     <div className="flex flex-col items-center">
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Jogador B</p>
-                      <CapitalGauge value={playerB.capitalEfficiency} size="xs" showLabel />
+                      <CapitalGauge value={displayPlayerB.capitalEfficiency} size="xs" showLabel />
                     </div>
                   </div>
-                  <WinnerIndicator winner={playerA.capitalEfficiency > playerB.capitalEfficiency ? "A" : "B"} label={playerA.capitalEfficiency > playerB.capitalEfficiency ? playerA.name.split(" ")[0] : playerB.name.split(" ")[0]} />
+                  <WinnerIndicator winner={displayPlayerA.capitalEfficiency > displayPlayerB.capitalEfficiency ? "A" : "B"} label={displayPlayerA.capitalEfficiency > displayPlayerB.capitalEfficiency ? displayPlayerA.name.split(" ")[0] : displayPlayerB.name.split(" ")[0]} />
                 </StrategicComparisonCard>
 
                 <StrategicComparisonCard title="Risco Estrutural" icon={Shield} iconColor="#FF4D4F">
                   <div className="space-y-4">
-                    <MetricRow label="Jogador A" value={playerA.structuralRisk.score.toFixed(1)} badge={<RiskBadge level={playerA.structuralRisk.level} />} variant="A" />
+                    <MetricRow label="Jogador A" value={displayPlayerA.structuralRisk.score.toFixed(1)} badge={<RiskBadge level={displayPlayerA.structuralRisk.level} />} variant="A" />
                     <div className="border-t border-[rgba(255,255,255,0.06)]" />
-                    <MetricRow label="Jogador B" value={playerB.structuralRisk.score.toFixed(1)} badge={<RiskBadge level={playerB.structuralRisk.level} />} variant="B" />
+                    <MetricRow label="Jogador B" value={displayPlayerB.structuralRisk.score.toFixed(1)} badge={<RiskBadge level={displayPlayerB.structuralRisk.level} />} variant="B" />
                   </div>
-                  <WinnerIndicator winner={playerA.structuralRisk.score < playerB.structuralRisk.score ? "A" : "B"} label="Menor risco" />
+                  <WinnerIndicator winner={displayPlayerA.structuralRisk.score < displayPlayerB.structuralRisk.score ? "A" : "B"} label="Menor risco" />
                 </StrategicComparisonCard>
 
                 <StrategicComparisonCard title="Anti-Flop Index" icon={AlertTriangle} iconColor="#fbbf24">
@@ -244,11 +257,11 @@ export default function Compare() {
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Jogador A</p>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-400">Flop Probability</span>
-                        <span className="text-sm font-bold text-[#FF4D4F]">{playerA.antiFlopIndex.flopProbability}%</span>
+                        <span className="text-sm font-bold text-[#FF4D4F]">{displayPlayerA.antiFlopIndex.flopProbability}%</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">Safety Index</span>
-                        <span className="text-sm font-bold text-[#00FF9C]">{playerA.antiFlopIndex.safetyIndex}</span>
+                        <span className="text-sm font-bold text-[#00FF9C]">{displayPlayerA.antiFlopIndex.safetyIndex}</span>
                       </div>
                     </div>
                     <div className="border-t border-[rgba(255,255,255,0.06)]" />
@@ -256,24 +269,24 @@ export default function Compare() {
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Jogador B</p>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-400">Flop Probability</span>
-                        <span className="text-sm font-bold text-[#FF4D4F]">{playerB.antiFlopIndex.flopProbability}%</span>
+                        <span className="text-sm font-bold text-[#FF4D4F]">{displayPlayerB.antiFlopIndex.flopProbability}%</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">Safety Index</span>
-                        <span className="text-sm font-bold text-[#00FF9C]">{playerB.antiFlopIndex.safetyIndex}</span>
+                        <span className="text-sm font-bold text-[#00FF9C]">{displayPlayerB.antiFlopIndex.safetyIndex}</span>
                       </div>
                     </div>
                   </div>
-                  <WinnerIndicator winner={playerA.antiFlopIndex.flopProbability < playerB.antiFlopIndex.flopProbability ? "A" : "B"} label="Menor probabilidade de flop" />
+                  <WinnerIndicator winner={displayPlayerA.antiFlopIndex.flopProbability < displayPlayerB.antiFlopIndex.flopProbability ? "A" : "B"} label="Menor probabilidade de flop" />
                 </StrategicComparisonCard>
 
                 <StrategicComparisonCard title="Liquidez" icon={TrendingUp} iconColor="#00FF9C">
                   <div className="space-y-4">
-                    <MetricRow label="Jogador A" value={playerA.liquidity.score.toFixed(1)} subtitle={playerA.liquidity.resaleWindow} variant="A" />
+                    <MetricRow label="Jogador A" value={displayPlayerA.liquidity.score.toFixed(1)} subtitle={displayPlayerA.liquidity.resaleWindow} variant="A" />
                     <div className="border-t border-[rgba(255,255,255,0.06)]" />
-                    <MetricRow label="Jogador B" value={playerB.liquidity.score.toFixed(1)} subtitle={playerB.liquidity.resaleWindow} variant="B" />
+                    <MetricRow label="Jogador B" value={displayPlayerB.liquidity.score.toFixed(1)} subtitle={displayPlayerB.liquidity.resaleWindow} variant="B" />
                   </div>
-                  <WinnerIndicator winner={playerA.liquidity.score > playerB.liquidity.score ? "A" : "B"} label="Maior liquidez" />
+                  <WinnerIndicator winner={displayPlayerA.liquidity.score > displayPlayerB.liquidity.score ? "A" : "B"} label="Maior liquidez" />
                 </StrategicComparisonCard>
 
                 <StrategicComparisonCard title="Risco Financeiro" icon={DollarSign} iconColor="#FF4D4F">
@@ -282,11 +295,11 @@ export default function Compare() {
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Jogador A</p>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-400">Risk Index</span>
-                        <span className="text-lg font-bold">{playerA.financialRisk.index.toFixed(1)}</span>
+                        <span className="text-lg font-bold">{displayPlayerA.financialRisk.index.toFixed(1)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">Capital Exposure</span>
-                        <span className="text-xs text-[#00C2FF]">{playerA.financialRisk.capitalExposure}</span>
+                        <span className="text-xs text-[#00C2FF]">{displayPlayerA.financialRisk.capitalExposure}</span>
                       </div>
                     </div>
                     <div className="border-t border-[rgba(255,255,255,0.06)]" />
@@ -294,24 +307,24 @@ export default function Compare() {
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Jogador B</p>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-400">Risk Index</span>
-                        <span className="text-lg font-bold">{playerB.financialRisk.index.toFixed(1)}</span>
+                        <span className="text-lg font-bold">{displayPlayerB.financialRisk.index.toFixed(1)}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400">Capital Exposure</span>
-                        <span className="text-xs text-[#00C2FF]">{playerB.financialRisk.capitalExposure}</span>
+                        <span className="text-xs text-[#00C2FF]">{displayPlayerB.financialRisk.capitalExposure}</span>
                       </div>
                     </div>
                   </div>
-                  <WinnerIndicator winner={playerA.financialRisk.index < playerB.financialRisk.index ? "A" : "B"} label="Menor risco financeiro" />
+                  <WinnerIndicator winner={displayPlayerA.financialRisk.index < displayPlayerB.financialRisk.index ? "A" : "B"} label="Menor risco financeiro" />
                 </StrategicComparisonCard>
 
                 <StrategicComparisonCard title="Overall Rating" icon={Award} iconColor="#7A5CFF">
                   <div className="space-y-4">
-                    <MetricRow label="Jogador A" value={playerA.overallRating.toString()} subtitle={`${playerA.position} • ${playerA.club}`} variant="A" />
+                    <MetricRow label="Jogador A" value={displayPlayerA.overallRating.toString()} subtitle={`${displayPlayerA.position} • ${displayPlayerA.club}`} variant="A" />
                     <div className="border-t border-[rgba(255,255,255,0.06)]" />
-                    <MetricRow label="Jogador B" value={playerB.overallRating.toString()} subtitle={`${playerB.position} • ${playerB.club}`} variant="B" />
+                    <MetricRow label="Jogador B" value={displayPlayerB.overallRating.toString()} subtitle={`${displayPlayerB.position} • ${displayPlayerB.club}`} variant="B" />
                   </div>
-                  <WinnerIndicator winner={playerA.overallRating > playerB.overallRating ? "A" : "B"} label="Maior rating" />
+                  <WinnerIndicator winner={displayPlayerA.overallRating > displayPlayerB.overallRating ? "A" : "B"} label="Maior rating" />
                 </StrategicComparisonCard>
               </div>
             </div>

@@ -22,7 +22,7 @@ export default function Dashboard() {
 
     async function loadPlayers() {
       try {
-        const response = await getPlayers();
+        const response = await getPlayers(1, 100);
         if (!active) {
           return;
         }
@@ -61,9 +61,17 @@ export default function Dashboard() {
     : 0;
   const totalMarketValue = useMemo(() => {
     const total = players.reduce((sum, player) => {
-      const normalized = player.marketValue.replace(/[^0-9.,]/g, "").replace(",", ".");
+      const normalized = player.marketValue.replace(/[^0-9.,MKmk]/g, "").replace(",", ".");
       const parsed = Number.parseFloat(normalized);
-      return Number.isFinite(parsed) ? sum + parsed : sum;
+      if (!Number.isFinite(parsed)) {
+        return sum;
+      }
+
+      if (/[Kk]$/.test(normalized)) {
+        return sum + parsed / 1000;
+      }
+
+      return sum + parsed;
     }, 0);
 
     return total > 0 ? `€ ${total.toFixed(1)}M` : "N/A";
@@ -75,7 +83,7 @@ export default function Dashboard() {
         const shortName = `${player.name.split(" ")[0]} ${player.name.split(" ")[1]?.[0] || ""}.`.trim();
         return {
           name: shortName,
-          uniqueKey: `${player.name}-${player.club}-${index}`,
+          uniqueKey: player.id || `${player.name}-${index}`,
           fullName: player.name,
           efficiency: player.capitalEfficiency,
         };
@@ -89,7 +97,7 @@ export default function Dashboard() {
         const shortName = `${player.name.split(" ")[0]} ${player.name.split(" ")[1]?.[0] || ""}.`.trim();
         return {
           name: shortName,
-          uniqueKey: `${player.name}-${player.position}-${index}`,
+          uniqueKey: player.id || `${player.name}-${index}`,
           fullName: player.name,
           rating: player.overallRating,
         };
@@ -232,7 +240,7 @@ export default function Dashboard() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 {topEfficiencyPlayers.map((player, index) => (
                   <div
-                    key={`${player.name}-${player.club}-${index}`}
+                    key={player.id || `${player.name}-${index}`}
                     className={`bg-[rgba(255,255,255,0.03)] rounded-[18px] p-7 relative transition-all duration-200 ${
                       index === 0
                         ? "shadow-[0_0_20px_rgba(0,255,156,0.08)] hover:shadow-[0_0_24px_rgba(0,255,156,0.12)]"
@@ -275,7 +283,7 @@ export default function Dashboard() {
               <div className="space-y-3">
                 {players.map((player, index) => (
                   <div
-                    key={`${player.name}-${player.position}-${index}`}
+                    key={player.id || `${player.name}-${index}`}
                     className={`flex items-center justify-between p-5 bg-[rgba(255,255,255,0.03)] rounded-[18px] transition-all duration-200 ${
                       player.riskLevel === "HIGH"
                         ? "shadow-[0_0_20px_rgba(255,77,79,0.12)] hover:shadow-[0_0_28px_rgba(255,77,79,0.2)]"
@@ -316,7 +324,7 @@ export default function Dashboard() {
                   .filter((player) => player.liquidity.score >= 8.5)
                   .map((player, index) => (
                     <div
-                      key={`${player.name}-${player.marketValue}-${index}`}
+                      key={player.id || `${player.name}-${index}`}
                       className="bg-[rgba(255,255,255,0.03)] rounded-[18px] p-6 shadow-[0_4px_16px_rgba(0,0,0,0.2)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)] hover:-translate-y-1 transition-all duration-200"
                     >
                       <div className="flex justify-between items-start mb-6">
