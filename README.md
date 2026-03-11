@@ -101,19 +101,3 @@ src/
 SoccerMind aims to bridge football expertise and data science, enabling clubs and analysts to make smarter, faster and more objective recruitment decisions.
 
 The long-term goal is to evolve into a complete football intelligence platform, combining scouting, analytics, predictive modeling and financial decision support.
-
-Se quiser, eu também posso montar uma versão MUITO forte de README estilo startup, com:
-
-badges
-
-screenshots
-
-arquitetura
-
-roadmap
-
-contribuição
-
-licença
-
-seção de IA / analytics
