@@ -3,7 +3,7 @@ import { Search, TrendingUp, ArrowUpDown, Users, ChevronLeft, ChevronRight, Star
 import { useNavigate } from "react-router";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
-import { mapApiPlayerToCard, type PlayerCardModel } from "../mappers/player.mapper";
+import type { PlayerCardModel } from "../mappers/player.mapper";
 import { getPlayers, searchPlayers } from "../services/players";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 
@@ -14,6 +14,19 @@ interface PaginationMeta {
   page?: number;
   totalPages?: number;
   total?: number;
+}
+
+function formatMarketValue(value: number | null) {
+  if (value === null || value <= 0) {
+    return "N/A";
+  }
+  if (value >= 1_000_000) {
+    return `EUR ${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `EUR ${(value / 1_000).toFixed(0)}K`;
+  }
+  return `EUR ${value.toFixed(0)}`;
 }
 
 export default function PlayersRanking() {
@@ -103,13 +116,7 @@ export default function PlayersRanking() {
           ? filteredSource.slice((page - 1) * limit, page * limit)
           : filteredSource;
 
-        const nextPlayers = paginatedPlayers.map((player, index) => {
-              const mapped = mapApiPlayerToCard(player as Record<string, unknown>);
-              return {
-                ...mapped,
-                id: mapped.id || `${mapped.name}-${index}`,
-              };
-            });
+        const nextPlayers = paginatedPlayers;
 
         setPlayers(nextPlayers);
         setMeta(
@@ -146,9 +153,10 @@ export default function PlayersRanking() {
 
   const filteredAndSortedPlayers = useMemo(() => {
     const list = [...players];
+    const getSortableValue = (value: number | null) => value ?? -1;
     list.sort((a, b) => {
       const multiplier = sortOrder === "asc" ? 1 : -1;
-      return (a[sortBy] - b[sortBy]) * multiplier;
+      return (getSortableValue(a[sortBy]) - getSortableValue(b[sortBy])) * multiplier;
     });
     return list;
   }, [players, sortBy, sortOrder]);
@@ -335,26 +343,26 @@ export default function PlayersRanking() {
                         </span>
                       </div>
 
-                      <div className="w-32 text-center text-sm text-gray-400">{player.team}</div>
+                      <div className="w-32 text-center text-sm text-gray-400">{player.team || "-"}</div>
 
                       <div className="w-24 flex justify-center">
-                        <span className={`${getStatColor(player.overall)} px-3 py-1.5 rounded-[8px] text-sm font-bold min-w-[52px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
-                          {player.overall}
+                        <span className={`${getStatColor(player.overall ?? 0)} px-3 py-1.5 rounded-[8px] text-sm font-bold min-w-[52px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
+                          {player.overall ?? "N/A"}
                         </span>
                       </div>
 
                       <div className="w-24 flex justify-center">
                         <div className="flex items-center gap-1.5">
-                          <span className={`${getStatColor(player.potential)} px-3 py-1.5 rounded-[8px] text-sm font-bold min-w-[52px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
-                            {player.potential}
+                          <span className={`${getStatColor(player.potential ?? 0)} px-3 py-1.5 rounded-[8px] text-sm font-bold min-w-[52px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
+                            {player.potential ?? "N/A"}
                           </span>
-                          {player.potential > player.overall + 5 && <TrendingUp className="w-3.5 h-3.5 text-[#00FF9C]/70" />}
+                          {player.potential !== null && player.overall !== null && player.potential > player.overall + 5 && <TrendingUp className="w-3.5 h-3.5 text-[#00FF9C]/70" />}
                         </div>
                       </div>
 
                       <div className="w-20 text-center text-sm text-gray-300 font-medium tabular-nums">{player.age}</div>
 
-                      <div className="w-28 text-right text-sm text-[#00FF9C] font-semibold tabular-nums">{player.marketValue}</div>
+                      <div className="w-28 text-right text-sm text-[#00FF9C] font-semibold tabular-nums">{formatMarketValue(player.marketValue)}</div>
 
                       <div className="w-32 flex justify-center">
                         <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">

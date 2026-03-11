@@ -4,9 +4,22 @@ import { ArrowLeft, TrendingUp, Shield, Star } from "lucide-react";
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from "recharts";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
-import { mapApiPlayerToCard, mapApiPlayerToProfile, type PlayerCardModel, type PlayerProfileModel } from "../mappers/player.mapper";
+import type { PlayerCardModel, PlayerProfileModel } from "../mappers/player.mapper";
 import { getPlayer, getPlayerProjection, getSimilarPlayers } from "../services/players";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
+
+function formatMarketValue(value: number | null) {
+  if (value === null || value <= 0) {
+    return "N/A";
+  }
+  if (value >= 1_000_000) {
+    return `EUR ${(value / 1_000_000).toFixed(1)}M`;
+  }
+  if (value >= 1_000) {
+    return `EUR ${(value / 1_000).toFixed(0)}K`;
+  }
+  return `EUR ${value.toFixed(0)}`;
+}
 
 export default function PlayerDetails() {
   const { id } = useParams();
@@ -78,18 +91,10 @@ export default function PlayerDetails() {
           return;
         }
 
-        setPlayer(mapApiPlayerToProfile(playerResponse.data as Record<string, unknown>));
+        setPlayer((playerResponse.data as PlayerProfileModel | null) ?? null);
         setProjection((projectionResponse?.data as Record<string, unknown> | undefined) ?? null);
         setSimilarPlayers(
-          Array.isArray(similarResponse?.data)
-            ? similarResponse!.data.map((item, index) => {
-                const mapped = mapApiPlayerToCard(item as Record<string, unknown>);
-                return {
-                  ...mapped,
-                  id: mapped.id || `${mapped.name}-${index}`,
-                };
-              })
-            : [],
+          Array.isArray(similarResponse?.data) ? (similarResponse.data as PlayerCardModel[]) : [],
         );
         setError(null);
       } catch (fetchError) {
@@ -127,6 +132,9 @@ export default function PlayerDetails() {
         0,
     );
   }, [player?.potential, projection]);
+
+  const overallValue = player?.overall ?? 0;
+  const displayedPotential = projectedPotential || player?.potential || 0;
 
   const handleWatchlistToggle = async () => {
     if (!player) {
@@ -278,9 +286,9 @@ export default function PlayerDetails() {
                     <span>•</span>
                     <span>{player.age} anos</span>
                     <span>•</span>
-                    <span className="text-white">{player.team}</span>
+                    <span className="text-white">{player.team || "-"}</span>
                     <span>•</span>
-                    <span>{player.league}</span>
+                    <span>{player.league || "-"}</span>
                   </div>
                 </div>
               </div>
@@ -288,20 +296,20 @@ export default function PlayerDetails() {
               <div className="flex gap-4">
                 <div className="bg-[#07142A] border border-[rgba(0,194,255,0.3)] rounded-lg px-6 py-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Overall</p>
-                  <p className="text-3xl text-[#00C2FF]">{player.overall}</p>
+                  <p className="text-3xl text-[#00C2FF]">{player.overall ?? "N/A"}</p>
                 </div>
                 <div className="bg-[#07142A] border border-[rgba(0,194,255,0.3)] rounded-lg px-6 py-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Potencial</p>
                   <div className="flex items-center gap-2">
-                    <p className="text-3xl text-[#00FF9C]">{projectedPotential || player.potential}</p>
-                    {(projectedPotential || player.potential) > player.overall + 5 && (
+                    <p className="text-3xl text-[#00FF9C]">{displayedPotential || "N/A"}</p>
+                    {displayedPotential > overallValue + 5 && (
                       <TrendingUp className="w-5 h-5 text-[#00FF9C]" />
                     )}
                   </div>
                 </div>
                 <div className="bg-[#07142A] border border-[rgba(0,194,255,0.3)] rounded-lg px-6 py-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Valor</p>
-                  <p className="text-3xl text-[#00FF9C]">{player.marketValue}</p>
+                  <p className="text-3xl text-[#00FF9C]">{formatMarketValue(player.marketValue)}</p>
                 </div>
                 <button
                   type="button"
@@ -474,8 +482,8 @@ export default function PlayerDetails() {
                     className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] p-4 text-left hover:border-[rgba(0,194,255,0.3)]"
                   >
                     <p className="font-semibold text-white">{similarPlayer.name}</p>
-                    <p className="mt-1 text-sm text-gray-400">{similarPlayer.position} • {similarPlayer.team}</p>
-                    <p className="mt-2 text-xs text-[#00FF9C]">{similarPlayer.marketValue}</p>
+                    <p className="mt-1 text-sm text-gray-400">{similarPlayer.position} • {similarPlayer.team || "-"}</p>
+                    <p className="mt-2 text-xs text-[#00FF9C]">{formatMarketValue(similarPlayer.marketValue)}</p>
                   </button>
                 ))}
               </div>
