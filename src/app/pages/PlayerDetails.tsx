@@ -9,7 +9,7 @@ import { getPlayer, getPlayerProjection, getSimilarPlayers } from "../services/p
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 
 function formatMarketValue(value: number | null) {
-  if (value === null || value <= 0) {
+  if (value === null) {
     return "N/A";
   }
   if (value >= 1_000_000) {
@@ -19,6 +19,14 @@ function formatMarketValue(value: number | null) {
     return `EUR ${(value / 1_000).toFixed(0)}K`;
   }
   return `EUR ${value.toFixed(0)}`;
+}
+
+function getNullableNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function formatStatValue(value: number | null) {
+  return value === null ? "-" : value;
 }
 
 export default function PlayerDetails() {
@@ -91,11 +99,9 @@ export default function PlayerDetails() {
           return;
         }
 
-        setPlayer((playerResponse.data as PlayerProfileModel | null) ?? null);
+        setPlayer(playerResponse.data ?? null);
         setProjection((projectionResponse?.data as Record<string, unknown> | undefined) ?? null);
-        setSimilarPlayers(
-          Array.isArray(similarResponse?.data) ? (similarResponse.data as PlayerCardModel[]) : [],
-        );
+        setSimilarPlayers(Array.isArray(similarResponse?.data) ? similarResponse.data : []);
         setError(null);
       } catch (fetchError) {
         if (!active) {
@@ -124,17 +130,18 @@ export default function PlayerDetails() {
     const projectionData = projection || {};
     const projections = Array.isArray(projectionData.projections) ? projectionData.projections : [];
     const nextProjection = projections[0] as Record<string, unknown> | undefined;
-    return Number(
-      nextProjection?.overall ??
-        projectionData.projectedPeak ??
-        projectionData.potential ??
-        player?.potential ??
-        0,
+
+    return (
+      getNullableNumber(nextProjection?.overall) ??
+      getNullableNumber(projectionData.projectedPeak) ??
+      getNullableNumber(projectionData.potential) ??
+      player?.potential ??
+      null
     );
   }, [player?.potential, projection]);
 
-  const overallValue = player?.overall ?? 0;
-  const displayedPotential = projectedPotential || player?.potential || 0;
+  const overallValue = player?.overall ?? null;
+  const displayedPotential = projectedPotential ?? player?.potential ?? null;
 
   const handleWatchlistToggle = async () => {
     if (!player) {
@@ -193,7 +200,8 @@ export default function PlayerDetails() {
     );
   }
 
-  const getStatColor = (value: number) => {
+  const getStatColor = (value: number | null) => {
+    if (value === null) return "bg-gray-700 text-gray-300";
     if (value >= 80) return "bg-[#00FF9C] text-[#07142A]";
     if (value >= 70) return "bg-[#7A5CFF] text-white";
     if (value >= 60) return "bg-[#00C2FF] text-[#07142A]";
@@ -201,7 +209,8 @@ export default function PlayerDetails() {
     return "bg-[#FF4D4F] text-white";
   };
 
-  const getStatBarColor = (value: number) => {
+  const getStatBarColor = (value: number | null) => {
+    if (value === null) return "#334155";
     if (value >= 80) return "#00FF9C";
     if (value >= 70) return "#7A5CFF";
     if (value >= 60) return "#00C2FF";
@@ -227,25 +236,25 @@ export default function PlayerDetails() {
   };
 
   const radarData = [
-    { attribute: "PAC", value: player.pac, fullMark: 100 },
-    { attribute: "SHO", value: player.sho, fullMark: 100 },
-    { attribute: "PAS", value: player.pas, fullMark: 100 },
-    { attribute: "DRI", value: player.dri, fullMark: 100 },
-    { attribute: "DEF", value: player.def, fullMark: 100 },
-    { attribute: "PHY", value: player.phy, fullMark: 100 },
+    { attribute: "PAC", value: player.pac ?? 0, fullMark: 100 },
+    { attribute: "SHO", value: player.sho ?? 0, fullMark: 100 },
+    { attribute: "PAS", value: player.pas ?? 0, fullMark: 100 },
+    { attribute: "DRI", value: player.dri ?? 0, fullMark: 100 },
+    { attribute: "DEF", value: player.def ?? 0, fullMark: 100 },
+    { attribute: "PHY", value: player.phy ?? 0, fullMark: 100 },
   ];
 
-  const StatBar = ({ label, value }: { label: string; value: number }) => (
+  const StatBar = ({ label, value }: { label: string; value: number | null }) => (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="text-gray-400">{label}</span>
-        <span className={`px-2 py-0.5 rounded ${getStatColor(value)}`}>{value}</span>
+        <span className={`px-2 py-0.5 rounded ${getStatColor(value)}`}>{formatStatValue(value)}</span>
       </div>
       <div className="h-2 bg-[#07142A] rounded-full overflow-hidden">
         <div
           className="h-full transition-all duration-500 rounded-full"
           style={{
-            width: `${value}%`,
+            width: `${value ?? 0}%`,
             backgroundColor: getStatBarColor(value),
           }}
         />
@@ -277,16 +286,16 @@ export default function PlayerDetails() {
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <h1 className="text-4xl">{player.name}</h1>
-                    <span className={`${getPositionColor(player.position)} px-3 py-1 rounded text-sm text-white`}>
-                      {player.position}
+                    <span className={`${getPositionColor(player.position || "-")} px-3 py-1 rounded text-sm text-white`}>
+                      {player.position || "-"}
                     </span>
                   </div>
                   <div className="flex items-center gap-6 text-sm text-gray-400">
-                    <span>{player.nationality}</span>
+                    <span>{player.nationality || "-"}</span>
                     <span>•</span>
                     <span>{player.age} anos</span>
                     <span>•</span>
-                    <span className="text-white">{player.team || "-"}</span>
+                    <span className="text-white">{player.team || "Sem clube"}</span>
                     <span>•</span>
                     <span>{player.league || "-"}</span>
                   </div>
@@ -296,13 +305,13 @@ export default function PlayerDetails() {
               <div className="flex gap-4">
                 <div className="bg-[#07142A] border border-[rgba(0,194,255,0.3)] rounded-lg px-6 py-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Overall</p>
-                  <p className="text-3xl text-[#00C2FF]">{player.overall ?? "N/A"}</p>
+                  <p className="text-3xl text-[#00C2FF]">{formatStatValue(player.overall)}</p>
                 </div>
                 <div className="bg-[#07142A] border border-[rgba(0,194,255,0.3)] rounded-lg px-6 py-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Potencial</p>
                   <div className="flex items-center gap-2">
-                    <p className="text-3xl text-[#00FF9C]">{displayedPotential || "N/A"}</p>
-                    {displayedPotential > overallValue + 5 && (
+                    <p className="text-3xl text-[#00FF9C]">{formatStatValue(displayedPotential)}</p>
+                    {displayedPotential !== null && overallValue !== null && displayedPotential > overallValue + 5 && (
                       <TrendingUp className="w-5 h-5 text-[#00FF9C]" />
                     )}
                   </div>
@@ -378,10 +387,19 @@ export default function PlayerDetails() {
               </div>
 
               <div className="grid grid-cols-3 gap-4 mt-4">
-                {[{ label: "PAC", value: player.pac }, { label: "SHO", value: player.sho }, { label: "PAS", value: player.pas }, { label: "DRI", value: player.dri }, { label: "DEF", value: player.def }, { label: "PHY", value: player.phy }].map((item, index) => (
+                {[
+                  { label: "PAC", value: player.pac },
+                  { label: "SHO", value: player.sho },
+                  { label: "PAS", value: player.pas },
+                  { label: "DRI", value: player.dri },
+                  { label: "DEF", value: player.def },
+                  { label: "PHY", value: player.phy },
+                ].map((item, index) => (
                   <div key={`${item.label}-${index}`} className="text-center">
                     <p className="text-xs text-gray-400">{item.label}</p>
-                    <p className={`text-2xl ${item.value >= 80 ? "text-[#00FF9C]" : "text-yellow-500"}`}>{item.value}</p>
+                    <p className={`text-2xl ${item.value !== null && item.value >= 80 ? "text-[#00FF9C]" : "text-yellow-500"}`}>
+                      {formatStatValue(item.value)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -482,7 +500,9 @@ export default function PlayerDetails() {
                     className="rounded-lg border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] p-4 text-left hover:border-[rgba(0,194,255,0.3)]"
                   >
                     <p className="font-semibold text-white">{similarPlayer.name}</p>
-                    <p className="mt-1 text-sm text-gray-400">{similarPlayer.position} • {similarPlayer.team || "-"}</p>
+                    <p className="mt-1 text-sm text-gray-400">
+                      {(similarPlayer.position || "-")} • {(similarPlayer.team || "Sem clube")}
+                    </p>
                     <p className="mt-2 text-xs text-[#00FF9C]">{formatMarketValue(similarPlayer.marketValue)}</p>
                   </button>
                 ))}

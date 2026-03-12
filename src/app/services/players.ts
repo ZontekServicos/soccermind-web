@@ -74,12 +74,14 @@ function mapPlayersEnvelope(
   };
 }
 
-export async function getPlayers(page = 1, limit = 20) {
+export async function getPlayers(page = 1, limit = 20): Promise<ApiEnvelope<PlayerCardModel[]>> {
   const response = await apiFetch<unknown>(`/players?page=${page}&limit=${limit}`);
   return mapPlayersEnvelope(response, mapApiPlayerToCard);
 }
 
-export async function searchPlayers(params: Record<string, string | number | undefined>) {
+export async function searchPlayers(
+  params: Record<string, string | number | undefined>,
+): Promise<ApiEnvelope<PlayerCardModel[]>> {
   const searchParams = new URLSearchParams();
   const keyMap: Record<string, string> = {
     minAge: "ageMin",
@@ -102,7 +104,7 @@ export async function searchPlayers(params: Record<string, string | number | und
   return mapPlayersEnvelope(response, mapApiPlayerToCard);
 }
 
-export async function getPlayer(id: string) {
+export async function getPlayer(id: string): Promise<ApiEnvelope<PlayerProfileModel>> {
   const response = await apiFetch<unknown>(`/player/${id}`);
 
   return {
@@ -115,7 +117,7 @@ export async function getPlayerProjection(id: string) {
   return apiFetch<unknown>(`/player/${id}/projection`);
 }
 
-export async function getSimilarPlayers(id: string) {
+export async function getSimilarPlayers(id: string): Promise<ApiEnvelope<PlayerCardModel[]>> {
   const response = await apiFetch<unknown>(`/player/${id}/similar`);
   return mapPlayersEnvelope(response, mapApiPlayerToCard);
 }

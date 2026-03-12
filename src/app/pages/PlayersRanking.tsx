@@ -17,7 +17,7 @@ interface PaginationMeta {
 }
 
 function formatMarketValue(value: number | null) {
-  if (value === null || value <= 0) {
+  if (value === null) {
     return "N/A";
   }
   if (value >= 1_000_000) {
@@ -27,6 +27,10 @@ function formatMarketValue(value: number | null) {
     return `EUR ${(value / 1_000).toFixed(0)}K`;
   }
   return `EUR ${value.toFixed(0)}`;
+}
+
+function formatStatValue(value: number | null) {
+  return value === null ? "-" : value;
 }
 
 export default function PlayersRanking() {
@@ -338,8 +342,8 @@ export default function PlayersRanking() {
                       </div>
 
                       <div className="w-20 flex justify-center">
-                        <span className={`${getPositionColor(player.position)} border px-2.5 py-1 rounded-[8px] text-[11px] font-semibold tracking-wide`}>
-                          {player.position}
+                        <span className={`${getPositionColor(player.position || "-")} border px-2.5 py-1 rounded-[8px] text-[11px] font-semibold tracking-wide`}>
+                          {player.position || "-"}
                         </span>
                       </div>
 
@@ -347,14 +351,14 @@ export default function PlayersRanking() {
 
                       <div className="w-24 flex justify-center">
                         <span className={`${getStatColor(player.overall ?? 0)} px-3 py-1.5 rounded-[8px] text-sm font-bold min-w-[52px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
-                          {player.overall ?? "N/A"}
+                          {formatStatValue(player.overall)}
                         </span>
                       </div>
 
                       <div className="w-24 flex justify-center">
                         <div className="flex items-center gap-1.5">
                           <span className={`${getStatColor(player.potential ?? 0)} px-3 py-1.5 rounded-[8px] text-sm font-bold min-w-[52px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
-                            {player.potential ?? "N/A"}
+                            {formatStatValue(player.potential)}
                           </span>
                           {player.potential !== null && player.overall !== null && player.potential > player.overall + 5 && <TrendingUp className="w-3.5 h-3.5 text-[#00FF9C]/70" />}
                         </div>
