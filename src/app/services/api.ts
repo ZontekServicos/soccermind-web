@@ -1,10 +1,33 @@
-export const BASE_URL = "https://scout-engine-production.up.railway.app/api";
+import { API_CONFIG } from "../config/api-config";
 
 export interface ApiEnvelope<T> {
   success: boolean;
   data: T;
   error: string | null;
   meta?: Record<string, unknown>;
+}
+
+function normalizeApiBaseUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  if (trimmed === "/api") {
+    return trimmed;
+  }
+
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed.replace(/\/$/, "")}/api`;
+}
+
+function buildApiBaseCandidates() {
+  const candidates = [
+    import.meta.env.VITE_API_BASE_URL,
+    "/api",
+    normalizeApiBaseUrl(API_CONFIG.BASE_URL),
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+  return Array.from(new Set(candidates.map((value) => normalizeApiBaseUrl(value))));
 }
 
 async function parseJsonSafely(response: Response) {
@@ -21,27 +44,54 @@ async function parseJsonSafely(response: Response) {
   }
 }
 
+function buildApiUrl(baseUrl: string, endpoint: string) {
+  return `${baseUrl}${endpoint}`;
+}
+
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<ApiEnvelope<T>> {
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
+  const candidates = buildApiBaseCandidates();
+  let lastError: Error | null = null;
 
-  const json = (await parseJsonSafely(response)) as ApiEnvelope<T> | null;
+  for (const baseUrl of candidates) {
+    try {
+      const response = await fetch(buildApiUrl(baseUrl, endpoint), {
+        headers: {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        },
+        ...options,
+      });
 
-  if (!response.ok || json?.success === false) {
-    throw new Error(json?.error || `API request failed (${response.status})`);
+      const json = (await parseJsonSafely(response)) as ApiEnvelope<T> | null;
+
+      if (!response.ok || json?.success === false) {
+        const message = json?.error || `API request failed (${response.status})`;
+
+        if (response.status >= 500 || response.status === 404) {
+          lastError = new Error(message);
+          continue;
+        }
+
+        throw new Error(message);
+      }
+
+      if (!json) {
+        lastError = new Error("Empty API response");
+        continue;
+      }
+
+      return json;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Failed to fetch");
+    }
   }
 
-  if (!json) {
-    throw new Error("Empty API response");
+  if (lastError?.message === "Failed to fetch") {
+    throw new Error("Nao foi possivel conectar a API do SoccerMind.");
   }
 
-  return json;
+  throw lastError ?? new Error("Unknown API error");
 }

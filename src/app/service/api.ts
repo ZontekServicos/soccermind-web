@@ -7,6 +7,7 @@
  */
 
 import { API_CONFIG, logApiActivity, PERFORMANCE } from "../config/api-config";
+import { apiFetch, type ApiEnvelope } from "../services/api";
 
 const API_BASE_URL = `${API_CONFIG.BASE_URL}/api`;
 
@@ -14,10 +15,7 @@ const API_BASE_URL = `${API_CONFIG.BASE_URL}/api`;
 // Types
 // ========================================
 
-export interface ApiResponse<T = any> {
-  success: boolean;
-  data: T;
-  error: string | null;
+export interface ApiResponse<T = any> extends ApiEnvelope<T> {
   meta?: PaginationMeta;
 }
 
@@ -117,31 +115,23 @@ class ApiClient {
     endpoint: string,
     options?: RequestInit
   ): Promise<ApiResponse<T>> {
+    const start = PERFORMANCE.startTimer();
+    logApiActivity("request", endpoint);
+
     try {
-      const url = `${this.baseURL}${endpoint}`;
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          "Content-Type": "application/json",
-          ...options?.headers,
-        },
-      });
-
-      if (!response.ok) {
-        return {
-          success: false,
-          data: null as any,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-        };
-      }
-
-      const result = await response.json();
-      return result;
+      const response = await apiFetch<T>(endpoint, options);
+      logApiActivity("response", endpoint, response);
+      PERFORMANCE.logApiCall(endpoint, PERFORMANCE.endTimer(start));
+      return response as ApiResponse<T>;
     } catch (error) {
+      const normalizedError = error instanceof Error ? error.message : "Unknown error";
+      logApiActivity("error", endpoint, normalizedError);
+      PERFORMANCE.logApiCall(endpoint, PERFORMANCE.endTimer(start));
+
       return {
         success: false,
-        data: null as any,
-        error: error instanceof Error ? error.message : "Unknown error",
+        data: null as T,
+        error: normalizedError,
       };
     }
   }

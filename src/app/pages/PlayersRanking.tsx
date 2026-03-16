@@ -12,21 +12,26 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
-import { PlayersFiltersPanel, type PlayersRankingFiltersState } from "../components/PlayersFiltersPanel";
+import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { AppSidebar } from "../components/AppSidebar";
 import type { PlayerCardModel } from "../mappers/player.mapper";
 import {
   searchPlayers,
   type PlayerFilterOptions,
-  type PlayersFiltersParams,
   type PlayersResponseMeta,
 } from "../services/players";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
+import {
+  buildApiFilters,
+  countActiveFilters,
+  DEFAULT_PLAYERS_FILTERS,
+  type FilterFieldKey,
+  type PlayersFiltersState,
+  parseFiltersFromSearchParams,
+} from "../utils/playerFilters";
 
 type SortBy = "overall" | "potential" | "age";
 type SortOrder = "asc" | "desc";
-
-type FilterFieldKey = keyof Omit<PlayersRankingFiltersState, "positions" | "search">;
 
 interface PaginationMeta extends PlayersResponseMeta {
   page?: number;
@@ -48,23 +53,6 @@ const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
   sources: [],
 };
 
-const DEFAULT_FILTERS: PlayersRankingFiltersState = {
-  search: "",
-  positions: [],
-  nationality: "",
-  team: "",
-  league: "",
-  source: "",
-  minAge: "",
-  maxAge: "",
-  minOverall: "",
-  maxOverall: "",
-  minPotential: "",
-  maxPotential: "",
-  minValue: "",
-  maxValue: "",
-};
-
 function formatMarketValue(value: number | null) {
   if (value === null) {
     return "N/A";
@@ -80,30 +68,6 @@ function formatMarketValue(value: number | null) {
 
 function formatStatValue(value: number | null) {
   return value === null ? "-" : value;
-}
-
-function parseFiltersFromSearchParams(searchParams: URLSearchParams): PlayersRankingFiltersState {
-  const positions = (searchParams.get("positions") ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  return {
-    search: searchParams.get("search") ?? "",
-    positions,
-    nationality: searchParams.get("nationality") ?? "",
-    team: searchParams.get("team") ?? "",
-    league: searchParams.get("league") ?? "",
-    source: searchParams.get("source") ?? "",
-    minAge: searchParams.get("minAge") ?? "",
-    maxAge: searchParams.get("maxAge") ?? "",
-    minOverall: searchParams.get("minOverall") ?? "",
-    maxOverall: searchParams.get("maxOverall") ?? "",
-    minPotential: searchParams.get("minPotential") ?? "",
-    maxPotential: searchParams.get("maxPotential") ?? "",
-    minValue: searchParams.get("minValue") ?? "",
-    maxValue: searchParams.get("maxValue") ?? "",
-  };
 }
 
 function parsePage(searchParams: URLSearchParams) {
@@ -139,48 +103,13 @@ function buildRangeLabel(label: string, minValue: string, maxValue: string) {
   return "";
 }
 
-function countActiveFilters(filters: PlayersRankingFiltersState) {
-  let count = filters.positions.length;
-
-  Object.entries(filters).forEach(([key, value]) => {
-    if (key === "positions") {
-      return;
-    }
-
-    if (typeof value === "string" && value.trim()) {
-      count += 1;
-    }
-  });
-
-  return count;
-}
-
-function buildApiFilters(filters: PlayersRankingFiltersState, debouncedSearch: string): PlayersFiltersParams {
-  return {
-    search: debouncedSearch || undefined,
-    positions: filters.positions.length > 0 ? filters.positions : undefined,
-    nationality: filters.nationality || undefined,
-    team: filters.team || undefined,
-    league: filters.league || undefined,
-    source: filters.source || undefined,
-    minAge: filters.minAge || undefined,
-    maxAge: filters.maxAge || undefined,
-    minOverall: filters.minOverall || undefined,
-    maxOverall: filters.maxOverall || undefined,
-    minPotential: filters.minPotential || undefined,
-    maxPotential: filters.maxPotential || undefined,
-    minValue: filters.minValue || undefined,
-    maxValue: filters.maxValue || undefined,
-  };
-}
-
 export default function PlayersRanking() {
   const navigate = useNavigate();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
   const [players, setPlayers] = useState<PlayerCardModel[]>([]);
   const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
-  const [filters, setFilters] = useState<PlayersRankingFiltersState>(initialFilters);
+  const [filters, setFilters] = useState<PlayersFiltersState>(initialFilters);
   const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search.trim());
   const [sortBy, setSortBy] = useState<SortBy>(() => parseSortBy(urlSearchParams));
   const [sortOrder, setSortOrder] = useState<SortOrder>(() => parseSortOrder(urlSearchParams));
@@ -459,7 +388,7 @@ export default function PlayersRanking() {
 
   const handleClearFilters = () => {
     setPage(1);
-    setFilters(DEFAULT_FILTERS);
+    setFilters(DEFAULT_PLAYERS_FILTERS);
   };
 
   return (

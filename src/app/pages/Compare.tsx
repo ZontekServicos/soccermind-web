@@ -1,36 +1,131 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router";
+import {
+  AlertTriangle,
+  Award,
+  DollarSign,
+  GitCompareArrows,
+  Search,
+  Shield,
+  Target,
+  TrendingUp,
+  Users,
+  X,
+} from "lucide-react";
+import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend } from "recharts";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { CapitalGauge } from "../components/CapitalGauge";
+import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { RiskBadge } from "../components/RiskBadge";
 import { TierBadge } from "../components/TierBadge";
-import { Shield, TrendingUp, DollarSign, AlertTriangle, Target, Award, GitCompareArrows } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend } from "recharts";
-import { getPlayers } from "../services/players";
-import { comparePlayers, comparePlayersByName } from "../services/compare";
 import { mapCompareResponse } from "../mappers/compare.mapper";
 import { mapApiPlayerToExtended } from "../mappers/player.mapper";
+import { comparePlayers, comparePlayersByName } from "../services/compare";
+import { searchPlayers, type PlayerFilterOptions } from "../services/players";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
+import {
+  buildApiFilters,
+  buildRangeLabel,
+  countActiveFilters,
+  type FilterFieldKey,
+  type PlayersFiltersState,
+  parseFiltersFromSearchParams,
+} from "../utils/playerFilters";
+
+type ActiveFilterChip = {
+  key: string;
+  label: string;
+  onRemove: () => void;
+};
+
+type PositionContext = ReturnType<typeof mapCompareResponse>["positionContext"];
+
+const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
+  positions: [],
+  nationalities: [],
+  teams: [],
+  leagues: [],
+  sources: [],
+};
+
+function buildPlayerCaption(player: PlayerExtended) {
+  return [player.position, player.club].filter(Boolean).join(" - ");
+}
+
+function dedupePlayers(players: PlayerExtended[]) {
+  const seen = new Set<string>();
+  return players.filter((player) => {
+    if (!player.id || seen.has(player.id)) {
+      return false;
+    }
+
+    seen.add(player.id);
+    return true;
+  });
+}
 
 export default function Compare() {
-  const [players, setPlayers] = useState<PlayerExtended[]>([]);
+  const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+  const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
+  const [filters, setFilters] = useState<PlayersFiltersState>(initialFilters);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search.trim());
+  const [filtersExpanded, setFiltersExpanded] = useState(() => countActiveFilters(initialFilters) > 0);
+  const [availablePlayers, setAvailablePlayers] = useState<PlayerExtended[]>([]);
   const [playerA, setPlayerA] = useState<PlayerExtended>(EMPTY_PLAYER);
   const [playerB, setPlayerB] = useState<PlayerExtended>(EMPTY_PLAYER);
   const [selectAOpen, setSelectAOpen] = useState(false);
   const [selectBOpen, setSelectBOpen] = useState(false);
+  const [playersLoading, setPlayersLoading] = useState(true);
+  const [playersError, setPlayersError] = useState<string | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [comparisonData, setComparisonData] = useState<ReturnType<typeof mapCompareResponse> | null>(null);
+  const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
 
-  const playersById = useMemo(() => new Map(players.map((player) => [player.id, player])), [players]);
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(filters.search.trim());
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [filters.search]);
+
+  const apiFilters = useMemo(() => buildApiFilters(filters, debouncedSearch), [filters, debouncedSearch]);
+  const activeFiltersCount = useMemo(() => countActiveFilters(filters), [filters]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams();
+
+    if (filters.search.trim()) nextParams.set("search", filters.search.trim());
+    if (filters.positions.length > 0) nextParams.set("positions", filters.positions.join(","));
+    if (filters.nationality) nextParams.set("nationality", filters.nationality);
+    if (filters.team) nextParams.set("team", filters.team);
+    if (filters.league) nextParams.set("league", filters.league);
+    if (filters.source) nextParams.set("source", filters.source);
+    if (filters.minAge) nextParams.set("minAge", filters.minAge);
+    if (filters.maxAge) nextParams.set("maxAge", filters.maxAge);
+    if (filters.minOverall) nextParams.set("minOverall", filters.minOverall);
+    if (filters.maxOverall) nextParams.set("maxOverall", filters.maxOverall);
+    if (filters.minPotential) nextParams.set("minPotential", filters.minPotential);
+    if (filters.maxPotential) nextParams.set("maxPotential", filters.maxPotential);
+    if (filters.minValue) nextParams.set("minValue", filters.minValue);
+    if (filters.maxValue) nextParams.set("maxValue", filters.maxValue);
+
+    setUrlSearchParams(nextParams, { replace: true });
+  }, [filters, setUrlSearchParams]);
 
   useEffect(() => {
     let active = true;
 
     async function loadPlayers() {
+      setPlayersLoading(true);
+
       try {
-        const response = await getPlayers(1, 100);
+        const response = await searchPlayers({ ...apiFilters, page: 1, limit: 80 });
         if (!active) {
           return;
         }
@@ -39,18 +134,29 @@ export default function Compare() {
           ? response.data.map((player) => mapApiPlayerToExtended(player as Record<string, unknown>))
           : [];
 
-        setPlayers(mappedPlayers);
-        setPlayerA(mappedPlayers[0] ?? EMPTY_PLAYER);
-        setPlayerB(mappedPlayers[1] ?? mappedPlayers[0] ?? EMPTY_PLAYER);
+        setAvailablePlayers(mappedPlayers);
+        setPlayersError(null);
+
+        const nextMeta = (response.meta || {}) as { filterOptions?: PlayerFilterOptions };
+        if (nextMeta.filterOptions) {
+          setFilterOptions(nextMeta.filterOptions);
+        }
+
+        setPlayerA((current) => (current.id && current.id !== EMPTY_PLAYER.id ? current : mappedPlayers[0] ?? EMPTY_PLAYER));
+        setPlayerB((current) =>
+          current.id && current.id !== EMPTY_PLAYER.id ? current : mappedPlayers[1] ?? mappedPlayers[0] ?? EMPTY_PLAYER,
+        );
       } catch (error) {
         if (!active) {
           return;
         }
 
-        setPlayers([]);
-        setPlayerA(EMPTY_PLAYER);
-        setPlayerB(EMPTY_PLAYER);
-        setCompareError(error instanceof Error ? error.message : "Erro ao carregar jogadores");
+        setAvailablePlayers([]);
+        setPlayersError(error instanceof Error ? error.message : "Erro ao carregar a shortlist de jogadores");
+      } finally {
+        if (active) {
+          setPlayersLoading(false);
+        }
       }
     }
 
@@ -59,7 +165,7 @@ export default function Compare() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [apiFilters]);
 
   useEffect(() => {
     let active = true;
@@ -76,6 +182,7 @@ export default function Compare() {
           playerA.id && playerB.id && playerA.id !== "empty-player" && playerB.id !== "empty-player"
             ? await comparePlayers(playerA.id, playerB.id)
             : await comparePlayersByName(playerA.name, playerB.name);
+
         if (!active) {
           return;
         }
@@ -103,6 +210,21 @@ export default function Compare() {
     };
   }, [playerA.id, playerB.id, playerA.name, playerB.name]);
 
+  const selectablePlayers = useMemo(
+    () =>
+      dedupePlayers(
+        [playerA, playerB, ...availablePlayers].filter(
+          (player) => player.id && player.id !== EMPTY_PLAYER.id,
+        ),
+      ),
+    [availablePlayers, playerA, playerB],
+  );
+
+  const playersById = useMemo(
+    () => new Map(selectablePlayers.map((player) => [player.id, player])),
+    [selectablePlayers],
+  );
+
   const displayPlayerA = comparisonData?.playerA ?? playerA;
   const displayPlayerB = comparisonData?.playerB ?? playerB;
   const positionContext = comparisonData?.positionContext ?? null;
@@ -125,23 +247,195 @@ export default function Compare() {
     { name: "Physical", a: displayPlayerA.stats.physical, b: displayPlayerB.stats.physical },
   ];
 
+  const activeFilterChips = useMemo<ActiveFilterChip[]>(() => {
+    const chips: ActiveFilterChip[] = [];
+
+    if (filters.search) {
+      chips.push({
+        key: "search",
+        label: `Busca: ${filters.search}`,
+        onRemove: () => setFilters((current) => ({ ...current, search: "" })),
+      });
+    }
+
+    filters.positions.forEach((position) => {
+      chips.push({
+        key: `position-${position}`,
+        label: `Posição: ${position}`,
+        onRemove: () => {
+          setFilters((current) => ({
+            ...current,
+            positions: current.positions.filter((item) => item !== position),
+          }));
+        },
+      });
+    });
+
+    [
+      ["nationality", filters.nationality, "Nacionalidade"],
+      ["team", filters.team, "Clube"],
+      ["league", filters.league, "Liga"],
+      ["source", filters.source, "Source"],
+    ].forEach(([key, value, label]) => {
+      if (typeof value === "string" && value) {
+        chips.push({
+          key: String(key),
+          label: `${label}: ${value}`,
+          onRemove: () => {
+            const field = key as FilterFieldKey;
+            setFilters((current) => ({ ...current, [field]: "" }));
+          },
+        });
+      }
+    });
+
+    [
+      ["age", buildRangeLabel("Idade", filters.minAge, filters.maxAge), ["minAge", "maxAge"]],
+      ["overall", buildRangeLabel("Overall", filters.minOverall, filters.maxOverall), ["minOverall", "maxOverall"]],
+      ["potential", buildRangeLabel("Potential", filters.minPotential, filters.maxPotential), ["minPotential", "maxPotential"]],
+      ["value", buildRangeLabel("Valor", filters.minValue, filters.maxValue), ["minValue", "maxValue"]],
+    ].forEach(([key, label, fields]) => {
+      if (typeof label === "string" && label) {
+        chips.push({
+          key: String(key),
+          label,
+          onRemove: () => {
+            const [minField, maxField] = fields as [FilterFieldKey, FilterFieldKey];
+            setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }));
+          },
+        });
+      }
+    });
+
+    return chips;
+  }, [filters]);
+
+  const handleFieldChange = (field: FilterFieldKey, value: string) => {
+    setFilters((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleSearchChange = (value: string) => {
+    setFilters((current) => ({ ...current, search: value }));
+  };
+
+  const handleTogglePosition = (position: string) => {
+    setFilters((current) => ({
+      ...current,
+      positions: current.positions.includes(position)
+        ? current.positions.filter((item) => item !== position)
+        : [...current.positions, position],
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setFilters({
+      search: "",
+      positions: [],
+      nationality: "",
+      team: "",
+      league: "",
+      source: "",
+      minAge: "",
+      maxAge: "",
+      minOverall: "",
+      maxOverall: "",
+      minPotential: "",
+      maxPotential: "",
+      minValue: "",
+      maxValue: "",
+    });
+  };
+
   return (
     <div className="flex h-screen bg-[#07142A]">
       <AppSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <AppHeader />
         <main className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-[1600px] mx-auto">
-            <div className="mb-10">
-              <h1 className="text-4xl mb-3">Player vs Player</h1>
-              <p className="text-sm text-gray-500">Analise comparativa estrategica para decisoes baseadas em dados</p>
-            </div>
+          <div className="max-w-[1600px] mx-auto space-y-6">
+            <section className="relative overflow-hidden rounded-[28px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(135deg,rgba(11,27,53,0.98),rgba(7,20,42,0.94))] px-7 py-7 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
+              <div className="absolute -right-20 top-0 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(122,92,255,0.16),transparent_68%)] blur-2xl" />
+              <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(0,194,255,0.12),transparent_72%)] blur-2xl" />
+              <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+                <div className="max-w-3xl">
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#C7B8FF]">
+                    <GitCompareArrows className="h-3.5 w-3.5" />
+                    Compare Intelligence
+                  </div>
+                  <h1 className="text-4xl font-semibold text-white">Player vs Player</h1>
+                  <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400">
+                    Refine a shortlist antes da comparação e navegue por perfis reais de scouting com contexto esportivo, potencial e faixa financeira.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[rgba(122,92,255,0.18)]">
+                        <Users className="h-5 w-5 text-[#C7B8FF]" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Shortlist</p>
+                        <p className="text-2xl font-bold text-[#C7B8FF]">{availablePlayers.length}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Filtros ativos</p>
+                    <p className="mt-2 text-2xl font-bold text-[#9BE7FF]">{activeFiltersCount}</p>
+                    <p className="mt-1 text-xs text-gray-500">Aplicados ao compare</p>
+                  </div>
+
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Atualização</p>
+                    <p className="mt-2 text-lg font-semibold text-white">Tempo real</p>
+                    <p className="mt-1 text-xs text-gray-500">Busca com debounce de 300ms</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <PlayersFiltersPanel
+              filters={filters}
+              options={filterOptions}
+              activeFiltersCount={activeFiltersCount}
+              isExpanded={filtersExpanded}
+              onToggleExpanded={() => setFiltersExpanded((current) => !current)}
+              onSearchChange={handleSearchChange}
+              onFieldChange={handleFieldChange}
+              onTogglePosition={handleTogglePosition}
+              onClearFilters={handleClearFilters}
+            />
+
+            {activeFilterChips.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {activeFilterChips.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={chip.onRemove}
+                    className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3.5 py-2 text-xs font-medium text-gray-300 transition-all hover:border-[rgba(0,194,255,0.22)] hover:text-[#9BE7FF]"
+                  >
+                    <span>{chip.label}</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {playersError && (
+              <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+                {playersError}
+              </div>
+            )}
 
             {compareError && (
-              <div className="mb-6 rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+              <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
                 {compareError}
               </div>
             )}
+
             {positionContext && (
               <PositionContextBanner
                 kind={positionContext.kind}
@@ -152,7 +446,7 @@ export default function Compare() {
               />
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <label className="text-[10px] text-gray-500 uppercase tracking-wider font-medium flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-[#00C2FF]" />
@@ -165,12 +459,12 @@ export default function Compare() {
                   onOpenChange={setSelectAOpen}
                 >
                   <SelectTrigger className={`bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border rounded-[14px] h-14 px-4 transition-all ${selectAOpen ? "border-[#00C2FF] shadow-[0_0_0_3px_rgba(0,194,255,0.1)]" : "border-[rgba(0,194,255,0.3)] hover:border-[rgba(0,194,255,0.5)]"}`}>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione o Jogador A" />
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A1B35] border-[rgba(0,194,255,0.3)]">
-                    {players.map((player) => (
+                    {selectablePlayers.map((player) => (
                       <SelectItem key={player.id} value={player.id} className="hover:bg-[rgba(0,194,255,0.1)] focus:bg-[rgba(0,194,255,0.1)]">
-                        {player.name} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {player.club}
+                        {player.name} - {player.club}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -189,18 +483,33 @@ export default function Compare() {
                   onOpenChange={setSelectBOpen}
                 >
                   <SelectTrigger className={`bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border rounded-[14px] h-14 px-4 transition-all ${selectBOpen ? "border-[#7A5CFF] shadow-[0_0_0_3px_rgba(122,92,255,0.1)]" : "border-[rgba(122,92,255,0.3)] hover:border-[rgba(122,92,255,0.5)]"}`}>
-                    <SelectValue />
+                    <SelectValue placeholder="Selecione o Jogador B" />
                   </SelectTrigger>
                   <SelectContent className="bg-[#0A1B35] border-[rgba(122,92,255,0.3)]">
-                    {players.map((player) => (
+                    {selectablePlayers.map((player) => (
                       <SelectItem key={player.id} value={player.id} className="hover:bg-[rgba(122,92,255,0.1)] focus:bg-[rgba(122,92,255,0.1)]">
-                        {player.name} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {player.club}
+                        {player.name} - {player.club}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
+            {playersLoading && (
+              <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-400">
+                Carregando shortlist para comparação...
+              </div>
+            )}
+
+            {!playersLoading && selectablePlayers.length === 0 && (
+              <div className="py-14 text-center">
+                <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.03)]">
+                  <Search className="h-7 w-7 text-gray-600" />
+                </div>
+                <p className="text-sm text-gray-500">Nenhum jogador encontrado com os filtros selecionados.</p>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
               <PlayerComparisonCard player={displayPlayerA} variant="A" />
@@ -210,7 +519,7 @@ export default function Compare() {
             <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[20px] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)] mb-10">
               <h2 className="text-2xl font-semibold mb-8 flex items-center gap-3">
                 <Target className="w-6 h-6 text-[#00C2FF]" />
-                Performance Tecnica
+                Performance técnica
               </h2>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -227,7 +536,7 @@ export default function Compare() {
                 </div>
 
                 <div className="space-y-5">
-                  {compareLoading && <p className="text-sm text-gray-500">Carregando comparacao...</p>}
+                  {compareLoading && <p className="text-sm text-gray-500">Carregando comparação...</p>}
                   {comparisonStats.map((stat) => (
                     <ComparisonBar key={`${stat.name}-${stat.a}-${stat.b}`} label={stat.name} valueA={stat.a} valueB={stat.b} />
                   ))}
@@ -236,7 +545,7 @@ export default function Compare() {
             </div>
 
             <div className="mb-8">
-              <h2 className="text-2xl font-semibold mb-8">Analise Estrategica</h2>
+              <h2 className="text-2xl font-semibold mb-8">Análise estratégica</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 <StrategicComparisonCard title="Capital Efficiency" icon={Target} iconColor="#00C2FF">
                   <div className="grid grid-cols-2 gap-6 pt-2">
@@ -252,7 +561,7 @@ export default function Compare() {
                   <WinnerIndicator winner={displayPlayerA.capitalEfficiency > displayPlayerB.capitalEfficiency ? "A" : "B"} label={displayPlayerA.capitalEfficiency > displayPlayerB.capitalEfficiency ? displayPlayerA.name.split(" ")[0] : displayPlayerB.name.split(" ")[0]} />
                 </StrategicComparisonCard>
 
-                <StrategicComparisonCard title="Risco Estrutural" icon={Shield} iconColor="#FF4D4F">
+                <StrategicComparisonCard title="Risco estrutural" icon={Shield} iconColor="#FF4D4F">
                   <div className="space-y-4">
                     <MetricRow label="Jogador A" value={displayPlayerA.structuralRisk.score.toFixed(1)} badge={<RiskBadge level={displayPlayerA.structuralRisk.level} />} variant="A" />
                     <div className="border-t border-[rgba(255,255,255,0.06)]" />
@@ -299,7 +608,7 @@ export default function Compare() {
                   <WinnerIndicator winner={displayPlayerA.liquidity.score > displayPlayerB.liquidity.score ? "A" : "B"} label="Maior liquidez" />
                 </StrategicComparisonCard>
 
-                <StrategicComparisonCard title="Risco Financeiro" icon={DollarSign} iconColor="#FF4D4F">
+                <StrategicComparisonCard title="Risco financeiro" icon={DollarSign} iconColor="#FF4D4F">
                   <div className="space-y-4">
                     <div>
                       <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Jogador A</p>
@@ -330,9 +639,9 @@ export default function Compare() {
 
                 <StrategicComparisonCard title="Overall Rating" icon={Award} iconColor="#7A5CFF">
                   <div className="space-y-4">
-                    <MetricRow label="Jogador A" value={displayPlayerA.overallRating.toString()} subtitle={`${displayPlayerA.position} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ${displayPlayerA.club}`} variant="A" />
+                    <MetricRow label="Jogador A" value={displayPlayerA.overallRating.toString()} subtitle={buildPlayerCaption(displayPlayerA)} variant="A" />
                     <div className="border-t border-[rgba(255,255,255,0.06)]" />
-                    <MetricRow label="Jogador B" value={displayPlayerB.overallRating.toString()} subtitle={`${displayPlayerB.position} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ${displayPlayerB.club}`} variant="B" />
+                    <MetricRow label="Jogador B" value={displayPlayerB.overallRating.toString()} subtitle={buildPlayerCaption(displayPlayerB)} variant="B" />
                   </div>
                   <WinnerIndicator winner={displayPlayerA.overallRating > displayPlayerB.overallRating ? "A" : "B"} label="Maior rating" />
                 </StrategicComparisonCard>
@@ -340,6 +649,54 @@ export default function Compare() {
             </div>
           </div>
         </main>
+      </div>
+    </div>
+  );
+}
+
+function PositionContextBanner({
+  kind,
+  label,
+  message,
+  positionA,
+  positionB,
+}: {
+  kind: PositionContext["kind"];
+  label: string;
+  message: string;
+  positionA: string;
+  positionB: string;
+}) {
+  const styles = {
+    same: {
+      border: "border-[rgba(0,255,156,0.22)]",
+      background: "bg-[rgba(0,255,156,0.08)]",
+      accent: "text-[#7DFFD1]",
+    },
+    related: {
+      border: "border-[rgba(0,194,255,0.22)]",
+      background: "bg-[rgba(0,194,255,0.08)]",
+      accent: "text-[#9BE7FF]",
+    },
+    cross: {
+      border: "border-[rgba(251,191,36,0.22)]",
+      background: "bg-[rgba(251,191,36,0.08)]",
+      accent: "text-[#F8D98B]",
+    },
+  }[kind];
+
+  return (
+    <div className={`rounded-[18px] border px-5 py-4 ${styles.border} ${styles.background}`}>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className={`text-sm font-semibold ${styles.accent}`}>{label}</p>
+          <p className="mt-1 text-sm text-gray-300">{message}</p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs text-gray-300">
+          <span>{positionA}</span>
+          <span className="text-gray-500">vs</span>
+          <span>{positionB}</span>
+        </div>
       </div>
     </div>
   );
@@ -361,7 +718,7 @@ function PlayerComparisonCard({ player, variant }: { player: PlayerExtended; var
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-1 text-gray-100">{player.name}</h3>
-              <p className="text-xs text-gray-500">{player.club} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {player.position}</p>
+              <p className="text-xs text-gray-500">{buildPlayerCaption(player)}</p>
             </div>
           </div>
           <TierBadge tier={player.tier} className="!px-2.5 !py-1 !text-[10px] !shadow-[0_2px_8px_rgba(0,0,0,0.2)]" />

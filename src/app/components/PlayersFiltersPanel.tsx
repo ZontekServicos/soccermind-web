@@ -1,32 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, ChevronsUpDown, RotateCcw, Search, Sparkles, X } from "lucide-react";
 import type { PlayerFilterOptions } from "../services/players";
-
-export interface PlayersRankingFiltersState {
-  search: string;
-  positions: string[];
-  nationality: string;
-  team: string;
-  league: string;
-  source: string;
-  minAge: string;
-  maxAge: string;
-  minOverall: string;
-  maxOverall: string;
-  minPotential: string;
-  maxPotential: string;
-  minValue: string;
-  maxValue: string;
-}
+import type { PlayersFiltersState } from "../utils/playerFilters";
 
 interface PlayersFiltersPanelProps {
-  filters: PlayersRankingFiltersState;
+  filters: PlayersFiltersState;
   options: PlayerFilterOptions;
   activeFiltersCount: number;
   isExpanded: boolean;
   onToggleExpanded: () => void;
   onSearchChange: (value: string) => void;
-  onFieldChange: (field: keyof Omit<PlayersRankingFiltersState, "positions" | "search">, value: string) => void;
+  onFieldChange: (field: keyof Omit<PlayersFiltersState, "positions" | "search">, value: string) => void;
   onTogglePosition: (position: string) => void;
   onClearFilters: () => void;
 }

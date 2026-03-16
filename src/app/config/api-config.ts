@@ -1,25 +1,32 @@
-/**
+﻿/**
  * Soccer Mind API Configuration
  * Centralized configuration for API integration
  */
+
+const ENV_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+
+function normalizeBaseUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  return trimmed.replace(/\/api\/?$/, "").replace(/\/$/, "");
+}
 
 export const API_CONFIG = {
   /**
    * Base URL for the backend API
    */
-  BASE_URL: "https://scout-engine-production.up.railway.app",
+  BASE_URL: normalizeBaseUrl(ENV_API_BASE_URL || "https://scout-engine-production.up.railway.app"),
 
   /**
    * Enable/disable API integration globally
-   * Set to false to use mock data only
-   * Set to true to use real API (requires CORS configuration)
    */
   ENABLED: true,
 
   /**
    * Auto-fetch on component mount
-   * Set to false to manually trigger fetches (safer for CORS issues)
-   * Set to true for automatic data loading
    */
   AUTO_FETCH: true,
 
@@ -42,7 +49,7 @@ export const API_CONFIG = {
    */
   CACHE: {
     enabled: false,
-    ttlMs: 5 * 60 * 1000, // 5 minutes
+    ttlMs: 5 * 60 * 1000,
   },
 
   /**
@@ -51,68 +58,24 @@ export const API_CONFIG = {
   DEBUG: true,
 };
 
-/**
- * Feature flags for gradual rollout
- */
 export const API_FEATURES = {
-  /**
-   * Enable API for players list
-   */
   PLAYERS_LIST: true,
-
-  /**
-   * Enable API for player details
-   */
   PLAYER_DETAILS: true,
-
-  /**
-   * Enable API for player search
-   */
   PLAYER_SEARCH: true,
-
-  /**
-   * Enable API for comparison
-   */
   COMPARISON: true,
-
-  /**
-   * Enable API for watchlist
-   */
   WATCHLIST: true,
-
-  /**
-   * Enable API for alerts
-   */
   ALERTS: false,
-
-  /**
-   * Enable API for reports
-   */
   REPORTS: false,
-
-  /**
-   * Enable API for transfer simulation
-   */
   SIMULATION: false,
-
-  /**
-   * Enable API for team analysis
-   */
   TEAM_ANALYSIS: false,
 };
 
-/**
- * Environment detection
- */
 export const ENV = {
   isDevelopment: import.meta.env.DEV,
   isProduction: import.meta.env.PROD,
   mode: import.meta.env.MODE,
 };
 
-/**
- * API Status Messages (i18n ready)
- */
 export const API_MESSAGES = {
   LOADING: {
     pt: "Carregando dados...",
@@ -127,10 +90,10 @@ export const API_MESSAGES = {
     de: "Fehler beim Laden der Daten",
   },
   NO_DATA: {
-    pt: "Nenhum dado disponível",
+    pt: "Nenhum dado disponivel",
     en: "No data available",
     es: "No hay datos disponibles",
-    de: "Keine Daten verfügbar",
+    de: "Keine Daten verfugbar",
   },
   CORS_ERROR: {
     pt: "Erro de CORS - Configure o backend",
@@ -139,16 +102,13 @@ export const API_MESSAGES = {
     de: "CORS-Fehler - Backend konfigurieren",
   },
   NETWORK_ERROR: {
-    pt: "Erro de rede - Verifique sua conexão",
+    pt: "Erro de rede - Verifique sua conexao",
     en: "Network error - Check your connection",
-    es: "Error de red - Verifique su conexión",
-    de: "Netzwerkfehler - Überprüfen Sie Ihre Verbindung",
+    es: "Error de red - Verifique su conexion",
+    de: "Netzwerkfehler - Uberprufen Sie Ihre Verbindung",
   },
 };
 
-/**
- * Helper to get API message in current language
- */
 export function getApiMessage(
   key: keyof typeof API_MESSAGES,
   language: "pt" | "en" | "es" | "de" = "pt"
@@ -156,26 +116,17 @@ export function getApiMessage(
   return API_MESSAGES[key][language];
 }
 
-/**
- * Check if API is enabled for a specific feature
- */
 export function isApiEnabled(feature?: keyof typeof API_FEATURES): boolean {
   if (!API_CONFIG.ENABLED) return false;
   if (!feature) return true;
   return API_FEATURES[feature];
 }
 
-/**
- * Get effective auto-fetch setting
- */
 export function shouldAutoFetch(override?: boolean): boolean {
   if (override !== undefined) return override;
   return API_CONFIG.AUTO_FETCH && API_CONFIG.ENABLED;
 }
 
-/**
- * Log API activity (only if DEBUG enabled)
- */
 export function logApiActivity(
   type: "request" | "response" | "error",
   endpoint: string,
@@ -199,35 +150,20 @@ export function logApiActivity(
   }
 }
 
-/**
- * Migration helpers
- */
 export const MIGRATION = {
-  /**
-   * Get data source label for UI
-   */
   getDataSourceLabel(isApiData: boolean): string {
     return isApiData ? "API (Real Data)" : "Mock Data";
   },
 
-  /**
-   * Get data source badge color
-   */
   getDataSourceColor(isApiData: boolean): string {
     return isApiData ? "#00FF9C" : "#7A5CFF";
   },
 
-  /**
-   * Check if should show data source indicator
-   */
   shouldShowDataSource(): boolean {
     return API_CONFIG.DEBUG || ENV.isDevelopment;
   },
 };
 
-/**
- * Performance monitoring
- */
 export const PERFORMANCE = {
   enabled: ENV.isDevelopment,
 
