@@ -176,15 +176,25 @@ export async function checkHealth() {
 // Players
 // ========================================
 
-export async function getPlayers(page: number = 1, limit: number = 20) {
-  return client.get<ApiPlayer[]>(`/players?page=${page}&limit=${limit}`);
+export async function getPlayers(page: number = 1, limit: number = 20, search?: string) {
+  const searchParams = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  if (search && search.trim()) searchParams.set("search", search.trim());
+
+  return client.get<ApiPlayer[]>(`/players?${searchParams.toString()}`);
 }
 
 export async function searchPlayers(params: {
   query?: string;
+  search?: string;
   position?: string;
   team?: string;
   league?: string;
+  page?: number;
+  limit?: number;
   minAge?: number;
   maxAge?: number;
   minOverall?: number;
@@ -192,16 +202,20 @@ export async function searchPlayers(params: {
 }) {
   const searchParams = new URLSearchParams();
   
-  if (params.query) searchParams.set("query", params.query);
+  if (params.search) searchParams.set("search", params.search);
+  if (params.query) searchParams.set("search", params.query);
   if (params.position) searchParams.set("position", params.position);
   if (params.team) searchParams.set("team", params.team);
   if (params.league) searchParams.set("league", params.league);
+  if (params.page !== undefined) searchParams.set("page", params.page.toString());
+  if (params.limit !== undefined) searchParams.set("limit", params.limit.toString());
   if (params.minAge !== undefined) searchParams.set("minAge", params.minAge.toString());
   if (params.maxAge !== undefined) searchParams.set("maxAge", params.maxAge.toString());
   if (params.minOverall !== undefined) searchParams.set("minOverall", params.minOverall.toString());
   if (params.maxOverall !== undefined) searchParams.set("maxOverall", params.maxOverall.toString());
 
-  return client.get<ApiPlayer[]>(`/players/search?${searchParams.toString()}`);
+  const query = searchParams.toString();
+  return client.get<ApiPlayer[]>(`/players${query ? `?${query}` : ""}`);
 }
 
 export async function getPlayer(id: string) {

@@ -37,7 +37,8 @@ export default function PlayersRanking() {
   const navigate = useNavigate();
   const [players, setPlayers] = useState<PlayerCardModel[]>([]);
   const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
-  const [searchTerm, setSearchTerm] = useState("");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortBy>("overall");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -46,6 +47,16 @@ export default function PlayersRanking() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const limit = 20;
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [search]);
 
   useEffect(() => {
     let active = true;
@@ -87,51 +98,16 @@ export default function PlayersRanking() {
     async function loadPlayers() {
       setLoading(true);
       try {
-        const trimmedSearch = searchTerm.trim().toLowerCase();
-        const response = trimmedSearch
-          ? await searchPlayers({ page: 1, limit: 100 })
+        const response = debouncedSearch
+          ? await searchPlayers({ search: debouncedSearch, page, limit })
           : await getPlayers(page, limit);
 
         if (!active) {
           return;
         }
 
-        const rawPlayers = Array.isArray(response.data) ? response.data : [];
-        const filteredSource = trimmedSearch
-          ? rawPlayers.filter((player) => {
-              const item = player as Record<string, unknown>;
-              const name = String(item.name ?? "").toLowerCase();
-              const team = String(item.team ?? "").toLowerCase();
-              const position = String(item.position ?? "").toLowerCase();
-              const positions = Array.isArray(item.positions)
-                ? item.positions.map((value) => String(value).toLowerCase())
-                : [];
-
-              return (
-                name.includes(trimmedSearch) ||
-                team.includes(trimmedSearch) ||
-                position.includes(trimmedSearch) ||
-                positions.some((value) => value.includes(trimmedSearch))
-              );
-            })
-          : rawPlayers;
-
-        const paginatedPlayers = trimmedSearch
-          ? filteredSource.slice((page - 1) * limit, page * limit)
-          : filteredSource;
-
-        const nextPlayers = paginatedPlayers;
-
-        setPlayers(nextPlayers);
-        setMeta(
-          trimmedSearch
-            ? {
-                page,
-                total: filteredSource.length,
-                totalPages: Math.max(1, Math.ceil(filteredSource.length / limit)),
-              }
-            : ((response.meta || {}) as PaginationMeta),
-        );
+        setPlayers(Array.isArray(response.data) ? response.data : []);
+        setMeta((response.meta || {}) as PaginationMeta);
         setError(null);
       } catch (fetchError) {
         if (!active) {
@@ -153,7 +129,11 @@ export default function PlayersRanking() {
     return () => {
       active = false;
     };
-  }, [limit, page, searchTerm]);
+  }, [debouncedSearch, limit, page]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
   const filteredAndSortedPlayers = useMemo(() => {
     const list = [...players];
@@ -234,7 +214,7 @@ export default function PlayersRanking() {
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-8">
                 <div className="flex-1">
                   <h1 className="text-4xl mb-3">Ranking de Jogadores</h1>
-                  <p className="text-sm text-gray-500">Análise completa e comparativa do elenco monitorado</p>
+                  <p className="text-sm text-gray-500">AnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lise completa e comparativa do elenco monitorado</p>
                 </div>
 
                 <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[16px] px-6 py-4 border border-[rgba(0,194,255,0.15)] shadow-[0_4px_16px_rgba(0,0,0,0.2)] min-w-[200px]">
@@ -258,12 +238,9 @@ export default function PlayersRanking() {
                 />
                 <input
                   type="text"
-                  placeholder="Buscar por nome, clube ou posição..."
-                  value={searchTerm}
-                  onChange={(event) => {
-                    setPage(1);
-                    setSearchTerm(event.target.value);
-                  }}
+                  placeholder="Buscar por nome, clube ou posiÃ§Ã£o"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
                   onFocus={() => setSearchFocused(true)}
                   onBlur={() => setSearchFocused(false)}
                   className={`w-full bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border rounded-[14px] pl-11 pr-4 py-3.5 text-sm placeholder:text-gray-600 focus:outline-none transition-all ${
@@ -286,7 +263,7 @@ export default function PlayersRanking() {
                 <div className="flex items-center gap-6">
                   <div className="w-10 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">#</div>
                   <div className="flex-1 min-w-[240px] text-[10px] text-gray-400 uppercase tracking-wider font-medium">Jogador</div>
-                  <div className="w-20 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">Posição</div>
+                  <div className="w-20 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">PosiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o</div>
                   <div className="w-32 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">Clube</div>
                   <div className="w-24 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium flex items-center justify-center gap-1.5 cursor-pointer hover:text-[#00C2FF] transition-colors" onClick={() => handleSort("overall")}>
                     Overall
@@ -301,7 +278,7 @@ export default function PlayersRanking() {
                     <ArrowUpDown className="w-3 h-3" />
                   </div>
                   <div className="w-28 text-right text-[10px] text-gray-500 uppercase tracking-wider font-medium">Valor</div>
-                  <div className="w-32 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">Ação</div>
+                  <div className="w-32 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">AÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o</div>
                 </div>
               </div>
 
@@ -404,7 +381,7 @@ export default function PlayersRanking() {
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgba(255,255,255,0.03)] mb-4">
                   <Search className="w-7 h-7 text-gray-600" />
                 </div>
-                <p className="text-gray-500 text-sm">Nenhum jogador encontrado com os critérios de busca</p>
+                <p className="text-gray-500 text-sm">Nenhum jogador encontrado com os critÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rios de busca</p>
               </div>
             )}
 
@@ -419,7 +396,7 @@ export default function PlayersRanking() {
                 Anterior
               </button>
               <span className="text-sm text-gray-500">
-                Página {meta.page ?? page} de {meta.totalPages ?? 1}
+                PÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡gina {meta.page ?? page} de {meta.totalPages ?? 1}
               </span>
               <button
                 type="button"
@@ -427,7 +404,7 @@ export default function PlayersRanking() {
                 disabled={loading || (meta.totalPages !== undefined && page >= meta.totalPages)}
                 className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
               >
-                Próxima
+                PrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³xima
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

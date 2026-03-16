@@ -74,8 +74,21 @@ function mapPlayersEnvelope(
   };
 }
 
-export async function getPlayers(page = 1, limit = 20): Promise<ApiEnvelope<PlayerCardModel[]>> {
-  const response = await apiFetch<unknown>(`/players?page=${page}&limit=${limit}`);
+export async function getPlayers(
+  page = 1,
+  limit = 20,
+  search?: string,
+): Promise<ApiEnvelope<PlayerCardModel[]>> {
+  const searchParams = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  if (search && search.trim()) {
+    searchParams.set("search", search.trim());
+  }
+
+  const response = await apiFetch<unknown>(`/players?${searchParams.toString()}`);
   return mapPlayersEnvelope(response, mapApiPlayerToCard);
 }
 
@@ -93,14 +106,13 @@ export async function searchPlayers(
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") {
       const targetKey = keyMap[key] || key;
-      if (targetKey !== "query") {
-        searchParams.set(targetKey, String(value));
-      }
+      const normalizedKey = targetKey === "query" ? "search" : targetKey;
+      searchParams.set(normalizedKey, String(value));
     }
   });
 
   const query = searchParams.toString();
-  const response = await apiFetch<unknown>(`/players/search${query ? `?${query}` : ""}`);
+  const response = await apiFetch<unknown>(`/players${query ? `?${query}` : ""}`);
   return mapPlayersEnvelope(response, mapApiPlayerToCard);
 }
 
