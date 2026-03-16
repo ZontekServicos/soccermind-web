@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { CapitalGauge } from "../components/CapitalGauge";
 import { RiskBadge } from "../components/RiskBadge";
 import { TierBadge } from "../components/TierBadge";
-import { Shield, TrendingUp, DollarSign, AlertTriangle, Target, Award } from "lucide-react";
+import { Shield, TrendingUp, DollarSign, AlertTriangle, Target, Award, GitCompareArrows } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend } from "recharts";
 import { getPlayers } from "../services/players";
@@ -80,7 +80,7 @@ export default function Compare() {
           return;
         }
 
-        setComparisonData(mapCompareResponse(response.data));
+        setComparisonData(response.data);
         setCompareError(null);
       } catch (error) {
         if (!active) {
@@ -105,6 +105,7 @@ export default function Compare() {
 
   const displayPlayerA = comparisonData?.playerA ?? playerA;
   const displayPlayerB = comparisonData?.playerB ?? playerB;
+  const positionContext = comparisonData?.positionContext ?? null;
 
   const radarData = comparisonData?.radarData || [
     { attribute: "Pace", A: displayPlayerA.stats.pace, B: displayPlayerB.stats.pace },
@@ -141,6 +142,15 @@ export default function Compare() {
                 {compareError}
               </div>
             )}
+            {positionContext && (
+              <PositionContextBanner
+                kind={positionContext.kind}
+                label={positionContext.label}
+                message={positionContext.message}
+                positionA={positionContext.positionA}
+                positionB={positionContext.positionB}
+              />
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
               <div className="space-y-3">
@@ -160,7 +170,7 @@ export default function Compare() {
                   <SelectContent className="bg-[#0A1B35] border-[rgba(0,194,255,0.3)]">
                     {players.map((player) => (
                       <SelectItem key={player.id} value={player.id} className="hover:bg-[rgba(0,194,255,0.1)] focus:bg-[rgba(0,194,255,0.1)]">
-                        {player.name} • {player.club}
+                        {player.name} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {player.club}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -184,7 +194,7 @@ export default function Compare() {
                   <SelectContent className="bg-[#0A1B35] border-[rgba(122,92,255,0.3)]">
                     {players.map((player) => (
                       <SelectItem key={player.id} value={player.id} className="hover:bg-[rgba(122,92,255,0.1)] focus:bg-[rgba(122,92,255,0.1)]">
-                        {player.name} • {player.club}
+                        {player.name} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {player.club}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -320,9 +330,9 @@ export default function Compare() {
 
                 <StrategicComparisonCard title="Overall Rating" icon={Award} iconColor="#7A5CFF">
                   <div className="space-y-4">
-                    <MetricRow label="Jogador A" value={displayPlayerA.overallRating.toString()} subtitle={`${displayPlayerA.position} • ${displayPlayerA.club}`} variant="A" />
+                    <MetricRow label="Jogador A" value={displayPlayerA.overallRating.toString()} subtitle={`${displayPlayerA.position} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ${displayPlayerA.club}`} variant="A" />
                     <div className="border-t border-[rgba(255,255,255,0.06)]" />
-                    <MetricRow label="Jogador B" value={displayPlayerB.overallRating.toString()} subtitle={`${displayPlayerB.position} • ${displayPlayerB.club}`} variant="B" />
+                    <MetricRow label="Jogador B" value={displayPlayerB.overallRating.toString()} subtitle={`${displayPlayerB.position} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ ${displayPlayerB.club}`} variant="B" />
                   </div>
                   <WinnerIndicator winner={displayPlayerA.overallRating > displayPlayerB.overallRating ? "A" : "B"} label="Maior rating" />
                 </StrategicComparisonCard>
@@ -351,7 +361,7 @@ function PlayerComparisonCard({ player, variant }: { player: PlayerExtended; var
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-1 text-gray-100">{player.name}</h3>
-              <p className="text-xs text-gray-500">{player.club} • {player.position}</p>
+              <p className="text-xs text-gray-500">{player.club} ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¢ {player.position}</p>
             </div>
           </div>
           <TierBadge tier={player.tier} className="!px-2.5 !py-1 !text-[10px] !shadow-[0_2px_8px_rgba(0,0,0,0.2)]" />
@@ -410,7 +420,7 @@ function ComparisonBar({ label, valueA, valueB }: { label: string; valueA: numbe
   );
 }
 
-function StrategicComparisonCard({ title, icon: Icon, iconColor, children }: { title: string; icon: React.ElementType; iconColor: string; children: React.ReactNode }) {
+function StrategicComparisonCard({ title, icon: Icon, iconColor, children }: { title: string; icon: React.ElementType; iconColor: string; children: ReactNode }) {
   return (
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] p-6 shadow-[0_4px_16px_rgba(0,0,0,0.2)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.25)] transition-all duration-200">
       <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[rgba(255,255,255,0.06)]">
@@ -424,7 +434,7 @@ function StrategicComparisonCard({ title, icon: Icon, iconColor, children }: { t
   );
 }
 
-function MetricRow({ label, value, subtitle, badge, variant }: { label: string; value: string; subtitle?: string; badge?: React.ReactNode; variant: "A" | "B" }) {
+function MetricRow({ label, value, subtitle, badge, variant }: { label: string; value: string; subtitle?: string; badge?: ReactNode; variant: "A" | "B" }) {
   const color = variant === "A" ? "#00C2FF" : "#7A5CFF";
 
   return (

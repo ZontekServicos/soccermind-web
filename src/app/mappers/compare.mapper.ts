@@ -2,6 +2,8 @@ import { mapApiPlayerToExtended, type ApiPlayerLike } from "./player.mapper";
 
 type UnknownRecord = Record<string, unknown>;
 
+type PositionContextKind = "same" | "related" | "cross";
+
 function isRecord(value: unknown): value is UnknownRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -116,10 +118,7 @@ function normalizeWinner(value: unknown) {
   return "DRAW" as const;
 }
 
-function buildRadarData(
-  statsA: Record<string, number>,
-  statsB: Record<string, number>,
-) {
+function buildRadarData(statsA: Record<string, number>, statsB: Record<string, number>) {
   return [
     { attribute: "Pace", A: toNumber(statsA.pace), B: toNumber(statsB.pace) },
     { attribute: "Shooting", A: toNumber(statsA.shooting), B: toNumber(statsB.shooting) },
@@ -128,6 +127,76 @@ function buildRadarData(
     { attribute: "Defending", A: toNumber(statsA.defending), B: toNumber(statsB.defending) },
     { attribute: "Physical", A: toNumber(statsA.physical), B: toNumber(statsB.physical) },
   ];
+}
+
+const POSITION_GROUPS: Record<string, string> = {
+  ST: "attack",
+  CF: "attack",
+  RW: "attack",
+  LW: "attack",
+  CAM: "midfield",
+  CM: "midfield",
+  CDM: "midfield",
+  RB: "wide-defense",
+  LB: "wide-defense",
+  RWB: "wide-defense",
+  LWB: "wide-defense",
+  CB: "central-defense",
+  GK: "goalkeeper",
+};
+
+function getPositionGroup(position: string) {
+  return POSITION_GROUPS[position] ?? "hybrid";
+}
+
+function normalizePositionContextKind(value: unknown): PositionContextKind {
+  const normalized = toText(value, "cross").toLowerCase();
+  if (normalized === "same" || normalized === "related" || normalized === "cross") {
+    return normalized;
+  }
+  return "cross";
+}
+
+function buildFallbackPositionContext(positionA: string, positionB: string) {
+  const groupA = getPositionGroup(positionA);
+  const groupB = getPositionGroup(positionB);
+
+  if (positionA === positionB) {
+    return {
+      kind: "same" as const,
+      label: "Comparacao posicional direta",
+      tone: "neutral",
+      message: "Os dois jogadores compartilham a mesma posicao primaria.",
+      positionA,
+      positionB,
+      groupA,
+      groupB,
+    };
+  }
+
+  if (groupA === groupB) {
+    return {
+      kind: "related" as const,
+      label: "Comparacao compativel",
+      tone: "info",
+      message: "As posicoes sao diferentes, mas pertencem ao mesmo grupo funcional.",
+      positionA,
+      positionB,
+      groupA,
+      groupB,
+    };
+  }
+
+  return {
+    kind: "cross" as const,
+    label: "Comparacao cruzada",
+    tone: "warning",
+    message: "A leitura deve considerar contextos taticos distintos entre as funcoes.",
+    positionA,
+    positionB,
+    groupA,
+    groupB,
+  };
 }
 
 export function mapCompareResponse(response: unknown) {
@@ -167,6 +236,7 @@ export function mapCompareResponse(response: unknown) {
   const riskB = pickRecord(pickRecord(source, ["risk"]) ?? {}, ["playerB"]);
   const antiFlopA = pickRecord(pickRecord(source, ["antiFlop"]) ?? {}, ["playerA"]);
   const antiFlopB = pickRecord(pickRecord(source, ["antiFlop"]) ?? {}, ["playerB"]);
+  const positionContextSource = pickRecord(source, ["positionContext"]);
 
   playerA.capitalEfficiency = toNumber(capitalA?.index, playerA.capitalEfficiency);
   playerB.capitalEfficiency = toNumber(capitalB?.index, playerB.capitalEfficiency);
@@ -233,9 +303,23 @@ export function mapCompareResponse(response: unknown) {
   playerB.riskLevel = playerB.structuralRisk.level;
 
   const radarData = buildRadarData(playerA.stats, playerB.stats);
-  const winner = normalizeWinner(
-    source.winner ?? pickRecord(source, ["quantitative"])?.winner,
-  );
+  const winner = normalizeWinner(source.winner ?? pickRecord(source, ["quantitative"])?.winner);
+  const fallbackPositionContext = buildFallbackPositionContext(playerA.position, playerB.position);
+  const positionContext = {
+    ...fallbackPositionContext,
+    ...(positionContextSource
+      ? {
+          kind: normalizePositionContextKind(positionContextSource.kind),
+          label: toText(positionContextSource.label, fallbackPositionContext.label),
+          tone: toText(positionContextSource.tone, fallbackPositionContext.tone),
+          message: toText(positionContextSource.message, fallbackPositionContext.message),
+          positionA: toText(positionContextSource.positionA, fallbackPositionContext.positionA),
+          positionB: toText(positionContextSource.positionB, fallbackPositionContext.positionB),
+          groupA: toText(positionContextSource.groupA, fallbackPositionContext.groupA),
+          groupB: toText(positionContextSource.groupB, fallbackPositionContext.groupB),
+        }
+      : {}),
+  };
 
   return {
     playerA,
@@ -248,5 +332,6 @@ export function mapCompareResponse(response: unknown) {
       a: item.A,
       b: item.B,
     })),
+    positionContext,
   };
 }
