@@ -9,6 +9,44 @@ import {
 
 type UnknownRecord = Record<string, unknown>;
 
+type PrimitiveFilterValue = string | number | undefined;
+
+export interface PlayerFilterOptions {
+  positions: string[];
+  nationalities: string[];
+  teams: string[];
+  leagues: string[];
+  sources: string[];
+}
+
+export interface PlayersFiltersParams {
+  search?: PrimitiveFilterValue;
+  positions?: string[];
+  nationality?: PrimitiveFilterValue;
+  team?: PrimitiveFilterValue;
+  league?: PrimitiveFilterValue;
+  source?: PrimitiveFilterValue;
+  minAge?: PrimitiveFilterValue;
+  maxAge?: PrimitiveFilterValue;
+  minOverall?: PrimitiveFilterValue;
+  maxOverall?: PrimitiveFilterValue;
+  minPotential?: PrimitiveFilterValue;
+  maxPotential?: PrimitiveFilterValue;
+  minValue?: PrimitiveFilterValue;
+  maxValue?: PrimitiveFilterValue;
+  page?: PrimitiveFilterValue;
+  limit?: PrimitiveFilterValue;
+}
+
+export interface PlayersResponseMeta {
+  page?: number;
+  limit?: number;
+  total?: number;
+  totalPages?: number;
+  filters?: Record<string, unknown>;
+  filterOptions?: PlayerFilterOptions;
+}
+
 function isRecord(value: unknown): value is UnknownRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -74,43 +112,53 @@ function mapPlayersEnvelope(
   };
 }
 
+function appendParam(searchParams: URLSearchParams, key: string, value: PrimitiveFilterValue) {
+  if (value === undefined || value === "") {
+    return;
+  }
+
+  searchParams.set(key, String(value));
+}
+
+function buildPlayersSearchParams(params: PlayersFiltersParams) {
+  const searchParams = new URLSearchParams();
+
+  appendParam(searchParams, "search", params.search);
+  if (params.positions && params.positions.length > 0) {
+    searchParams.set("positions", params.positions.join(","));
+  }
+  appendParam(searchParams, "nationality", params.nationality);
+  appendParam(searchParams, "team", params.team);
+  appendParam(searchParams, "league", params.league);
+  appendParam(searchParams, "source", params.source);
+  appendParam(searchParams, "minAge", params.minAge);
+  appendParam(searchParams, "maxAge", params.maxAge);
+  appendParam(searchParams, "minOverall", params.minOverall);
+  appendParam(searchParams, "maxOverall", params.maxOverall);
+  appendParam(searchParams, "minPotential", params.minPotential);
+  appendParam(searchParams, "maxPotential", params.maxPotential);
+  appendParam(searchParams, "minValue", params.minValue);
+  appendParam(searchParams, "maxValue", params.maxValue);
+  appendParam(searchParams, "page", params.page);
+  appendParam(searchParams, "limit", params.limit);
+
+  return searchParams;
+}
+
 export async function getPlayers(
   page = 1,
   limit = 20,
   search?: string,
 ): Promise<ApiEnvelope<PlayerCardModel[]>> {
-  const searchParams = new URLSearchParams({
-    page: String(page),
-    limit: String(limit),
-  });
-
-  if (search && search.trim()) {
-    searchParams.set("search", search.trim());
-  }
-
+  const searchParams = buildPlayersSearchParams({ page, limit, search });
   const response = await apiFetch<unknown>(`/players?${searchParams.toString()}`);
   return mapPlayersEnvelope(response, mapApiPlayerToCard);
 }
 
 export async function searchPlayers(
-  params: Record<string, string | number | undefined>,
+  params: PlayersFiltersParams = {},
 ): Promise<ApiEnvelope<PlayerCardModel[]>> {
-  const searchParams = new URLSearchParams();
-  const keyMap: Record<string, string> = {
-    minAge: "ageMin",
-    maxAge: "ageMax",
-    minOverall: "overallMin",
-    maxOverall: "overallMax",
-  };
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== "") {
-      const targetKey = keyMap[key] || key;
-      const normalizedKey = targetKey === "query" ? "search" : targetKey;
-      searchParams.set(normalizedKey, String(value));
-    }
-  });
-
+  const searchParams = buildPlayersSearchParams(params);
   const query = searchParams.toString();
   const response = await apiFetch<unknown>(`/players${query ? `?${query}` : ""}`);
   return mapPlayersEnvelope(response, mapApiPlayerToCard);

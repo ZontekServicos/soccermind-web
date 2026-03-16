@@ -1,20 +1,69 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, TrendingUp, ArrowUpDown, Users, ChevronLeft, ChevronRight, Star } from "lucide-react";
-import { useNavigate } from "react-router";
-import { AppSidebar } from "../components/AppSidebar";
+import {
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  SlidersHorizontal,
+  Star,
+  TrendingUp,
+  Users,
+  X,
+} from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
+import { PlayersFiltersPanel, type PlayersRankingFiltersState } from "../components/PlayersFiltersPanel";
+import { AppSidebar } from "../components/AppSidebar";
 import type { PlayerCardModel } from "../mappers/player.mapper";
-import { getPlayers, searchPlayers } from "../services/players";
+import {
+  searchPlayers,
+  type PlayerFilterOptions,
+  type PlayersFiltersParams,
+  type PlayersResponseMeta,
+} from "../services/players";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 
 type SortBy = "overall" | "potential" | "age";
 type SortOrder = "asc" | "desc";
 
-interface PaginationMeta {
+type FilterFieldKey = keyof Omit<PlayersRankingFiltersState, "positions" | "search">;
+
+interface PaginationMeta extends PlayersResponseMeta {
   page?: number;
   totalPages?: number;
   total?: number;
 }
+
+interface ActiveFilterChip {
+  key: string;
+  label: string;
+  onRemove: () => void;
+}
+
+const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
+  positions: [],
+  nationalities: [],
+  teams: [],
+  leagues: [],
+  sources: [],
+};
+
+const DEFAULT_FILTERS: PlayersRankingFiltersState = {
+  search: "",
+  positions: [],
+  nationality: "",
+  team: "",
+  league: "",
+  source: "",
+  minAge: "",
+  maxAge: "",
+  minOverall: "",
+  maxOverall: "",
+  minPotential: "",
+  maxPotential: "",
+  minValue: "",
+  maxValue: "",
+};
 
 function formatMarketValue(value: number | null) {
   if (value === null) {
@@ -33,30 +82,125 @@ function formatStatValue(value: number | null) {
   return value === null ? "-" : value;
 }
 
+function parseFiltersFromSearchParams(searchParams: URLSearchParams): PlayersRankingFiltersState {
+  const positions = (searchParams.get("positions") ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return {
+    search: searchParams.get("search") ?? "",
+    positions,
+    nationality: searchParams.get("nationality") ?? "",
+    team: searchParams.get("team") ?? "",
+    league: searchParams.get("league") ?? "",
+    source: searchParams.get("source") ?? "",
+    minAge: searchParams.get("minAge") ?? "",
+    maxAge: searchParams.get("maxAge") ?? "",
+    minOverall: searchParams.get("minOverall") ?? "",
+    maxOverall: searchParams.get("maxOverall") ?? "",
+    minPotential: searchParams.get("minPotential") ?? "",
+    maxPotential: searchParams.get("maxPotential") ?? "",
+    minValue: searchParams.get("minValue") ?? "",
+    maxValue: searchParams.get("maxValue") ?? "",
+  };
+}
+
+function parsePage(searchParams: URLSearchParams) {
+  const rawValue = Number(searchParams.get("page") ?? "1");
+  return Number.isFinite(rawValue) && rawValue > 0 ? rawValue : 1;
+}
+
+function parseSortBy(searchParams: URLSearchParams): SortBy {
+  const value = searchParams.get("sortBy");
+  if (value === "overall" || value === "potential" || value === "age") {
+    return value;
+  }
+  return "overall";
+}
+
+function parseSortOrder(searchParams: URLSearchParams): SortOrder {
+  return searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
+}
+
+function buildRangeLabel(label: string, minValue: string, maxValue: string) {
+  if (minValue && maxValue) {
+    return `${label}: ${minValue} - ${maxValue}`;
+  }
+
+  if (minValue) {
+    return `${label}: >= ${minValue}`;
+  }
+
+  if (maxValue) {
+    return `${label}: <= ${maxValue}`;
+  }
+
+  return "";
+}
+
+function countActiveFilters(filters: PlayersRankingFiltersState) {
+  let count = filters.positions.length;
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (key === "positions") {
+      return;
+    }
+
+    if (typeof value === "string" && value.trim()) {
+      count += 1;
+    }
+  });
+
+  return count;
+}
+
+function buildApiFilters(filters: PlayersRankingFiltersState, debouncedSearch: string): PlayersFiltersParams {
+  return {
+    search: debouncedSearch || undefined,
+    positions: filters.positions.length > 0 ? filters.positions : undefined,
+    nationality: filters.nationality || undefined,
+    team: filters.team || undefined,
+    league: filters.league || undefined,
+    source: filters.source || undefined,
+    minAge: filters.minAge || undefined,
+    maxAge: filters.maxAge || undefined,
+    minOverall: filters.minOverall || undefined,
+    maxOverall: filters.maxOverall || undefined,
+    minPotential: filters.minPotential || undefined,
+    maxPotential: filters.maxPotential || undefined,
+    minValue: filters.minValue || undefined,
+    maxValue: filters.maxValue || undefined,
+  };
+}
+
 export default function PlayersRanking() {
   const navigate = useNavigate();
+  const [urlSearchParams, setUrlSearchParams] = useSearchParams();
+  const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
   const [players, setPlayers] = useState<PlayerCardModel[]>([]);
   const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sortBy, setSortBy] = useState<SortBy>("overall");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<PlayersRankingFiltersState>(initialFilters);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search.trim());
+  const [sortBy, setSortBy] = useState<SortBy>(() => parseSortBy(urlSearchParams));
+  const [sortOrder, setSortOrder] = useState<SortOrder>(() => parseSortOrder(urlSearchParams));
+  const [page, setPage] = useState(() => parsePage(urlSearchParams));
   const [meta, setMeta] = useState<PaginationMeta>({});
+  const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filtersExpanded, setFiltersExpanded] = useState(() => countActiveFilters(initialFilters) > 0);
   const limit = 20;
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setDebouncedSearch(search.trim());
+      setDebouncedSearch(filters.search.trim());
     }, 300);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [search]);
+  }, [filters.search]);
 
   useEffect(() => {
     let active = true;
@@ -92,22 +236,25 @@ export default function PlayersRanking() {
     };
   }, []);
 
+  const apiFilters = useMemo(() => buildApiFilters(filters, debouncedSearch), [filters, debouncedSearch]);
+
   useEffect(() => {
     let active = true;
 
     async function loadPlayers() {
       setLoading(true);
       try {
-        const response = debouncedSearch
-          ? await searchPlayers({ search: debouncedSearch, page, limit })
-          : await getPlayers(page, limit);
-
+        const response = await searchPlayers({ ...apiFilters, page, limit });
         if (!active) {
           return;
         }
 
+        const nextMeta = (response.meta || {}) as PaginationMeta;
         setPlayers(Array.isArray(response.data) ? response.data : []);
-        setMeta((response.meta || {}) as PaginationMeta);
+        setMeta(nextMeta);
+        if (nextMeta.filterOptions) {
+          setFilterOptions(nextMeta.filterOptions);
+        }
         setError(null);
       } catch (fetchError) {
         if (!active) {
@@ -129,11 +276,31 @@ export default function PlayersRanking() {
     return () => {
       active = false;
     };
-  }, [debouncedSearch, limit, page]);
+  }, [apiFilters, limit, page]);
 
   useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch]);
+    const nextParams = new URLSearchParams();
+
+    if (filters.search.trim()) nextParams.set("search", filters.search.trim());
+    if (filters.positions.length > 0) nextParams.set("positions", filters.positions.join(","));
+    if (filters.nationality) nextParams.set("nationality", filters.nationality);
+    if (filters.team) nextParams.set("team", filters.team);
+    if (filters.league) nextParams.set("league", filters.league);
+    if (filters.source) nextParams.set("source", filters.source);
+    if (filters.minAge) nextParams.set("minAge", filters.minAge);
+    if (filters.maxAge) nextParams.set("maxAge", filters.maxAge);
+    if (filters.minOverall) nextParams.set("minOverall", filters.minOverall);
+    if (filters.maxOverall) nextParams.set("maxOverall", filters.maxOverall);
+    if (filters.minPotential) nextParams.set("minPotential", filters.minPotential);
+    if (filters.maxPotential) nextParams.set("maxPotential", filters.maxPotential);
+    if (filters.minValue) nextParams.set("minValue", filters.minValue);
+    if (filters.maxValue) nextParams.set("maxValue", filters.maxValue);
+    if (page > 1) nextParams.set("page", String(page));
+    if (sortBy !== "overall") nextParams.set("sortBy", sortBy);
+    if (sortOrder !== "desc") nextParams.set("sortOrder", sortOrder);
+
+    setUrlSearchParams(nextParams, { replace: true });
+  }, [filters, page, setUrlSearchParams, sortBy, sortOrder]);
 
   const filteredAndSortedPlayers = useMemo(() => {
     const list = [...players];
@@ -144,6 +311,74 @@ export default function PlayersRanking() {
     });
     return list;
   }, [players, sortBy, sortOrder]);
+
+  const activeFiltersCount = useMemo(() => countActiveFilters(filters), [filters]);
+
+  const activeFilterChips = useMemo<ActiveFilterChip[]>(() => {
+    const chips: ActiveFilterChip[] = [];
+
+    if (filters.search) {
+      chips.push({
+        key: "search",
+        label: `Busca: ${filters.search}`,
+        onRemove: () => setFilters((current) => ({ ...current, search: "" })),
+      });
+    }
+
+    filters.positions.forEach((position) => {
+      chips.push({
+        key: `position-${position}`,
+        label: `Posicao: ${position}`,
+        onRemove: () => {
+          setPage(1);
+          setFilters((current) => ({
+            ...current,
+            positions: current.positions.filter((item) => item !== position),
+          }));
+        },
+      });
+    });
+
+    [
+      ["nationality", filters.nationality, "Nacionalidade"],
+      ["team", filters.team, "Clube"],
+      ["league", filters.league, "Liga"],
+      ["source", filters.source, "Source"],
+    ].forEach(([key, value, label]) => {
+      if (typeof value === "string" && value) {
+        chips.push({
+          key: String(key),
+          label: `${label}: ${value}`,
+          onRemove: () => {
+            const field = key as FilterFieldKey;
+            setPage(1);
+            setFilters((current) => ({ ...current, [field]: "" }));
+          },
+        });
+      }
+    });
+
+    [
+      ["age", buildRangeLabel("Idade", filters.minAge, filters.maxAge), ["minAge", "maxAge"]],
+      ["overall", buildRangeLabel("Overall", filters.minOverall, filters.maxOverall), ["minOverall", "maxOverall"]],
+      ["potential", buildRangeLabel("Potential", filters.minPotential, filters.maxPotential), ["minPotential", "maxPotential"]],
+      ["value", buildRangeLabel("Valor", filters.minValue, filters.maxValue), ["minValue", "maxValue"]],
+    ].forEach(([key, label, fields]) => {
+      if (typeof label === "string" && label) {
+        chips.push({
+          key: String(key),
+          label,
+          onRemove: () => {
+            setPage(1);
+            const [minField, maxField] = fields as [FilterFieldKey, FilterFieldKey];
+            setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }));
+          },
+        });
+      }
+    });
+
+    return chips;
+  }, [filters]);
 
   const getStatColor = (value: number) => {
     if (value >= 85) return "bg-[#00FF9C]/90 text-[#07142A]";
@@ -173,11 +408,12 @@ export default function PlayersRanking() {
 
   const handleSort = (field: SortBy) => {
     if (sortBy === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(field);
-      setSortOrder("desc");
+      setSortOrder((current) => (current === "asc" ? "desc" : "asc"));
+      return;
     }
+
+    setSortBy(field);
+    setSortOrder("desc");
   };
 
   const handleWatchlistToggle = async (player: PlayerCardModel) => {
@@ -196,89 +432,141 @@ export default function PlayersRanking() {
       setWatchlistIds((current) => new Set(current).add(player.id));
     } catch (watchlistError) {
       setError(
-        watchlistError instanceof Error
-          ? watchlistError.message
-          : "Erro ao atualizar watchlist",
+        watchlistError instanceof Error ? watchlistError.message : "Erro ao atualizar watchlist",
       );
     }
+  };
+
+  const handleFieldChange = (field: FilterFieldKey, value: string) => {
+    setPage(1);
+    setFilters((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleSearchChange = (value: string) => {
+    setPage(1);
+    setFilters((current) => ({ ...current, search: value }));
+  };
+
+  const handleTogglePosition = (position: string) => {
+    setPage(1);
+    setFilters((current) => ({
+      ...current,
+      positions: current.positions.includes(position)
+        ? current.positions.filter((item) => item !== position)
+        : [...current.positions, position],
+    }));
+  };
+
+  const handleClearFilters = () => {
+    setPage(1);
+    setFilters(DEFAULT_FILTERS);
   };
 
   return (
     <div className="flex h-screen bg-[#07142A]">
       <AppSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
         <AppHeader />
         <main className="flex-1 overflow-auto p-8">
-          <div className="max-w-[1600px] mx-auto">
-            <div className="mb-8">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-8">
-                <div className="flex-1">
-                  <h1 className="text-4xl mb-3">Ranking de Jogadores</h1>
-                  <p className="text-sm text-gray-500">AnÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lise completa e comparativa do elenco monitorado</p>
+          <div className="mx-auto max-w-[1600px] space-y-6">
+            <section className="relative overflow-hidden rounded-[28px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(135deg,rgba(11,27,53,0.98),rgba(7,20,42,0.94))] px-7 py-7 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
+              <div className="absolute -right-20 top-0 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(0,194,255,0.18),transparent_68%)] blur-2xl" />
+              <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(122,92,255,0.12),transparent_72%)] blur-2xl" />
+              <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+                <div className="max-w-3xl">
+                  <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#7FDBFF]">
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    Ranking Intelligence
+                  </div>
+                  <h1 className="text-4xl font-semibold text-white">Ranking de Jogadores</h1>
+                  <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400">
+                    Uma camada de filtros analiticos para transformar o ranking em um cockpit real de scouting, sem perder a identidade visual do SoccerMind.
+                  </p>
                 </div>
 
-                <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[16px] px-6 py-4 border border-[rgba(0,194,255,0.15)] shadow-[0_4px_16px_rgba(0,0,0,0.2)] min-w-[200px]">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-[12px] bg-[rgba(0,194,255,0.15)] flex items-center justify-center">
-                      <Users className="w-5 h-5 text-[#00C2FF]" />
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[rgba(0,194,255,0.14)]">
+                        <Users className="h-5 w-5 text-[#00C2FF]" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Jogadores</p>
+                        <p className="text-2xl font-bold text-[#00C2FF]">{meta.total ?? filteredAndSortedPlayers.length}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Total de Jogadores</p>
-                      <p className="text-2xl font-bold text-[#00C2FF]">{meta.total ?? filteredAndSortedPlayers.length}</p>
-                    </div>
+                  </div>
+
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Filtros ativos</p>
+                    <p className="mt-2 text-2xl font-bold text-[#9BE7FF]">{activeFiltersCount}</p>
+                    <p className="mt-1 text-xs text-gray-500">Sincronizados com a URL</p>
+                  </div>
+
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Atualizacao</p>
+                    <p className="mt-2 text-lg font-semibold text-white">Tempo real</p>
+                    <p className="mt-1 text-xs text-gray-500">Busca com debounce de 300ms</p>
                   </div>
                 </div>
               </div>
+            </section>
 
-              <div className="relative">
-                <Search
-                  className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
-                    searchFocused ? "text-[#00C2FF]" : "text-gray-500"
-                  }`}
-                />
-                <input
-                  type="text"
-                  placeholder="Buscar por nome, clube ou posiÃ§Ã£o"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                  className={`w-full bg-[rgba(255,255,255,0.02)] backdrop-blur-sm border rounded-[14px] pl-11 pr-4 py-3.5 text-sm placeholder:text-gray-600 focus:outline-none transition-all ${
-                    searchFocused
-                      ? "border-[#00C2FF] shadow-[0_0_0_3px_rgba(0,194,255,0.1)]"
-                      : "border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.12)]"
-                  }`}
-                />
+            <PlayersFiltersPanel
+              filters={filters}
+              options={filterOptions}
+              activeFiltersCount={activeFiltersCount}
+              isExpanded={filtersExpanded}
+              onToggleExpanded={() => setFiltersExpanded((current) => !current)}
+              onSearchChange={handleSearchChange}
+              onFieldChange={handleFieldChange}
+              onTogglePosition={handleTogglePosition}
+              onClearFilters={handleClearFilters}
+            />
+
+            {activeFilterChips.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {activeFilterChips.map((chip) => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={chip.onRemove}
+                    className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3.5 py-2 text-xs font-medium text-gray-300 transition-all hover:border-[rgba(0,194,255,0.22)] hover:text-[#9BE7FF]"
+                  >
+                    <span>{chip.label}</span>
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ))}
               </div>
-            </div>
+            )}
 
             {error && (
-              <div className="mb-6 rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+              <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
                 {error}
               </div>
             )}
 
-            <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[20px] shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden">
-              <div className="bg-[rgba(255,255,255,0.04)] border-b border-[rgba(255,255,255,0.08)] px-8 py-4">
+            <div className="overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+              <div className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-8 py-4">
                 <div className="flex items-center gap-6">
-                  <div className="w-10 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">#</div>
-                  <div className="flex-1 min-w-[240px] text-[10px] text-gray-400 uppercase tracking-wider font-medium">Jogador</div>
-                  <div className="w-20 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">PosiÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o</div>
-                  <div className="w-32 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">Clube</div>
-                  <div className="w-24 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium flex items-center justify-center gap-1.5 cursor-pointer hover:text-[#00C2FF] transition-colors" onClick={() => handleSort("overall")}>
+                  <div className="w-10 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">#</div>
+                  <div className="min-w-[240px] flex-1 text-[10px] font-medium uppercase tracking-[0.24em] text-gray-400">Jogador</div>
+                  <div className="w-20 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Posicao</div>
+                  <div className="w-32 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Clube</div>
+                  <div className="flex w-24 cursor-pointer items-center justify-center gap-1.5 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("overall")}>
                     Overall
-                    <ArrowUpDown className="w-3 h-3" />
+                    <ArrowUpDown className="h-3 w-3" />
                   </div>
-                  <div className="w-24 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium flex items-center justify-center gap-1.5 cursor-pointer hover:text-[#00C2FF] transition-colors" onClick={() => handleSort("potential")}>
-                    Potencial
-                    <ArrowUpDown className="w-3 h-3" />
+                  <div className="flex w-24 cursor-pointer items-center justify-center gap-1.5 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("potential")}>
+                    Potential
+                    <ArrowUpDown className="h-3 w-3" />
                   </div>
-                  <div className="w-20 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium flex items-center justify-center gap-1.5 cursor-pointer hover:text-[#00C2FF] transition-colors" onClick={() => handleSort("age")}>
+                  <div className="flex w-20 cursor-pointer items-center justify-center gap-1.5 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("age")}>
                     Idade
-                    <ArrowUpDown className="w-3 h-3" />
+                    <ArrowUpDown className="h-3 w-3" />
                   </div>
-                  <div className="w-28 text-right text-[10px] text-gray-500 uppercase tracking-wider font-medium">Valor</div>
-                  <div className="w-32 text-center text-[10px] text-gray-500 uppercase tracking-wider font-medium">AÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o</div>
+                  <div className="w-28 text-right text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Valor</div>
+                  <div className="w-32 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Acao</div>
                 </div>
               </div>
 
@@ -289,63 +577,69 @@ export default function PlayersRanking() {
                   filteredAndSortedPlayers.map((player, index) => (
                     <div
                       key={`${player.id ?? player.name ?? "item"}-${index}`}
-                      className={`px-8 py-5 flex items-center gap-6 border-b border-[rgba(255,255,255,0.04)] last:border-b-0 transition-all duration-200 cursor-pointer group ${
+                      className={`group flex cursor-pointer items-center gap-6 border-b border-[rgba(255,255,255,0.04)] px-8 py-5 transition-all duration-200 last:border-b-0 ${
                         index % 2 === 0 ? "bg-[rgba(255,255,255,0.01)]" : "bg-transparent"
-                      } hover:bg-[rgba(0,194,255,0.05)] hover:border-[rgba(0,194,255,0.15)]`}
+                      } hover:border-[rgba(0,194,255,0.15)] hover:bg-[rgba(0,194,255,0.05)]`}
                       onClick={() => navigate(`/players/${player.id}`)}
                     >
                       <div className="w-10 text-center">
-                        <span className="text-base text-gray-400 font-medium">#{(page - 1) * limit + index + 1}</span>
+                        <span className="text-base font-medium text-gray-400">#{(page - 1) * limit + index + 1}</span>
                       </div>
 
-                      <div className="flex-1 min-w-[240px]">
+                      <div className="min-w-[240px] flex-1">
                         <div className="flex items-center gap-4">
                           <div
-                            className="w-11 h-11 rounded-[12px] flex items-center justify-center text-base font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.3)] relative overflow-hidden"
+                            className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-[12px] text-base font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
                             style={{
                               background: "linear-gradient(135deg, rgba(0,194,255,0.25) 0%, rgba(122,92,255,0.25) 100%)",
                               border: "1px solid rgba(255,255,255,0.1)",
                             }}
                           >
                             <span className="relative z-10 text-white">
-                              {player.name.split(" ").map((name) => name[0]).join("").slice(0, 2)}
+                              {player.name
+                                .split(" ")
+                                .map((name) => name[0])
+                                .join("")
+                                .slice(0, 2)}
                             </span>
                           </div>
                           <div>
-                            <p className="font-semibold text-gray-100 group-hover:text-[#00C2FF] transition-colors mb-0.5">{player.name}</p>
+                            <p className="mb-0.5 font-semibold text-gray-100 transition-colors group-hover:text-[#00C2FF]">{player.name}</p>
                             <p className="text-xs text-gray-600">{player.nationality}</p>
                           </div>
                         </div>
                       </div>
 
-                      <div className="w-20 flex justify-center">
-                        <span className={`${getPositionColor(player.position || "-")} border px-2.5 py-1 rounded-[8px] text-[11px] font-semibold tracking-wide`}>
+                      <div className="flex w-20 justify-center">
+                        <span className={`${getPositionColor(player.position || "-")} rounded-[8px] border px-2.5 py-1 text-[11px] font-semibold tracking-wide`}>
                           {player.position || "-"}
                         </span>
                       </div>
 
                       <div className="w-32 text-center text-sm text-gray-400">{player.team || "-"}</div>
 
-                      <div className="w-24 flex justify-center">
-                        <span className={`${getStatColor(player.overall ?? 0)} px-3 py-1.5 rounded-[8px] text-sm font-bold min-w-[52px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
+                      <div className="flex w-24 justify-center">
+                        <span className={`${getStatColor(player.overall ?? 0)} min-w-[52px] rounded-[8px] px-3 py-1.5 text-center text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
                           {formatStatValue(player.overall)}
                         </span>
                       </div>
 
-                      <div className="w-24 flex justify-center">
+                      <div className="flex w-24 justify-center">
                         <div className="flex items-center gap-1.5">
-                          <span className={`${getStatColor(player.potential ?? 0)} px-3 py-1.5 rounded-[8px] text-sm font-bold min-w-[52px] text-center shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
+                          <span className={`${getStatColor(player.potential ?? 0)} min-w-[52px] rounded-[8px] px-3 py-1.5 text-center text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
                             {formatStatValue(player.potential)}
                           </span>
-                          {player.potential !== null && player.overall !== null && player.potential > player.overall + 5 && <TrendingUp className="w-3.5 h-3.5 text-[#00FF9C]/70" />}
+                          {player.potential !== null && player.overall !== null && player.potential > player.overall + 5 && (
+                            <TrendingUp className="h-3.5 w-3.5 text-[#00FF9C]/70" />
+                          )}
                         </div>
                       </div>
 
-                      <div className="w-20 text-center text-sm text-gray-300 font-medium tabular-nums">{player.age}</div>
+                      <div className="w-20 text-center text-sm font-medium tabular-nums text-gray-300">{player.age}</div>
 
-                      <div className="w-28 text-right text-sm text-[#00FF9C] font-semibold tabular-nums">{formatMarketValue(player.marketValue)}</div>
+                      <div className="w-28 text-right text-sm font-semibold tabular-nums text-[#00FF9C]">{formatMarketValue(player.marketValue)}</div>
 
-                      <div className="w-32 flex justify-center">
+                      <div className="flex w-32 justify-center">
                         <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
                           <button
                             className={`inline-flex h-9 w-9 items-center justify-center rounded-[10px] border transition-all ${
@@ -361,7 +655,7 @@ export default function PlayersRanking() {
                             <Star className="h-4 w-4" fill={watchlistIds.has(player.id) ? "currentColor" : "none"} />
                           </button>
                           <button
-                            className="px-4 py-2 bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[10px] text-xs font-semibold transition-all shadow-[0_2px_8px_rgba(0,194,255,0.3)] hover:shadow-[0_4px_12px_rgba(0,194,255,0.4)]"
+                            className="rounded-[10px] bg-[#00C2FF]/90 px-4 py-2 text-xs font-semibold text-[#07142A] shadow-[0_2px_8px_rgba(0,194,255,0.3)] transition-all hover:bg-[#00C2FF] hover:shadow-[0_4px_12px_rgba(0,194,255,0.4)]"
                             onClick={(event) => {
                               event.stopPropagation();
                               navigate(`/players/${player.id}`);
@@ -377,11 +671,11 @@ export default function PlayersRanking() {
             </div>
 
             {!loading && filteredAndSortedPlayers.length === 0 && (
-              <div className="text-center py-16">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[rgba(255,255,255,0.03)] mb-4">
-                  <Search className="w-7 h-7 text-gray-600" />
+              <div className="py-16 text-center">
+                <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.03)]">
+                  <Search className="h-7 w-7 text-gray-600" />
                 </div>
-                <p className="text-gray-500 text-sm">Nenhum jogador encontrado com os critÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©rios de busca</p>
+                <p className="text-sm text-gray-500">Nenhum jogador encontrado com os filtros selecionados.</p>
               </div>
             )}
 
@@ -392,11 +686,11 @@ export default function PlayersRanking() {
                 disabled={page <= 1 || loading}
                 className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="h-4 w-4" />
                 Anterior
               </button>
               <span className="text-sm text-gray-500">
-                PÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡gina {meta.page ?? page} de {meta.totalPages ?? 1}
+                Pagina {meta.page ?? page} de {meta.totalPages ?? 1}
               </span>
               <button
                 type="button"
@@ -404,8 +698,8 @@ export default function PlayersRanking() {
                 disabled={loading || (meta.totalPages !== undefined && page >= meta.totalPages)}
                 className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
               >
-                PrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³xima
-                <ChevronRight className="w-4 h-4" />
+                Proxima
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
           </div>
