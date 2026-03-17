@@ -10,6 +10,7 @@ export interface PlayerStats {
 }
 
 export interface PlayerExtended extends PlayerProfile {
+  potential: number;
   stats: PlayerStats;
   marketValue: string;
   contract: string;
@@ -43,6 +44,7 @@ export const EMPTY_PLAYER: PlayerExtended = {
   nationality: "N/A",
   club: "N/A",
   overallRating: 0,
+  potential: 0,
   tier: "C",
   positionRank: 0,
   capitalEfficiency: 0,

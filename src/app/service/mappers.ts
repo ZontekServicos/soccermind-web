@@ -45,6 +45,7 @@ export function mapApiPlayerToPlayer(apiPlayer: ApiPlayer): PlayerExtended {
     nationality: apiPlayer.nationality,
     club: apiPlayer.team ?? "Free Agent",
     overallRating: overall,
+    potential,
     tier: tier,
     positionRank: 0, // Will be calculated later if needed
     capitalEfficiency: capitalEfficiency,

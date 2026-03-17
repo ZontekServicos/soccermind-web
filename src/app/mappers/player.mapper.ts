@@ -409,6 +409,7 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
     nationality: card.nationality || "N/A",
     club: card.team || "N/A",
     overallRating: overall,
+    potential,
     tier:
       overall >= 85 ? "ELITE" : overall >= 80 ? "A" : overall >= 75 ? "B" : overall >= 70 ? "C" : "DEVELOPMENT",
     positionRank: toNumber(getValue(source, ["positionRank", "rank"]), 0),
