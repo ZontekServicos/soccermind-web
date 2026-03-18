@@ -98,51 +98,60 @@ function formatCompactCurrency(value: number) {
   return `EUR ${(value / 1_000).toFixed(0)}K`;
 }
 
-function classifyRisk(player: PlayerExtended): RiskBucket {
+function getCompositeRisk(player: PlayerExtended) {
   const structural = player.structuralRisk.score;
   const financial = player.financialRisk.index;
+  const liquidity = player.liquidity.score;
 
-  if (structural >= 7 || financial >= 7) {
+  return structural * 0.5 + financial * 0.3 + (10 - liquidity) * 0.2;
+}
+
+function classifyRisk(player: PlayerExtended): RiskBucket {
+  const compositeRisk = getCompositeRisk(player);
+
+  if (compositeRisk >= 7.5) {
     return "HIGH";
   }
 
-  if (structural <= 3 && financial <= 5) {
-    return "LOW";
+  if (compositeRisk >= 5) {
+    return "MEDIUM";
   }
 
-  return "MEDIUM";
+  return "LOW";
 }
 
 function getRiskExplanation(player: PlayerExtended, bucket: RiskBucket) {
   const structural = player.structuralRisk.score;
   const financial = player.financialRisk.index;
+  const liquidity = player.liquidity.score;
   const upside = player.potential - player.overallRating;
+  const compositeRisk = getCompositeRisk(player);
 
   if (bucket === "HIGH") {
-    if (structural >= 7 && financial >= 7) {
-      return "Exige diligencia reforcada porque combina risco estrutural elevado com exposicao financeira alta.";
+    if (financial >= structural) {
+      return `Composite risk ${compositeRisk.toFixed(1)} puxado pela exposicao financeira, com liquidez insuficiente para amortecer o custo do investimento.`;
     }
 
-    if (structural >= 7) {
-      return "Perfil esportivo mais sensivel no ciclo atual, com maior risco estrutural para retorno consistente.";
-    }
-
-    return "A alocacao de capital demanda cautela, pois o custo relativo ainda pressiona o risco financeiro.";
+    return `Composite risk ${compositeRisk.toFixed(1)} pressionado pela estrutura esportiva atual, exigindo diligencia maior antes de alocar capital.`;
   }
 
   if (bucket === "LOW") {
-    if (upside >= 4) {
-      return "Combina risco controlado com margem de evolucao, favorecendo investimento com boa opcao de revenda.";
+    if (upside >= 4 && liquidity >= 7) {
+      return `Composite risk ${compositeRisk.toFixed(1)} com boa liquidez e margem de evolucao, favorecendo investimento com opcao real de revenda.`;
     }
 
-    return "Perfil equilibrado para tomada de decisao, com risco esportivo e financeiro sob controle.";
+    return `Composite risk ${compositeRisk.toFixed(1)} sob controle, com equilibrio entre risco estrutural, risco financeiro e capacidade de saida.`;
+  }
+
+  if (liquidity >= 7 && financial < 6) {
+    return `Composite risk ${compositeRisk.toFixed(1)} moderado, mas compensado por liquidez saudavel e risco financeiro controlado.`;
   }
 
   if (upside >= 5) {
-    return "Ativo com upside relevante, mas ainda requer monitoramento para converter potencial em retorno previsivel.";
+    return `Composite risk ${compositeRisk.toFixed(1)} em faixa intermediaria, com upside relevante e necessidade de monitorar a conversao desse potencial.`;
   }
 
-  return "Pede acompanhamento tatico-financeiro, com risco administravel e retorno dependente de contexto.";
+  return `Composite risk ${compositeRisk.toFixed(1)} pede acompanhamento tatico-financeiro, sem sinal de urgencia critica no momento.`;
 }
 
 function buildRiskEntry(player: PlayerExtended): RiskPlayerEntry {
@@ -813,6 +822,7 @@ function RiskDecisionCard({
   explanation: string;
 }) {
   const palette = getRiskSectionColor(riskBucket);
+  const compositeRisk = getCompositeRisk(player);
 
   return (
     <div
@@ -838,7 +848,7 @@ function RiskDecisionCard({
           <RiskMetric label="Structural Risk" value={player.structuralRisk.score.toFixed(1)} />
           <RiskMetric label="Financial Risk" value={player.financialRisk.index.toFixed(1)} />
           <RiskMetric label="Liquidity" value={player.liquidity.score.toFixed(1)} />
-          <RiskMetric label="Capital Efficiency" value={player.capitalEfficiency.toFixed(1)} />
+          <RiskMetric label="Composite Risk" value={compositeRisk.toFixed(1)} />
         </div>
       </div>
     </div>

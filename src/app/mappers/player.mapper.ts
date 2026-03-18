@@ -276,6 +276,80 @@ function formatMarketValue(value: NullableNumber) {
   return `EUR ${value.toFixed(0)}`;
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function deriveStructuralRisk(age: number, overall: number, potential: number) {
+  const upside = Math.max(0, potential - overall);
+  const ageRisk = age >= 31 ? 4.2 : age >= 28 ? 2.8 : age <= 20 ? 2 : 1.4;
+  const performanceRisk = overall >= 85 ? 1.1 : overall >= 80 ? 1.8 : overall >= 75 ? 2.8 : 4;
+  const upsideRelief = upside >= 6 ? 1.4 : upside >= 3 ? 0.7 : 0;
+
+  return clamp(ageRisk + performanceRisk - upsideRelief, 1, 9.5);
+}
+
+function deriveLiquidityScore(age: number, overall: number, potential: number) {
+  const upside = Math.max(0, potential - overall);
+  const ageScore = age >= 21 && age <= 27 ? 2.6 : age >= 18 && age <= 20 ? 2.2 : age <= 30 ? 1.5 : 0.8;
+  const qualityScore = overall >= 85 ? 2.8 : overall >= 80 ? 2.1 : overall >= 75 ? 1.5 : 0.9;
+  const upsideScore = upside >= 6 ? 1.9 : upside >= 3 ? 1.1 : 0.4;
+
+  return clamp(2.2 + ageScore + qualityScore + upsideScore, 2, 9.8);
+}
+
+function deriveFinancialRisk(
+  age: number,
+  overall: number,
+  potential: number,
+  marketValueNumeric: number,
+  structuralRisk: number,
+  liquidityScore: number,
+) {
+  const upside = Math.max(0, potential - overall);
+  const marketPressure =
+    marketValueNumeric >= 80_000_000
+      ? 7.6
+      : marketValueNumeric >= 50_000_000
+        ? 6.6
+        : marketValueNumeric >= 25_000_000
+          ? 5.5
+          : marketValueNumeric >= 10_000_000
+            ? 4.5
+            : marketValueNumeric >= 3_000_000
+              ? 3.5
+              : marketValueNumeric > 0
+                ? 2.8
+                : 4.1;
+  const agePressure = age >= 31 ? 1.6 : age >= 28 ? 0.8 : age <= 22 ? -0.3 : 0;
+  const structuralPressure = structuralRisk * 0.18;
+  const liquidityRelief = Math.max(0, liquidityScore - 5) * 0.42;
+  const upsideRelief = Math.min(1.3, upside * 0.18);
+  const qualityRelief = overall >= 84 ? 0.4 : 0;
+
+  return clamp(
+    marketPressure + agePressure + structuralPressure - liquidityRelief - upsideRelief - qualityRelief,
+    1.5,
+    9.2,
+  );
+}
+
+function deriveCompositeRisk(structuralRisk: number, financialRisk: number, liquidityScore: number) {
+  return clamp(structuralRisk * 0.5 + financialRisk * 0.3 + (10 - liquidityScore) * 0.2, 0, 10);
+}
+
+function resolveRiskBucket(compositeRisk: number): PlayerExtended["riskLevel"] {
+  if (compositeRisk >= 7.5) {
+    return "HIGH";
+  }
+
+  if (compositeRisk >= 5) {
+    return "MEDIUM";
+  }
+
+  return "LOW";
+}
+
 function pickNullableNumber(source: UnknownRecord, keys: string[]) {
   return parseNullableNumber(getValue(source, keys));
 }
@@ -398,8 +472,18 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
   const potential = card.potential ?? overall;
   const marketValueNumeric = card.marketValue ?? 0;
   const capitalEfficiency = Math.max(0, Math.min(10, (overall + potential) / 20 - age / 20 + 3));
-  const riskLevel: PlayerExtended["riskLevel"] =
-    age > 29 ? "HIGH" : potential - overall >= 5 ? "LOW" : "MEDIUM";
+  const structuralRiskScore = deriveStructuralRisk(age, overall, potential);
+  const liquidityScore = deriveLiquidityScore(age, overall, potential);
+  const financialRiskIndex = deriveFinancialRisk(
+    age,
+    overall,
+    potential,
+    marketValueNumeric,
+    structuralRiskScore,
+    liquidityScore,
+  );
+  const compositeRisk = deriveCompositeRisk(structuralRiskScore, financialRiskIndex, liquidityScore);
+  const riskLevel = resolveRiskBucket(compositeRisk);
 
   return {
     id: card.id,
@@ -427,9 +511,9 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
     marketValue: card.marketValueLabel,
     contract: "N/A",
     structuralRisk: {
-      score: Math.max(0, Math.min(10, age > 30 ? 7 : age > 26 ? 5 : 3)),
+      score: structuralRiskScore,
       level: riskLevel,
-      breakdown: "Gerado a partir de idade, overall e potencial disponíveis.",
+      breakdown: "Gerado a partir da curva etaria, consistencia tecnica e margem de evolucao do atleta.",
     },
     antiFlopIndex: {
       flopProbability: Math.max(0, Math.min(100, 50 - (potential - overall) * 5 + (age > 28 ? 15 : 0))),
@@ -437,18 +521,19 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
       classification: "Gerado a partir dos dados atuais da API.",
     },
     liquidity: {
-      score: Math.max(0, Math.min(10, overall / 10)),
+      score: liquidityScore,
       resaleWindow: age < 24 ? "3-5 anos" : age < 28 ? "2-3 anos" : "1-2 anos",
-      marketProfile: card.league ? `Mercado ativo em ${card.league}` : "Mercado em avaliação",
+      marketProfile:
+        liquidityScore >= 8
+          ? "Alta liquidez e janela de saida favoravel."
+          : liquidityScore >= 6
+            ? "Liquidez moderada, com mercado ativo para revenda."
+            : "Liquidez mais restrita e ciclo de saida menos imediato.",
     },
     financialRisk: {
-      index: Math.max(
-        0,
-        Math.min(10, marketValueNumeric > 30_000_000 ? 7 : marketValueNumeric > 10_000_000 ? 5 : 3),
-      ),
-      capitalExposure:
-        marketValueNumeric > 30_000_000 ? "Alta" : marketValueNumeric > 10_000_000 ? "Média" : "Baixa",
-      investmentProfile: "Baseado no valor de mercado retornado pela API.",
+      index: financialRiskIndex,
+      capitalExposure: financialRiskIndex >= 7 ? "Alta" : financialRiskIndex >= 5 ? "Media" : "Baixa",
+      investmentProfile: `Composto por pressao de mercado, liquidez ${liquidityScore.toFixed(1)} e risco agregado ${compositeRisk.toFixed(1)}.`,
     },
   };
 }
