@@ -494,8 +494,8 @@ export default function Dashboard() {
                 title="Capital Efficiency Ranking"
                 icon={Target}
                 iconColor="#00C2FF"
-                subtitle={`Top ${CHART_DATA_LIMIT} atletas, exibidos em paginas para leitura mais objetiva.`}
-                summary="Leitura rapida do melhor equilibrio entre desempenho, idade e custo."
+                subtitle="Mostra os jogadores com melhor relacao entre desempenho e custo de investimento."
+                summary="Valores mais altos indicam melhor retorno esportivo por capital alocado."
                 data={pagedEfficiencyData}
                 page={efficiencyPage}
                 totalPages={efficiencyTotalPages}
@@ -509,8 +509,8 @@ export default function Dashboard() {
                 title="Overall Rating Ranking"
                 icon={TrendingUp}
                 iconColor="#7A5CFF"
-                subtitle={`Amostra enxuta com os ${CHART_DATA_LIMIT} ratings mais altos do elenco.`}
-                summary="Menos ruido visual e mais foco nos nomes que realmente movem a decisao."
+                subtitle="Mostra os jogadores com maior nivel tecnico geral no elenco analisado."
+                summary="Representa qualidade esportiva pura, sem considerar custo de mercado."
                 data={pagedRatingData}
                 page={ratingPage}
                 totalPages={ratingTotalPages}
