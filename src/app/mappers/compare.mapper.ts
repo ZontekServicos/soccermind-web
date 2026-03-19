@@ -157,6 +157,14 @@ function normalizePositionContextKind(value: unknown): PositionContextKind {
   return "cross";
 }
 
+function normalizeRiskLevel(value: unknown) {
+  const normalized = toText(value, "").toUpperCase();
+  if (normalized === "LOW" || normalized === "MEDIUM" || normalized === "HIGH") {
+    return normalized;
+  }
+  return null;
+}
+
 function buildFallbackPositionContext(positionA: string, positionB: string) {
   const groupA = getPositionGroup(positionA);
   const groupB = getPositionGroup(positionB);
@@ -223,6 +231,12 @@ export function mapCompareResponse(response: unknown) {
 
   const playerA = mapApiPlayerToExtended(normalizedPlayerA);
   const playerB = mapApiPlayerToExtended(normalizedPlayerB);
+  const normalizedStructuralA = pickRecord(normalizedPlayerA, ["structuralRisk"]);
+  const normalizedStructuralB = pickRecord(normalizedPlayerB, ["structuralRisk"]);
+  const normalizedLiquidityA = pickRecord(normalizedPlayerA, ["liquidity"]);
+  const normalizedLiquidityB = pickRecord(normalizedPlayerB, ["liquidity"]);
+  const normalizedFinancialA = pickRecord(normalizedPlayerA, ["financialRisk"]);
+  const normalizedFinancialB = pickRecord(normalizedPlayerB, ["financialRisk"]);
 
   const overallA = pickRecord(pickRecord(source, ["overallRating"]) ?? {}, ["playerA"]);
   const overallB = pickRecord(pickRecord(source, ["overallRating"]) ?? {}, ["playerB"]);
@@ -236,6 +250,8 @@ export function mapCompareResponse(response: unknown) {
   const riskB = pickRecord(pickRecord(source, ["risk"]) ?? {}, ["playerB"]);
   const antiFlopA = pickRecord(pickRecord(source, ["antiFlop"]) ?? {}, ["playerA"]);
   const antiFlopB = pickRecord(pickRecord(source, ["antiFlop"]) ?? {}, ["playerB"]);
+  const riskProfileA = pickRecord(pickRecord(source, ["riskProfile"]) ?? {}, ["playerA"]);
+  const riskProfileB = pickRecord(pickRecord(source, ["riskProfile"]) ?? {}, ["playerB"]);
   const positionContextSource = pickRecord(source, ["positionContext"]);
 
   playerA.capitalEfficiency = toNumber(capitalA?.index, playerA.capitalEfficiency);
@@ -246,24 +262,30 @@ export function mapCompareResponse(response: unknown) {
   playerB.positionRank = toNumber(overallB?.positionRank, playerB.positionRank);
 
   playerA.structuralRisk = {
-    score: toNumber(riskA?.totalRisk, playerA.structuralRisk.score),
-    level:
-      toNumber(riskA?.totalRisk, playerA.structuralRisk.score) >= 60
+    score: normalizedStructuralA ? playerA.structuralRisk.score : toNumber(riskA?.totalRisk, playerA.structuralRisk.score),
+    level: normalizedStructuralA
+      ? playerA.structuralRisk.level
+      : toNumber(riskA?.totalRisk, playerA.structuralRisk.score) >= 60
         ? "HIGH"
         : toNumber(riskA?.totalRisk, playerA.structuralRisk.score) >= 20
           ? "MEDIUM"
           : "LOW",
-    breakdown: toText(riskA?.executiveSummary, playerA.structuralRisk.breakdown),
+    breakdown: normalizedStructuralA
+      ? playerA.structuralRisk.breakdown
+      : toText(riskA?.executiveSummary, playerA.structuralRisk.breakdown),
   };
   playerB.structuralRisk = {
-    score: toNumber(riskB?.totalRisk, playerB.structuralRisk.score),
-    level:
-      toNumber(riskB?.totalRisk, playerB.structuralRisk.score) >= 60
+    score: normalizedStructuralB ? playerB.structuralRisk.score : toNumber(riskB?.totalRisk, playerB.structuralRisk.score),
+    level: normalizedStructuralB
+      ? playerB.structuralRisk.level
+      : toNumber(riskB?.totalRisk, playerB.structuralRisk.score) >= 60
         ? "HIGH"
         : toNumber(riskB?.totalRisk, playerB.structuralRisk.score) >= 20
           ? "MEDIUM"
           : "LOW",
-    breakdown: toText(riskB?.executiveSummary, playerB.structuralRisk.breakdown),
+    breakdown: normalizedStructuralB
+      ? playerB.structuralRisk.breakdown
+      : toText(riskB?.executiveSummary, playerB.structuralRisk.breakdown),
   };
 
   playerA.antiFlopIndex = {
@@ -278,29 +300,45 @@ export function mapCompareResponse(response: unknown) {
   };
 
   playerA.liquidity = {
-    score: toNumber(liquidityA?.liquidityScore, playerA.liquidity.score),
+    score: normalizedLiquidityA ? playerA.liquidity.score : toNumber(liquidityA?.liquidityScore, playerA.liquidity.score),
     resaleWindow: toText(liquidityA?.resaleWindow, playerA.liquidity.resaleWindow),
     marketProfile: toText(liquidityA?.marketProfile, playerA.liquidity.marketProfile),
   };
   playerB.liquidity = {
-    score: toNumber(liquidityB?.liquidityScore, playerB.liquidity.score),
+    score: normalizedLiquidityB ? playerB.liquidity.score : toNumber(liquidityB?.liquidityScore, playerB.liquidity.score),
     resaleWindow: toText(liquidityB?.resaleWindow, playerB.liquidity.resaleWindow),
     marketProfile: toText(liquidityB?.marketProfile, playerB.liquidity.marketProfile),
   };
 
   playerA.financialRisk = {
-    index: toNumber(financialA?.riskIndex, playerA.financialRisk.index),
+    index: normalizedFinancialA ? playerA.financialRisk.index : toNumber(financialA?.riskIndex, playerA.financialRisk.index),
     capitalExposure: toText(financialA?.capitalExposure, playerA.financialRisk.capitalExposure),
     investmentProfile: toText(financialA?.investmentProfile, playerA.financialRisk.investmentProfile),
   };
   playerB.financialRisk = {
-    index: toNumber(financialB?.riskIndex, playerB.financialRisk.index),
+    index: normalizedFinancialB ? playerB.financialRisk.index : toNumber(financialB?.riskIndex, playerB.financialRisk.index),
     capitalExposure: toText(financialB?.capitalExposure, playerB.financialRisk.capitalExposure),
     investmentProfile: toText(financialB?.investmentProfile, playerB.financialRisk.investmentProfile),
   };
 
-  playerA.riskLevel = playerA.structuralRisk.level;
-  playerB.riskLevel = playerB.structuralRisk.level;
+  if (riskProfileA) {
+    playerA.risk = {
+      score: toNumber(riskProfileA.score, playerA.risk.score),
+      level: normalizeRiskLevel(riskProfileA.level) ?? playerA.risk.level,
+      explanation: toText(riskProfileA.explanation, playerA.risk.explanation),
+    };
+  }
+
+  if (riskProfileB) {
+    playerB.risk = {
+      score: toNumber(riskProfileB.score, playerB.risk.score),
+      level: normalizeRiskLevel(riskProfileB.level) ?? playerB.risk.level,
+      explanation: toText(riskProfileB.explanation, playerB.risk.explanation),
+    };
+  }
+
+  playerA.riskLevel = playerA.risk.level;
+  playerB.riskLevel = playerB.risk.level;
 
   const radarData = buildRadarData(playerA.stats, playerB.stats);
   const winner = normalizeWinner(source.winner ?? pickRecord(source, ["quantitative"])?.winner);

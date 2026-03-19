@@ -14,6 +14,11 @@ export interface PlayerExtended extends PlayerProfile {
   stats: PlayerStats;
   marketValue: string;
   contract: string;
+  risk: {
+    score: number;
+    level: "LOW" | "MEDIUM" | "HIGH";
+    explanation: string;
+  };
   structuralRisk: {
     score: number;
     level: "LOW" | "MEDIUM" | "HIGH";
@@ -51,6 +56,11 @@ export const EMPTY_PLAYER: PlayerExtended = {
   riskLevel: "MEDIUM",
   marketValue: "N/A",
   contract: "N/A",
+  risk: {
+    score: 0,
+    level: "MEDIUM",
+    explanation: "Sem dados suficientes para calcular o risco composto.",
+  },
   stats: {
     pace: 0,
     passing: 0,

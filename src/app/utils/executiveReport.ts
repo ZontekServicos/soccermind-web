@@ -212,14 +212,15 @@ function buildDecisionScore(
     growthIndex * 0.08 +
     upsideGap * 2.2 +
     ageCurveBonus -
-    player.structuralRisk.score * 0.42 -
-    player.financialRisk.index * 0.28 -
+    player.risk.score * 0.7 -
+    player.structuralRisk.score * 0.28 -
+    player.financialRisk.index * 0.22 -
     marketPenalty
   );
 }
 
 function describeTimeHorizon(player: PlayerExtended, potential: number, growthIndex: number) {
-  if (player.overallRating >= 84 && player.structuralRisk.score <= 35 && player.financialRisk.index <= 45) {
+  if (player.overallRating >= 84 && player.risk.score <= 4.2 && player.financialRisk.index <= 4.5) {
     return "reforco imediato";
   }
 
@@ -306,7 +307,7 @@ export function buildExecutiveReportModel({
     getMetricWinner(playerA.capitalEfficiency, playerB.capitalEfficiency) === "A" ? playerA.name : getMetricWinner(playerA.capitalEfficiency, playerB.capitalEfficiency) === "B" ? playerB.name : "equilibrio"
   } em eficiencia de capital precisa ser lida ao lado da diferenca de liquidez e da pressao de risco financeiro, porque e nesse encaixe que o retorno total do investimento se torna mais previsivel.`;
 
-  const riskOverview = `${playerA.name} carrega risco estrutural de ${playerA.structuralRisk.score.toFixed(1)} e risco financeiro de ${playerA.financialRisk.index.toFixed(1)}, com leitura dominante de "${playerA.financialRisk.investmentProfile}". ${playerB.name} aparece com risco estrutural de ${playerB.structuralRisk.score.toFixed(1)} e risco financeiro de ${playerB.financialRisk.index.toFixed(1)}, sustentado por "${playerB.financialRisk.investmentProfile}". A vantagem real nao esta apenas em quem corre menos risco absoluto, mas em quem apresenta risco melhor remunerado pelo pacote tecnico, pela janela de revenda e pela margem de crescimento ainda capturavel.`;
+  const riskOverview = `${playerA.name} aparece com risco composto de ${playerA.risk.score.toFixed(1)} (${playerA.risk.level}), sustentado por ${playerA.risk.explanation.toLowerCase()} ${playerB.name} responde com risco composto de ${playerB.risk.score.toFixed(1)} (${playerB.risk.level}), em uma leitura em que ${playerB.risk.explanation.toLowerCase()} A vantagem real nao esta apenas em quem corre menos risco absoluto, mas em quem apresenta risco melhor remunerado pelo pacote tecnico, pela janela de revenda e pela margem de crescimento ainda capturavel.`;
 
   const narrativeParagraphs = recommendedPlayer && secondaryPlayer
     ? [
@@ -342,6 +343,13 @@ export function buildExecutiveReportModel({
       a: playerA.capitalEfficiency,
       b: playerB.capitalEfficiency,
       winner: getMetricWinner(playerA.capitalEfficiency, playerB.capitalEfficiency),
+    },
+    {
+      label: "Composite Risk",
+      a: playerA.risk.score,
+      b: playerB.risk.score,
+      inverse: true,
+      winner: getMetricWinner(playerA.risk.score, playerB.risk.score, true),
     },
     {
       label: "Structural Risk",

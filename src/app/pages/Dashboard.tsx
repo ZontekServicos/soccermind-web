@@ -98,76 +98,18 @@ function formatCompactCurrency(value: number) {
   return `EUR ${(value / 1_000).toFixed(0)}K`;
 }
 
-function getCompositeRisk(player: PlayerExtended) {
-  const structural = player.structuralRisk.score;
-  const financial = player.financialRisk.index;
-  const liquidity = player.liquidity.score;
-
-  return structural * 0.5 + financial * 0.3 + (10 - liquidity) * 0.2;
-}
-
-function classifyRisk(player: PlayerExtended): RiskBucket {
-  const compositeRisk = getCompositeRisk(player);
-
-  if (compositeRisk >= 7.5) {
-    return "HIGH";
-  }
-
-  if (compositeRisk >= 5) {
-    return "MEDIUM";
-  }
-
-  return "LOW";
-}
-
-function getRiskExplanation(player: PlayerExtended, bucket: RiskBucket) {
-  const structural = player.structuralRisk.score;
-  const financial = player.financialRisk.index;
-  const liquidity = player.liquidity.score;
-  const upside = player.potential - player.overallRating;
-  const compositeRisk = getCompositeRisk(player);
-
-  if (bucket === "HIGH") {
-    if (financial >= structural) {
-      return `Composite risk ${compositeRisk.toFixed(1)} puxado pela exposicao financeira, com liquidez insuficiente para amortecer o custo do investimento.`;
-    }
-
-    return `Composite risk ${compositeRisk.toFixed(1)} pressionado pela estrutura esportiva atual, exigindo diligencia maior antes de alocar capital.`;
-  }
-
-  if (bucket === "LOW") {
-    if (upside >= 4 && liquidity >= 7) {
-      return `Composite risk ${compositeRisk.toFixed(1)} com boa liquidez e margem de evolucao, favorecendo investimento com opcao real de revenda.`;
-    }
-
-    return `Composite risk ${compositeRisk.toFixed(1)} sob controle, com equilibrio entre risco estrutural, risco financeiro e capacidade de saida.`;
-  }
-
-  if (liquidity >= 7 && financial < 6) {
-    return `Composite risk ${compositeRisk.toFixed(1)} moderado, mas compensado por liquidez saudavel e risco financeiro controlado.`;
-  }
-
-  if (upside >= 5) {
-    return `Composite risk ${compositeRisk.toFixed(1)} em faixa intermediaria, com upside relevante e necessidade de monitorar a conversao desse potencial.`;
-  }
-
-  return `Composite risk ${compositeRisk.toFixed(1)} pede acompanhamento tatico-financeiro, sem sinal de urgencia critica no momento.`;
-}
-
 function buildRiskEntry(player: PlayerExtended): RiskPlayerEntry {
-  const riskBucket = classifyRisk(player);
-
   return {
     player,
-    riskBucket,
-    explanation: getRiskExplanation(player, riskBucket),
+    riskBucket: player.risk.level,
+    explanation: player.risk.explanation,
   };
 }
 
 function buildStrategicAsset(player: PlayerExtended): StrategicAsset | null {
   const marketValue = parseMarketValueLabel(player.marketValue);
   const liquidity = player.liquidity.score;
-  const risk = classifyRisk(player);
+  const risk = player.risk.level;
   const upside = player.potential - player.overallRating;
   const valueEfficiency = marketValue > 0 ? (player.overallRating + player.potential) / (marketValue / 1_000_000) : 0;
   const immediateImpact = player.overallRating >= 86 && liquidity >= 7.5;
@@ -257,7 +199,7 @@ function getAssetTierColor(tier: StrategicAssetTier) {
 }
 
 function getRiskCount(players: PlayerExtended[], bucket: RiskBucket) {
-  return players.filter((player) => classifyRisk(player) === bucket).length;
+  return players.filter((player) => player.risk.level === bucket).length;
 }
 
 function getRiskSectionColor(bucket: RiskBucket) {
@@ -822,7 +764,7 @@ function RiskDecisionCard({
   explanation: string;
 }) {
   const palette = getRiskSectionColor(riskBucket);
-  const compositeRisk = getCompositeRisk(player);
+  const compositeRisk = player.risk.score;
 
   return (
     <div

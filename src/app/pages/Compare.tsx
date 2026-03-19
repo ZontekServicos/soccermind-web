@@ -724,7 +724,7 @@ function PlayerComparisonCard({ player, variant }: { player: PlayerExtended; var
           <TierBadge tier={player.tier} className="!px-2.5 !py-1 !text-[10px] !shadow-[0_2px_8px_rgba(0,0,0,0.2)]" />
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-4 gap-4 mb-6">
           <div>
             <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Overall</p>
             <p className="text-2xl font-bold" style={{ color: accentColor }}>{player.overallRating}</p>
@@ -737,11 +737,18 @@ function PlayerComparisonCard({ player, variant }: { player: PlayerExtended; var
             <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Risk Level</p>
             <RiskBadge level={player.riskLevel} />
           </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Risk Score</p>
+            <p className="text-2xl font-bold text-gray-300">{player.risk.score.toFixed(1)}</p>
+          </div>
         </div>
 
-        <div className="flex items-center justify-center pt-2 border-t border-[rgba(255,255,255,0.06)]">
-          <div className="text-center">
+        <div className="border-t border-[rgba(255,255,255,0.06)] pt-4">
+          <p className="mb-4 text-sm leading-6 text-gray-400">{player.risk.explanation}</p>
+          <div className="flex items-center justify-center">
             <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-3">Capital Efficiency</p>
+          </div>
+          <div className="flex justify-center">
             <CapitalGauge value={player.capitalEfficiency} size="xs" showLabel />
           </div>
         </div>

@@ -108,7 +108,10 @@ function mapPlayersEnvelope(
 ): ApiEnvelope<PlayerCardModel[]> {
   return {
     ...response,
-    data: extractPlayersPayload(response.data).map((item) => mapper(item as ApiPlayerLike | UnknownRecord)),
+    data: extractPlayersPayload(response.data).map((item) => ({
+      ...(item as Record<string, unknown>),
+      ...mapper(item as ApiPlayerLike | UnknownRecord),
+    })),
   };
 }
 

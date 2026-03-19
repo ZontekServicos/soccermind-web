@@ -350,6 +350,16 @@ function resolveRiskBucket(compositeRisk: number): PlayerExtended["riskLevel"] {
   return "LOW";
 }
 
+function normalizeRiskLevel(value: unknown): PlayerExtended["riskLevel"] | null {
+  const normalized = getTextCandidate(value)?.toUpperCase();
+
+  if (normalized === "LOW" || normalized === "MEDIUM" || normalized === "HIGH") {
+    return normalized;
+  }
+
+  return null;
+}
+
 function pickNullableNumber(source: UnknownRecord, keys: string[]) {
   return parseNullableNumber(getValue(source, keys));
 }
@@ -471,6 +481,10 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
   const overall = card.overall ?? 70;
   const potential = card.potential ?? overall;
   const marketValueNumeric = card.marketValue ?? 0;
+  const riskSource = pickFirstRecord(source, ["risk"]);
+  const structuralRiskSource = pickFirstRecord(source, ["structuralRisk"]);
+  const liquiditySource = pickFirstRecord(source, ["liquidity"]);
+  const financialRiskSource = pickFirstRecord(source, ["financialRisk"]);
   const capitalEfficiency = Math.max(0, Math.min(10, (overall + potential) / 20 - age / 20 + 3));
   const structuralRiskScore = deriveStructuralRisk(age, overall, potential);
   const liquidityScore = deriveLiquidityScore(age, overall, potential);
@@ -484,6 +498,17 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
   );
   const compositeRisk = deriveCompositeRisk(structuralRiskScore, financialRiskIndex, liquidityScore);
   const riskLevel = resolveRiskBucket(compositeRisk);
+  const providedRiskScore = pickNullableNumber(riskSource ?? {}, ["score", "riskScore", "compositeRisk"]);
+  const providedRiskLevel = normalizeRiskLevel(riskSource?.level);
+  const finalRiskScore = providedRiskScore ?? compositeRisk;
+  const finalRiskLevel = providedRiskLevel ?? riskLevel;
+  const finalRiskExplanation =
+    getTextCandidate(riskSource?.explanation) ??
+    `Composite risk ${finalRiskScore.toFixed(1)} construido a partir de exposicao estrutural, custo e liquidez.`;
+  const finalStructuralRiskScore = pickNullableNumber(structuralRiskSource ?? {}, ["score"]) ?? structuralRiskScore;
+  const finalStructuralRiskLevel = normalizeRiskLevel(structuralRiskSource?.level) ?? finalRiskLevel;
+  const finalLiquidityScore = pickNullableNumber(liquiditySource ?? {}, ["score", "liquidityScore"]) ?? liquidityScore;
+  const finalFinancialRiskIndex = pickNullableNumber(financialRiskSource ?? {}, ["index", "riskIndex"]) ?? financialRiskIndex;
 
   return {
     id: card.id,
@@ -498,7 +523,12 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
       overall >= 85 ? "ELITE" : overall >= 80 ? "A" : overall >= 75 ? "B" : overall >= 70 ? "C" : "DEVELOPMENT",
     positionRank: toNumber(getValue(source, ["positionRank", "rank"]), 0),
     capitalEfficiency,
-    riskLevel,
+    riskLevel: finalRiskLevel,
+    risk: {
+      score: finalRiskScore,
+      level: finalRiskLevel,
+      explanation: finalRiskExplanation,
+    },
     photoUrl: card.image || undefined,
     stats: {
       pace: profile.pac ?? 0,
@@ -511,9 +541,11 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
     marketValue: card.marketValueLabel,
     contract: "N/A",
     structuralRisk: {
-      score: structuralRiskScore,
-      level: riskLevel,
-      breakdown: "Gerado a partir da curva etaria, consistencia tecnica e margem de evolucao do atleta.",
+      score: finalStructuralRiskScore,
+      level: finalStructuralRiskLevel,
+      breakdown:
+        getTextCandidate(structuralRiskSource?.breakdown) ??
+        "Gerado a partir da curva etaria, consistencia tecnica e margem de evolucao do atleta.",
     },
     antiFlopIndex: {
       flopProbability: Math.max(0, Math.min(100, 50 - (potential - overall) * 5 + (age > 28 ? 15 : 0))),
@@ -521,19 +553,26 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
       classification: "Gerado a partir dos dados atuais da API.",
     },
     liquidity: {
-      score: liquidityScore,
-      resaleWindow: age < 24 ? "3-5 anos" : age < 28 ? "2-3 anos" : "1-2 anos",
+      score: finalLiquidityScore,
+      resaleWindow:
+        getTextCandidate(liquiditySource?.resaleWindow) ??
+        (age < 24 ? "3-5 anos" : age < 28 ? "2-3 anos" : "1-2 anos"),
       marketProfile:
-        liquidityScore >= 8
+        getTextCandidate(liquiditySource?.marketProfile) ??
+        (finalLiquidityScore >= 8
           ? "Alta liquidez e janela de saida favoravel."
-          : liquidityScore >= 6
+          : finalLiquidityScore >= 6
             ? "Liquidez moderada, com mercado ativo para revenda."
-            : "Liquidez mais restrita e ciclo de saida menos imediato.",
+            : "Liquidez mais restrita e ciclo de saida menos imediato."),
     },
     financialRisk: {
-      index: financialRiskIndex,
-      capitalExposure: financialRiskIndex >= 7 ? "Alta" : financialRiskIndex >= 5 ? "Media" : "Baixa",
-      investmentProfile: `Composto por pressao de mercado, liquidez ${liquidityScore.toFixed(1)} e risco agregado ${compositeRisk.toFixed(1)}.`,
+      index: finalFinancialRiskIndex,
+      capitalExposure:
+        getTextCandidate(financialRiskSource?.capitalExposure) ??
+        (finalFinancialRiskIndex >= 7 ? "Alta" : finalFinancialRiskIndex >= 5 ? "Media" : "Baixa"),
+      investmentProfile:
+        getTextCandidate(financialRiskSource?.investmentProfile) ??
+        `Composto por pressao de mercado, liquidez ${finalLiquidityScore.toFixed(1)} e risco agregado ${finalRiskScore.toFixed(1)}.`,
     },
   };
 }

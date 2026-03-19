@@ -721,10 +721,11 @@ function PlayerRiskBlock({
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
+        <RiskCard title="Composite Risk" value={`${player.risk.score.toFixed(1)}`} subtitle={player.risk.level} description={player.risk.explanation} />
         <RiskCard title="Structural Risk" value={`${player.structuralRisk.score.toFixed(1)}`} subtitle={player.structuralRisk.level} description={player.structuralRisk.breakdown} />
         <RiskCard title="Financial Risk" value={`${player.financialRisk.index.toFixed(1)}`} subtitle={player.financialRisk.capitalExposure} description={player.financialRisk.investmentProfile} />
         <RiskCard title="Liquidity Window" value={`${player.liquidity.score.toFixed(1)}`} subtitle={player.liquidity.resaleWindow} description={player.liquidity.marketProfile} />
-        <RiskCard title="Capital Efficiency" value={`${player.capitalEfficiency.toFixed(1)}`} subtitle={player.riskLevel} description={`${player.name} combina leitura de custo, risco e desempenho dentro do recorte atual.`} />
+        <RiskCard title="Capital Efficiency" value={`${player.capitalEfficiency.toFixed(1)}`} subtitle={player.risk.level} description={`${player.name} combina leitura de custo, risco e desempenho dentro do recorte atual.`} />
       </div>
     </div>
   );
