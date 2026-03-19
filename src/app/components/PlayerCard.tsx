@@ -1,4 +1,4 @@
-import { SquadPlayer } from "../data/corinthiansSquad";
+import type { SquadPlayer } from "../types/squad";
 import { RiskBadge } from "./RiskBadge";
 
 interface PlayerCardProps {

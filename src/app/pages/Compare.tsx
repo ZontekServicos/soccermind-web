@@ -21,9 +21,8 @@ import { RiskBadge } from "../components/RiskBadge";
 import { TierBadge } from "../components/TierBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { mapCompareResponse } from "../mappers/compare.mapper";
-import { mapApiPlayerToExtended } from "../mappers/player.mapper";
 import { comparePlayers, comparePlayersByName } from "../services/compare";
-import { searchPlayers, type PlayerFilterOptions } from "../services/players";
+import { searchExtendedPlayers, type PlayerFilterOptions } from "../services/players";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import {
   buildApiFilters,
@@ -125,14 +124,12 @@ export default function Compare() {
       setPlayersLoading(true);
 
       try {
-        const response = await searchPlayers({ ...apiFilters, page: 1, limit: 80 });
+        const response = await searchExtendedPlayers({ ...apiFilters, page: 1, limit: 80 });
         if (!active) {
           return;
         }
 
-        const mappedPlayers = Array.isArray(response.data)
-          ? response.data.map((player) => mapApiPlayerToExtended(player as Record<string, unknown>))
-          : [];
+        const mappedPlayers = Array.isArray(response.data) ? response.data : [];
 
         setAvailablePlayers(mappedPlayers);
         setPlayersError(null);

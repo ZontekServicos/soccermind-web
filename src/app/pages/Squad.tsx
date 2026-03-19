@@ -6,9 +6,10 @@ import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Input } from "../components/ui/input";
 import { LayoutGrid, List, Users, Search, Filter, Save, RotateCcw, Sparkles, TrendingUp, TrendingDown, Minus, Plus, Edit } from "lucide-react";
-import { corinthiansSquad as defaultSquad, SquadPlayer } from "../data/corinthiansSquad";
 import { RiskBadge } from "../components/RiskBadge";
 import { PlayerEditModal } from "../components/PlayerEditModal";
+import { getLineupSnapshot, getSquadSnapshot, persistLineup, persistSquad } from "../services/squad";
+import type { SquadLineup, SquadPlayer } from "../types/squad";
 
 type ViewMode = "cards" | "list" | "tactical";
 type Formation = "4-3-3" | "4-4-2" | "4-2-3-1" | "3-5-2";
@@ -77,33 +78,14 @@ const formations: Record<Formation, { positions: Record<string, { x: string; y: 
 };
 
 export default function Squad() {
-  // Load squad from localStorage or use default
-  const [squad, setSquad] = useState<SquadPlayer[]>(() => {
-    const saved = localStorage.getItem("soccermind-squad");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error("Error loading squad from localStorage", e);
-      }
-    }
-    return defaultSquad;
-  });
+  const [squad, setSquad] = useState<SquadPlayer[]>(() => getSquadSnapshot());
 
   const [viewMode, setViewMode] = useState<ViewMode>("tactical");
   const [searchQuery, setSearchQuery] = useState("");
   const [positionFilter, setPositionFilter] = useState<string>("all");
   const [ovrFilter, setOvrFilter] = useState<string>("all");
   const [formation, setFormation] = useState<Formation>("4-3-3");
-  const [lineup, setLineup] = useState<Record<string, SquadPlayer>>(() => {
-    const initialLineup: Record<string, SquadPlayer> = {};
-    squad.forEach((player) => {
-      if (player.fieldPosition && !initialLineup[player.fieldPosition]) {
-        initialLineup[player.fieldPosition] = player;
-      }
-    });
-    return initialLineup;
-  });
+  const [lineup, setLineup] = useState<SquadLineup>(() => getLineupSnapshot(squad));
   
   const [draggedPlayer, setDraggedPlayer] = useState<SquadPlayer | null>(null);
   const [draggedFromPosition, setDraggedFromPosition] = useState<string | null>(null);
@@ -112,34 +94,24 @@ export default function Squad() {
 
   // Save squad to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("soccermind-squad", JSON.stringify(squad));
+    persistSquad(squad);
   }, [squad]);
 
   // Save lineup to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("soccermind-lineup", JSON.stringify(lineup));
+    persistLineup(lineup);
   }, [lineup]);
 
-  // Load lineup from localStorage on mount
+  // Keep the lineup coherent with the current squad roster.
   useEffect(() => {
-    const savedLineup = localStorage.getItem("soccermind-lineup");
-    if (savedLineup) {
-      try {
-        const parsed = JSON.parse(savedLineup);
-        // Validate that players still exist in squad
-        const validLineup: Record<string, SquadPlayer> = {};
-        Object.entries(parsed).forEach(([pos, player]: [string, any]) => {
-          const existingPlayer = squad.find(p => p.id === player.id);
-          if (existingPlayer) {
-            validLineup[pos] = existingPlayer;
-          }
-        });
-        setLineup(validLineup);
-      } catch (e) {
-        console.error("Error loading lineup from localStorage", e);
+    setLineup((current) => {
+      if (Object.keys(current).length > 0) {
+        return current;
       }
-    }
-  }, []);
+
+      return getLineupSnapshot(squad);
+    });
+  }, [squad]);
 
   const positions = [
     { value: "all", label: "Todas as Posições" },
@@ -330,7 +302,7 @@ export default function Squad() {
   };
 
   const handleSaveLineup = () => {
-    localStorage.setItem("soccermind-lineup", JSON.stringify(lineup));
+    persistLineup(lineup);
     alert("✅ Escalação salva com sucesso!");
   };
 

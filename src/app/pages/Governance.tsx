@@ -1,4 +1,4 @@
-import { AppSidebar } from "../components/AppSidebar";
+﻿import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -25,7 +25,8 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
-import { useState, useMemo, memo } from "react";
+import { useEffect, useState, useMemo, memo } from "react";
+import { getGovernanceRecords } from "../services/governance";
 
 interface GovernanceRecord {
   id: string;
@@ -35,7 +36,7 @@ interface GovernanceRecord {
   player: string;
   action: string;
   justification: string;
-  status: "Aprovado" | "Pendente" | "Em Análise" | "Reprovado";
+  status: "Aprovado" | "Pendente" | "Em AnÃ¡lise" | "Reprovado";
   approvedBy?: string;
   area: string;
   version: string;
@@ -48,18 +49,18 @@ const mockRecords: GovernanceRecord[] = [
   {
     id: "GOV-2026-001",
     date: "2026-02-20T14:35:00",
-    requestedBy: "João Silva",
+    requestedBy: "JoÃ£o Silva",
     role: "Diretor Executivo",
     player: "Gabriel Barbosa",
-    action: "Análise Comparativa Completa",
+    action: "AnÃ¡lise Comparativa Completa",
     justification:
-      "Avaliação para renovação contratual. Necessário comparar com opções do mercado antes da decisão final.",
+      "AvaliaÃ§Ã£o para renovaÃ§Ã£o contratual. NecessÃ¡rio comparar com opÃ§Ãµes do mercado antes da decisÃ£o final.",
     status: "Aprovado",
     approvedBy: "Ricardo Santos (Presidente)",
-    area: "Gestão de Elenco",
+    area: "GestÃ£o de Elenco",
     version: "1.2",
     lastUpdate: "2026-02-21T10:15:00",
-    createdBy: "João Silva",
+    createdBy: "JoÃ£o Silva",
     reviewedBy: "Maria Oliveira",
   },
   {
@@ -68,11 +69,11 @@ const mockRecords: GovernanceRecord[] = [
     requestedBy: "Maria Oliveira",
     role: "Scout Chefe",
     player: "Vitor Roque",
-    action: "Relatório de Risco Estrutural",
+    action: "RelatÃ³rio de Risco Estrutural",
     justification:
-      "Monitoramento de ativo estratégico. Verificar evolução no clube europeu e possibilidade de retorno.",
+      "Monitoramento de ativo estratÃ©gico. Verificar evoluÃ§Ã£o no clube europeu e possibilidade de retorno.",
     status: "Aprovado",
-    approvedBy: "João Silva (Diretor Executivo)",
+    approvedBy: "JoÃ£o Silva (Diretor Executivo)",
     area: "Scouting",
     version: "1.0",
     lastUpdate: "2026-02-18T16:45:00",
@@ -85,9 +86,9 @@ const mockRecords: GovernanceRecord[] = [
     requestedBy: "Carlos Mendes",
     role: "Diretor Financeiro",
     player: "Pedro Guilherme",
-    action: "Análise de Capital Efficiency",
-    justification: "Avaliação de custo-benefício para planejamento orçamentário 2026/2027.",
-    status: "Em Análise",
+    action: "AnÃ¡lise de Capital Efficiency",
+    justification: "AvaliaÃ§Ã£o de custo-benefÃ­cio para planejamento orÃ§amentÃ¡rio 2026/2027.",
+    status: "Em AnÃ¡lise",
     area: "Financeiro",
     version: "1.0",
     lastUpdate: "2026-02-16T14:30:00",
@@ -96,18 +97,18 @@ const mockRecords: GovernanceRecord[] = [
   {
     id: "GOV-2026-004",
     date: "2026-02-12T16:45:00",
-    requestedBy: "João Silva",
+    requestedBy: "JoÃ£o Silva",
     role: "Diretor Executivo",
     player: "Luiz Henrique",
-    action: "Relatório Completo de Liquidez",
+    action: "RelatÃ³rio Completo de Liquidez",
     justification:
-      "Análise de oportunidade de mercado. Clube europeu demonstrou interesse e necessitamos avaliar o timing ideal de venda.",
+      "AnÃ¡lise de oportunidade de mercado. Clube europeu demonstrou interesse e necessitamos avaliar o timing ideal de venda.",
     status: "Aprovado",
     approvedBy: "Ricardo Santos (Presidente)",
-    area: "Gestão de Elenco",
+    area: "GestÃ£o de Elenco",
     version: "1.1",
     lastUpdate: "2026-02-13T11:20:00",
-    createdBy: "João Silva",
+    createdBy: "JoÃ£o Silva",
     reviewedBy: "Maria Oliveira",
   },
   {
@@ -116,10 +117,10 @@ const mockRecords: GovernanceRecord[] = [
     requestedBy: "Maria Oliveira",
     role: "Scout Chefe",
     player: "Gabriel Barbosa",
-    action: "Atualização de Anti-Flop Index",
-    justification: "Monitoramento trimestral de performance. Verificar se métricas se mantêm dentro do esperado.",
+    action: "AtualizaÃ§Ã£o de Anti-Flop Index",
+    justification: "Monitoramento trimestral de performance. Verificar se mÃ©tricas se mantÃªm dentro do esperado.",
     status: "Aprovado",
-    approvedBy: "João Silva (Diretor Executivo)",
+    approvedBy: "JoÃ£o Silva (Diretor Executivo)",
     area: "Scouting",
     version: "1.0",
     lastUpdate: "2026-02-10T17:00:00",
@@ -127,18 +128,38 @@ const mockRecords: GovernanceRecord[] = [
   },
 ];
 
-type FilterStatus = "all" | "Aprovado" | "Pendente" | "Em Análise" | "Reprovado";
+type FilterStatus = "all" | "Aprovado" | "Pendente" | "Em AnÃ¡lise" | "Reprovado";
 type PeriodType = "7d" | "30d" | "90d" | "custom";
 
 export default function Governance() {
+  const [records, setRecords] = useState<GovernanceRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [filterPeriod, setFilterPeriod] = useState<PeriodType>("30d");
   const [filterArea, setFilterArea] = useState<string>("all");
   const [expandedRecords, setExpandedRecords] = useState<Set<string>>(new Set());
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadGovernanceRecords() {
+      const response = await getGovernanceRecords();
+      if (!active) {
+        return;
+      }
+
+      setRecords(response.data as GovernanceRecord[]);
+    }
+
+    loadGovernanceRecords();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const filteredData = useMemo(() => {
-    let filtered = [...mockRecords];
+    let filtered = [...records];
 
     if (searchQuery) {
       filtered = filtered.filter(
@@ -158,13 +179,13 @@ export default function Governance() {
     }
 
     return filtered;
-  }, [searchQuery, filterStatus, filterArea]);
+  }, [records, searchQuery, filterStatus, filterArea]);
 
   const stats = useMemo(() => {
-    const total = mockRecords.length;
-    const approved = mockRecords.filter((r) => r.status === "Aprovado").length;
-    const inAnalysis = mockRecords.filter((r) => r.status === "Em Análise").length;
-    const activeUsers = new Set(mockRecords.map((r) => r.requestedBy)).size;
+    const total = records.length;
+    const approved = records.filter((r) => r.status === "Aprovado").length;
+    const inAnalysis = records.filter((r) => r.status === "Em An?lise").length;
+    const activeUsers = new Set(records.map((r) => r.requestedBy)).size;
 
     return {
       total: { value: total, change: +18 },
@@ -172,7 +193,7 @@ export default function Governance() {
       inAnalysis: { value: inAnalysis, change: -10 },
       activeUsers: { value: activeUsers, change: +5 },
     };
-  }, []);
+  }, [records]);
 
   const activeFiltersCount = [
     filterStatus !== "all",
@@ -247,8 +268,8 @@ const HeaderSection = memo(() => {
   return (
     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-10">
       <div>
-        <h1 className="text-4xl font-semibold mb-3">Governança</h1>
-        <p className="text-sm text-gray-500">Controle executivo e rastreabilidade de decisões estratégicas</p>
+        <h1 className="text-4xl font-semibold mb-3">GovernanÃ§a</h1>
+        <p className="text-sm text-gray-500">Controle executivo e rastreabilidade de decisÃµes estratÃ©gicas</p>
       </div>
       <div className="flex items-center gap-3">
         <Button
@@ -292,7 +313,7 @@ const KPISection = memo(({ stats, onFilterClick }: KPISectionProps) => {
         label="Total de Registros"
         value={stats.total.value}
         change={stats.total.change}
-        subtitle="Últimos 30 dias"
+        subtitle="Ãšltimos 30 dias"
         onClick={() => onFilterClick("all")}
       />
       <KPICard
@@ -302,24 +323,24 @@ const KPISection = memo(({ stats, onFilterClick }: KPISectionProps) => {
         label="Aprovados"
         value={stats.approved.value}
         change={stats.approved.change}
-        subtitle="Decisões finalizadas"
+        subtitle="DecisÃµes finalizadas"
         onClick={() => onFilterClick("Aprovado")}
       />
       <KPICard
         icon={Clock}
         iconColor="#fbbf24"
         iconBg="rgba(251,191,36,0.15)"
-        label="Em Análise"
+        label="Em AnÃ¡lise"
         value={stats.inAnalysis.value}
         change={stats.inAnalysis.change}
-        subtitle="Aguardando aprovação"
-        onClick={() => onFilterClick("Em Análise")}
+        subtitle="Aguardando aprovaÃ§Ã£o"
+        onClick={() => onFilterClick("Em AnÃ¡lise")}
       />
       <KPICard
         icon={User}
         iconColor="#7A5CFF"
         iconBg="rgba(122,92,255,0.15)"
-        label="Usuários Ativos"
+        label="UsuÃ¡rios Ativos"
         value={stats.activeUsers.value}
         change={stats.activeUsers.change}
         subtitle="Executivos e analistas"
@@ -414,7 +435,7 @@ const FiltersSection = memo(
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <Input
               type="text"
-              placeholder="Buscar por ID, jogador ou responsável..."
+              placeholder="Buscar por ID, jogador ou responsÃ¡vel..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-11 bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] focus:border-[#00C2FF] rounded-[12px] h-11"
@@ -431,7 +452,7 @@ const FiltersSection = memo(
               <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="Aprovado">Aprovado</SelectItem>
-                <SelectItem value="Em Análise">Em Análise</SelectItem>
+                <SelectItem value="Em AnÃ¡lise">Em AnÃ¡lise</SelectItem>
                 <SelectItem value="Pendente">Pendente</SelectItem>
                 <SelectItem value="Reprovado">Reprovado</SelectItem>
               </SelectContent>
@@ -443,12 +464,12 @@ const FiltersSection = memo(
             <Select value={filterPeriod} onValueChange={(value) => setFilterPeriod(value as PeriodType)}>
               <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
                 <Calendar className="w-4 h-4 mr-2 text-gray-500" />
-                <SelectValue placeholder="Período" />
+                <SelectValue placeholder="PerÃ­odo" />
               </SelectTrigger>
               <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
-                <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                <SelectItem value="7d">Ãšltimos 7 dias</SelectItem>
+                <SelectItem value="30d">Ãšltimos 30 dias</SelectItem>
+                <SelectItem value="90d">Ãšltimos 90 dias</SelectItem>
                 <SelectItem value="custom">Personalizado</SelectItem>
               </SelectContent>
             </Select>
@@ -458,11 +479,11 @@ const FiltersSection = memo(
           <div className="lg:col-span-3">
             <Select value={filterArea} onValueChange={setFilterArea}>
               <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
-                <SelectValue placeholder="Área" />
+                <SelectValue placeholder="Ãrea" />
               </SelectTrigger>
               <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
-                <SelectItem value="all">Todas as áreas</SelectItem>
-                <SelectItem value="Gestão de Elenco">Gestão de Elenco</SelectItem>
+                <SelectItem value="all">Todas as Ã¡reas</SelectItem>
+                <SelectItem value="GestÃ£o de Elenco">GestÃ£o de Elenco</SelectItem>
                 <SelectItem value="Scouting">Scouting</SelectItem>
                 <SelectItem value="Financeiro">Financeiro</SelectItem>
               </SelectContent>
@@ -481,7 +502,7 @@ const FiltersSection = memo(
                 <FilterChip label={`Status: ${filterStatus}`} onRemove={() => setFilterStatus("all")} />
               )}
               {filterArea !== "all" && (
-                <FilterChip label={`Área: ${filterArea}`} onRemove={() => setFilterArea("all")} />
+                <FilterChip label={`Ãrea: ${filterArea}`} onRemove={() => setFilterArea("all")} />
               )}
               {searchQuery && <FilterChip label={`Busca: "${searchQuery}"`} onRemove={() => setSearchQuery("")} />}
             </div>
@@ -574,37 +595,37 @@ const RecordCard = memo(({ record, isExpanded, onToggleExpand }: RecordCardProps
           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
             <ActionButton icon={Eye} tooltip="Ver detalhes" />
             <ActionButton icon={FileDown} tooltip="Baixar PDF" />
-            <ActionButton icon={Copy} tooltip="Duplicar decisão" />
+            <ActionButton icon={Copy} tooltip="Duplicar decisÃ£o" />
           </div>
         </div>
 
-        {/* Line 2: Solicitante + Aprovador + Área */}
+        {/* Line 2: Solicitante + Aprovador + Ãrea */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-5">
           <MetaField label="Solicitante" value={`${record.requestedBy} (${record.role})`} icon={User} />
           <MetaField
             label={record.status === "Aprovado" ? "Aprovado Por" : "Status"}
-            value={record.approvedBy || "Aguardando aprovação"}
+            value={record.approvedBy || "Aguardando aprovaÃ§Ã£o"}
             icon={CheckCircle}
             color={record.approvedBy ? "#00FF9C" : "#fbbf24"}
           />
-          <MetaField label="Área Responsável" value={record.area} icon={Shield} />
+          <MetaField label="Ãrea ResponsÃ¡vel" value={record.area} icon={Shield} />
         </div>
 
-        {/* Line 3: Jogador + Ação */}
+        {/* Line 3: Jogador + AÃ§Ã£o */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-5">
           <div>
             <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Jogador</p>
             <p className="text-sm font-semibold text-gray-200">{record.player}</p>
           </div>
           <div>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Ação Solicitada</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">AÃ§Ã£o Solicitada</p>
             <p className="text-sm font-semibold text-gray-200">{record.action}</p>
           </div>
         </div>
 
         {/* Line 4: Justificativa (truncated) */}
         <div className="pt-5 border-t border-[rgba(255,255,255,0.06)]">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Justificativa Técnica</p>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-2">Justificativa TÃ©cnica</p>
           <p className={`text-sm text-gray-400 leading-relaxed ${!isExpanded && "line-clamp-2"}`}>
             {record.justification}
           </p>
@@ -655,9 +676,9 @@ const RecordCard = memo(({ record, isExpanded, onToggleExpand }: RecordCardProps
               )}
             </div>
             <div className="mt-4 flex items-center gap-6 text-xs text-gray-600">
-              <span>Versão: {record.version}</span>
+              <span>VersÃ£o: {record.version}</span>
               <span>
-                Última atualização:{" "}
+                Ãšltima atualizaÃ§Ã£o:{" "}
                 {new Date(record.lastUpdate).toLocaleString("pt-BR", {
                   day: "2-digit",
                   month: "2-digit",
@@ -733,7 +754,7 @@ const StatusBadge = memo(({ status }: { status: string }) => {
   const config = {
     Aprovado: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
     Pendente: { bg: "rgba(148,163,184,0.15)", text: "#94a3b8", border: "rgba(148,163,184,0.3)" },
-    "Em Análise": { bg: "rgba(251,191,36,0.15)", text: "#fbbf24", border: "rgba(251,191,36,0.3)" },
+    "Em AnÃ¡lise": { bg: "rgba(251,191,36,0.15)", text: "#fbbf24", border: "rgba(251,191,36,0.3)" },
     Reprovado: { bg: "rgba(255,77,79,0.15)", text: "#FF4D4F", border: "rgba(255,77,79,0.3)" },
   };
 
@@ -778,17 +799,17 @@ const ComplianceSection = memo(() => {
           <Shield className="w-6 h-6 text-[#00FF9C]" />
         </div>
         <div className="flex-1">
-          <h3 className="text-xl font-semibold mb-3">Conformidade e Transparência</h3>
+          <h3 className="text-xl font-semibold mb-3">Conformidade e TransparÃªncia</h3>
           <p className="text-sm text-gray-400 leading-relaxed mb-4">
-            Todos os registros são mantidos de acordo com as diretrizes de governança corporativa do clube. O sistema
-            garante rastreabilidade completa de todas as decisões estratégicas relacionadas a atletas, incluindo
-            solicitante, aprovador, justificativa técnica e data de execução.
+            Todos os registros sÃ£o mantidos de acordo com as diretrizes de governanÃ§a corporativa do clube. O sistema
+            garante rastreabilidade completa de todas as decisÃµes estratÃ©gicas relacionadas a atletas, incluindo
+            solicitante, aprovador, justificativa tÃ©cnica e data de execuÃ§Ã£o.
           </p>
           <div className="bg-[rgba(0,194,255,0.08)] border-l-4 border-[#00C2FF] rounded-r-[10px] p-4">
             <p className="text-xs text-gray-400">
-              <strong className="text-[#00C2FF] font-semibold">Política de Retenção:</strong> Registros mantidos por 5
+              <strong className="text-[#00C2FF] font-semibold">PolÃ­tica de RetenÃ§Ã£o:</strong> Registros mantidos por 5
               anos conforme regulamento interno. Acesso restrito a executivos e membros do conselho deliberativo. Todas
-              as ações são registradas com timestamp e versionamento automático.
+              as aÃ§Ãµes sÃ£o registradas com timestamp e versionamento automÃ¡tico.
             </p>
           </div>
         </div>
@@ -810,7 +831,7 @@ const EmptyState = memo(() => {
           <AlertCircle className="w-8 h-8 text-[#00C2FF]" />
         </div>
         <h3 className="text-xl font-semibold mb-3">Nenhum registro encontrado</h3>
-        <p className="text-sm text-gray-500 mb-6">Ajuste os filtros ou crie um novo registro de governança</p>
+        <p className="text-sm text-gray-500 mb-6">Ajuste os filtros ou crie um novo registro de governanÃ§a</p>
         <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold">
           <Plus className="w-4 h-4 mr-2" />
           Novo Registro

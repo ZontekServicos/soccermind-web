@@ -1,25 +1,4 @@
-export interface SquadPlayer {
-  id: string;
-  name: string;
-  number: number;
-  position: string;
-  fieldPosition?: "GK" | "LB" | "CB1" | "CB2" | "RB" | "CDM" | "CM1" | "CM2" | "LW" | "ST" | "RW"; // Position on field
-  age: number;
-  nationality: string;
-  overallRating: number;
-  capitalEfficiency: number;
-  riskLevel: "LOW" | "MEDIUM" | "HIGH";
-  contractUntil: string;
-  marketValue: string;
-  stats: {
-    pace: number;
-    shooting: number;
-    passing: number;
-    dribbling: number;
-    defending: number;
-    physical: number;
-  };
-}
+import type { SquadPlayer } from "../types/squad";
 
 export const corinthiansSquad: SquadPlayer[] = [
   // Goleiros

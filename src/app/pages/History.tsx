@@ -1,4 +1,4 @@
-import { AppSidebar } from "../components/AppSidebar";
+﻿import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -23,45 +23,46 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-import { useState, useMemo, memo } from "react";
+import { useEffect, useState, useMemo, memo } from "react";
+import { getAnalysisHistory } from "../services/history";
 
 interface AnalysisHistory {
   id: string;
   date: string;
-  type: "Comparação" | "Relatório" | "Dashboard";
+  type: "ComparaÃ§Ã£o" | "RelatÃ³rio" | "Dashboard";
   players: string[];
   user: string;
   club: string;
-  status: "Concluído" | "Em andamento" | "Arquivado";
+  status: "ConcluÃ­do" | "Em andamento" | "Arquivado";
 }
 
 const mockHistory: AnalysisHistory[] = [
   {
     id: "AH-001",
     date: "2026-02-26T14:35:00",
-    type: "Comparação",
+    type: "ComparaÃ§Ã£o",
     players: ["Gabriel Barbosa", "Pedro Guilherme"],
-    user: "João Silva",
+    user: "JoÃ£o Silva",
     club: "Corinthians",
-    status: "Concluído",
+    status: "ConcluÃ­do",
   },
   {
     id: "AH-002",
     date: "2026-02-25T11:20:00",
-    type: "Relatório",
+    type: "RelatÃ³rio",
     players: ["Vitor Roque"],
     user: "Maria Oliveira",
     club: "Flamengo",
-    status: "Concluído",
+    status: "ConcluÃ­do",
   },
   {
     id: "AH-003",
     date: "2026-02-24T16:45:00",
-    type: "Comparação",
+    type: "ComparaÃ§Ã£o",
     players: ["Luiz Henrique", "Gabriel Barbosa"],
-    user: "João Silva",
+    user: "JoÃ£o Silva",
     club: "Corinthians",
-    status: "Concluído",
+    status: "ConcluÃ­do",
   },
   {
     id: "AH-004",
@@ -75,31 +76,53 @@ const mockHistory: AnalysisHistory[] = [
   {
     id: "AH-005",
     date: "2026-02-22T13:30:00",
-    type: "Relatório",
+    type: "RelatÃ³rio",
     players: ["Pedro Guilherme"],
     user: "Maria Oliveira",
     club: "Flamengo",
-    status: "Concluído",
+    status: "ConcluÃ­do",
   },
 ];
 
-type FilterType = "all" | "Comparação" | "Relatório" | "Dashboard";
+type FilterType = "all" | "ComparaÃ§Ã£o" | "RelatÃ³rio" | "Dashboard";
 type PeriodType = "7d" | "30d" | "90d" | "custom";
 type SortField = "date" | "type" | "user";
 type SortOrder = "asc" | "desc";
 
 export default function History() {
+  const [historyItems, setHistoryItems] = useState<AnalysisHistory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [filterPeriod, setFilterPeriod] = useState<PeriodType>("30d");
   const [filterClub, setFilterClub] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadHistory() {
+      setIsLoading(true);
+      const response = await getAnalysisHistory();
+      if (!active) {
+        return;
+      }
+
+      setHistoryItems(response.data as unknown as AnalysisHistory[]);
+      setIsLoading(false);
+    }
+
+    loadHistory();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Filter and sort logic
   const filteredData = useMemo(() => {
-    let filtered = [...mockHistory];
+    let filtered = [...historyItems];
 
     // Search
     if (searchQuery) {
@@ -135,19 +158,19 @@ export default function History() {
     });
 
     return filtered;
-  }, [searchQuery, filterType, filterClub, sortField, sortOrder]);
+  }, [historyItems, searchQuery, filterType, filterClub, sortField, sortOrder]);
 
   const stats = useMemo(() => {
-    const total = mockHistory.length;
-    const comparisons = mockHistory.filter((h) => h.type === "Comparação").length;
-    const reports = mockHistory.filter((h) => h.type === "Relatório").length;
+    const total = historyItems.length;
+    const comparisons = historyItems.filter((h) => h.type === "Compara??o").length;
+    const reports = historyItems.filter((h) => h.type === "Relat?rio").length;
 
     return {
       total: { value: total, change: +12 },
       comparisons: { value: comparisons, change: +8 },
       reports: { value: reports, change: +15 },
     };
-  }, []);
+  }, [historyItems]);
 
   const activeFiltersCount = [
     filterType !== "all",
@@ -220,9 +243,9 @@ const HeaderSection = memo(() => {
   return (
     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-10">
       <div>
-        <h1 className="text-4xl font-semibold mb-3">Análises</h1>
+        <h1 className="text-4xl font-semibold mb-3">AnÃ¡lises</h1>
         <p className="text-sm text-gray-500">
-          Hub de monitoramento estratégico de análises e comparações
+          Hub de monitoramento estratÃ©gico de anÃ¡lises e comparaÃ§Ãµes
         </p>
       </div>
       <div className="flex items-center gap-3">
@@ -235,7 +258,7 @@ const HeaderSection = memo(() => {
         </Button>
         <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold shadow-[0_4px_16px_rgba(0,194,255,0.25)] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)] transition-all">
           <Plus className="w-4 h-4 mr-2" />
-          Nova Análise
+          Nova AnÃ¡lise
         </Button>
       </div>
     </div>
@@ -263,31 +286,31 @@ const KPISection = memo(({ stats, onFilterClick }: KPISectionProps) => {
         icon={HistoryIcon}
         iconColor="#00C2FF"
         iconBg="rgba(0,194,255,0.15)"
-        label="Total de Análises"
+        label="Total de AnÃ¡lises"
         value={stats.total.value}
         change={stats.total.change}
-        subtitle="Últimos 30 dias"
+        subtitle="Ãšltimos 30 dias"
         onClick={() => onFilterClick("all")}
       />
       <KPICard
         icon={Users}
         iconColor="#7A5CFF"
         iconBg="rgba(122,92,255,0.15)"
-        label="Comparações"
+        label="ComparaÃ§Ãµes"
         value={stats.comparisons.value}
         change={stats.comparisons.change}
-        subtitle="Análises comparativas"
-        onClick={() => onFilterClick("Comparação")}
+        subtitle="AnÃ¡lises comparativas"
+        onClick={() => onFilterClick("ComparaÃ§Ã£o")}
       />
       <KPICard
         icon={FileText}
         iconColor="#00FF9C"
         iconBg="rgba(0,255,156,0.15)"
-        label="Relatórios"
+        label="RelatÃ³rios"
         value={stats.reports.value}
         change={stats.reports.change}
-        subtitle="Relatórios gerados"
-        onClick={() => onFilterClick("Relatório")}
+        subtitle="RelatÃ³rios gerados"
+        onClick={() => onFilterClick("RelatÃ³rio")}
       />
     </div>
   );
@@ -408,8 +431,8 @@ const FiltersSection = memo(({
             </SelectTrigger>
             <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
               <SelectItem value="all">Todos os tipos</SelectItem>
-              <SelectItem value="Comparação">Comparação</SelectItem>
-              <SelectItem value="Relatório">Relatório</SelectItem>
+              <SelectItem value="ComparaÃ§Ã£o">ComparaÃ§Ã£o</SelectItem>
+              <SelectItem value="RelatÃ³rio">RelatÃ³rio</SelectItem>
               <SelectItem value="Dashboard">Dashboard</SelectItem>
             </SelectContent>
           </Select>
@@ -420,12 +443,12 @@ const FiltersSection = memo(({
           <Select value={filterPeriod} onValueChange={(value) => setFilterPeriod(value as PeriodType)}>
             <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
               <Calendar className="w-4 h-4 mr-2 text-gray-500" />
-              <SelectValue placeholder="Período" />
+              <SelectValue placeholder="PerÃ­odo" />
             </SelectTrigger>
             <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
-              <SelectItem value="7d">Últimos 7 dias</SelectItem>
-              <SelectItem value="30d">Últimos 30 dias</SelectItem>
-              <SelectItem value="90d">Últimos 90 dias</SelectItem>
+              <SelectItem value="7d">Ãšltimos 7 dias</SelectItem>
+              <SelectItem value="30d">Ãšltimos 30 dias</SelectItem>
+              <SelectItem value="90d">Ãšltimos 90 dias</SelectItem>
               <SelectItem value="custom">Personalizado</SelectItem>
             </SelectContent>
           </Select>
@@ -529,13 +552,13 @@ const ActivityTable = memo(({ data, sortField, sortOrder, onSort, isLoading }: A
               <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">
                 Jogadores
               </th>
-              <TableHeader label="Responsável" field="user" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
+              <TableHeader label="ResponsÃ¡vel" field="user" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
               <TableHeader label="Data/Hora" field="date" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
               <th className="text-center py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">
                 Status
               </th>
               <th className="text-center py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">
-                Ações
+                AÃ§Ãµes
               </th>
             </tr>
           </thead>
@@ -617,7 +640,7 @@ const ActivityRow = memo(({ item }: { item: AnalysisHistory }) => {
         <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <ActionButton icon={Eye} tooltip="Ver detalhes" />
           <ActionButton icon={Copy} tooltip="Duplicar" />
-          <ActionButton icon={FileText} tooltip="Gerar relatório" />
+          <ActionButton icon={FileText} tooltip="Gerar relatÃ³rio" />
           <ActionButton icon={Trash2} tooltip="Excluir" variant="danger" />
         </div>
       </td>
@@ -629,8 +652,8 @@ ActivityRow.displayName = "ActivityRow";
 
 const TypeBadge = memo(({ type }: { type: string }) => {
   const config = {
-    Comparação: { bg: "rgba(122,92,255,0.15)", text: "#7A5CFF", border: "rgba(122,92,255,0.3)" },
-    Relatório: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
+    "ComparaÃ§Ã£o": { bg: "rgba(122,92,255,0.15)", text: "#7A5CFF", border: "rgba(122,92,255,0.3)" },
+    "RelatÃ³rio": { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
     Dashboard: { bg: "rgba(0,194,255,0.15)", text: "#00C2FF", border: "rgba(0,194,255,0.3)" },
   };
 
@@ -650,7 +673,7 @@ TypeBadge.displayName = "TypeBadge";
 
 const StatusBadge = memo(({ status }: { status: string }) => {
   const config = {
-    Concluído: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
+    "ConcluÃ­do": { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
     "Em andamento": { bg: "rgba(251,191,36,0.15)", text: "#fbbf24", border: "rgba(251,191,36,0.3)" },
     Arquivado: { bg: "rgba(148,163,184,0.15)", text: "#94a3b8", border: "rgba(148,163,184,0.3)" },
   };
@@ -705,13 +728,13 @@ const EmptyState = memo(() => {
         <div className="w-16 h-16 bg-[rgba(0,194,255,0.1)] rounded-[14px] flex items-center justify-center mx-auto mb-6">
           <AlertCircle className="w-8 h-8 text-[#00C2FF]" />
         </div>
-        <h3 className="text-xl font-semibold mb-3">Nenhuma análise encontrada</h3>
+        <h3 className="text-xl font-semibold mb-3">Nenhuma anÃ¡lise encontrada</h3>
         <p className="text-sm text-gray-500 mb-6">
-          Ajuste os filtros ou crie uma nova análise para começar
+          Ajuste os filtros ou crie uma nova anÃ¡lise para comeÃ§ar
         </p>
         <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold">
           <Plus className="w-4 h-4 mr-2" />
-          Nova Análise
+          Nova AnÃ¡lise
         </Button>
       </div>
     </div>
@@ -724,7 +747,7 @@ const LoadingState = memo(() => {
   return (
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-16 text-center">
       <Loader2 className="w-12 h-12 text-[#00C2FF] animate-spin mx-auto mb-4" />
-      <p className="text-sm text-gray-500">Carregando análises...</p>
+      <p className="text-sm text-gray-500">Carregando anÃ¡lises...</p>
     </div>
   );
 });

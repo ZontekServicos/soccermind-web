@@ -17,8 +17,7 @@ import { TierBadge } from "../components/TierBadge";
 import { RiskBadge } from "../components/RiskBadge";
 import { CapitalGauge } from "../components/CapitalGauge";
 import { useLanguage } from "../contexts/LanguageContext";
-import { getPlayers } from "../services/players";
-import { mapApiPlayerToExtended } from "../mappers/player.mapper";
+import { getDashboardPlayers } from "../services/dashboard";
 import type { PlayerExtended } from "../types/player";
 
 type RiskBucket = "LOW" | "MEDIUM" | "HIGH";
@@ -251,16 +250,12 @@ export default function Dashboard() {
 
     async function loadPlayers() {
       try {
-        const response = await getPlayers(1, 80);
+        const response = await getDashboardPlayers(80);
         if (!active) {
           return;
         }
 
-        setPlayers(
-          Array.isArray(response.data)
-            ? response.data.map((player) => mapApiPlayerToExtended(player as Record<string, unknown>))
-            : [],
-        );
+        setPlayers(Array.isArray(response.data) ? response.data : []);
         setError(null);
       } catch (fetchError) {
         if (!active) {

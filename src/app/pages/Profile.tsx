@@ -22,7 +22,8 @@ import {
   Filter,
   RefreshCw,
 } from "lucide-react";
-import { useState, useMemo, memo } from "react";
+import { useEffect, useState, useMemo, memo } from "react";
+import { getProfileUpsells } from "../services/profile";
 import clubLogo from "../../assets/club-logo.png";
 
 const fallbackImage = "/placeholder.png";
@@ -85,11 +86,43 @@ type FilterType = "all" | "Ativo" | "Inativo" | "Pendente";
 type SortType = "date-desc" | "date-asc" | "name-asc" | "name-desc";
 
 export default function Profile() {
+  const [upsells, setUpsells] = useState<Upsell[]>([]);
   const [filterStatus, setFilterStatus] = useState<FilterType>("all");
   const [sortBy, setSortBy] = useState<SortType>("date-desc");
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadUpsells() {
+      const response = await getProfileUpsells();
+      if (!active) {
+        return;
+      }
+
+      setUpsells(
+        response.data.map((upsell) => ({
+          ...upsell,
+          icon:
+            upsell.iconKey === "dashboard"
+              ? BarChart3
+              : upsell.iconKey === "compare"
+                ? Users
+                : upsell.iconKey === "integration"
+                  ? CheckCircle
+                  : TrendingUp,
+        })),
+      );
+    }
+
+    loadUpsells();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const filteredUpsells = useMemo(() => {
-    let filtered = [...mockUpsells];
+    let filtered = [...upsells];
 
     if (filterStatus !== "all") {
       filtered = filtered.filter((item) => item.status === filterStatus);
@@ -111,7 +144,7 @@ export default function Profile() {
     });
 
     return filtered;
-  }, [filterStatus, sortBy]);
+  }, [filterStatus, sortBy, upsells]);
 
   // Contract calculations
   const startDate = new Date("2025-01-01");

@@ -1,9 +1,11 @@
 import { type ApiEnvelope, apiFetch } from "./api";
 import {
   mapApiPlayerToCard,
+  mapApiPlayerToExtended,
   mapApiPlayerToProfile,
   type ApiPlayerLike,
   type PlayerCardModel,
+  type PlayerExtended,
   type PlayerProfileModel,
 } from "../mappers/player.mapper";
 
@@ -165,6 +167,33 @@ export async function searchPlayers(
   const query = searchParams.toString();
   const response = await apiFetch<unknown>(`/players${query ? `?${query}` : ""}`);
   return mapPlayersEnvelope(response, mapApiPlayerToCard);
+}
+
+function mapExtendedPlayersEnvelope(
+  response: ApiEnvelope<PlayerCardModel[]>,
+): ApiEnvelope<PlayerExtended[]> {
+  return {
+    ...response,
+    data: Array.isArray(response.data)
+      ? response.data.map((player) => mapApiPlayerToExtended(player as ApiPlayerLike | UnknownRecord))
+      : [],
+  };
+}
+
+export async function getExtendedPlayers(
+  page = 1,
+  limit = 20,
+  search?: string,
+): Promise<ApiEnvelope<PlayerExtended[]>> {
+  const response = await getPlayers(page, limit, search);
+  return mapExtendedPlayersEnvelope(response);
+}
+
+export async function searchExtendedPlayers(
+  params: PlayersFiltersParams = {},
+): Promise<ApiEnvelope<PlayerExtended[]>> {
+  const response = await searchPlayers(params);
+  return mapExtendedPlayersEnvelope(response);
 }
 
 export async function getPlayer(id: string): Promise<ApiEnvelope<PlayerProfileModel>> {

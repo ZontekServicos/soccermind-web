@@ -1,9 +1,10 @@
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { Plus, Search, Calendar, User, X, Paperclip, UserPlus, Key, UserMinus, Lock, Zap, GraduationCap, Rocket } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { getServiceDeskTickets } from "../services/serviceDesk";
 
 // Mock data for tickets
 const mockTickets = [
@@ -66,13 +67,33 @@ const mockTickets = [
 
 export default function ServiceDesk() {
   const { t, language } = useLanguage();
+  const [tickets, setTickets] = useState<typeof mockTickets>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadTickets() {
+      const response = await getServiceDeskTickets();
+      if (!active) {
+        return;
+      }
+
+      setTickets(response.data as typeof mockTickets);
+    }
+
+    loadTickets();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Filter tickets based on active tab, priority filter, and search
-  const filteredTickets = mockTickets.filter((ticket) => {
+  const filteredTickets = tickets.filter((ticket) => {
     const matchesTab =
       activeTab === "all" ||
       (activeTab === "open" && ticket.status === "open") ||
@@ -91,10 +112,10 @@ export default function ServiceDesk() {
 
   // Count tickets by status
   const counts = {
-    all: mockTickets.length,
-    open: mockTickets.filter((t) => t.status === "open").length,
-    in_progress: mockTickets.filter((t) => t.status === "in_progress").length,
-    resolved: mockTickets.filter((t) => t.status === "resolved").length,
+    all: tickets.length,
+    open: tickets.filter((t) => t.status === "open").length,
+    in_progress: tickets.filter((t) => t.status === "in_progress").length,
+    resolved: tickets.filter((t) => t.status === "resolved").length,
   };
 
   return (
