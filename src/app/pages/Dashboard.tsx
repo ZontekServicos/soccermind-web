@@ -17,7 +17,7 @@ import { TierBadge } from "../components/TierBadge";
 import { RiskBadge } from "../components/RiskBadge";
 import { CapitalGauge } from "../components/CapitalGauge";
 import { useLanguage } from "../contexts/LanguageContext";
-import { type ChartDatum, type RiskBucket, type StrategicAsset, getDashboardData } from "../services/dashboard";
+import { type ChartDatum, type RiskBucket, type StrategicAsset, type StrategicAssetTier, getDashboardData } from "../services/dashboard";
 import type { PlayerExtended } from "../types/player";
 
 type RiskTab = "ALL" | RiskBucket;
@@ -25,22 +25,6 @@ type RiskTab = "ALL" | RiskBucket;
 const CHART_PAGE_SIZE = 10;
 const RISK_PAGE_SIZE = 10;
 const ASSET_PAGE_SIZE = 4;
-
-function formatCompactCurrency(value: number) {
-  if (!value) {
-    return "N/A";
-  }
-
-  if (value >= 1_000_000_000) {
-    return `EUR ${(value / 1_000_000_000).toFixed(2)}B`;
-  }
-
-  if (value >= 1_000_000) {
-    return `EUR ${(value / 1_000_000).toFixed(1)}M`;
-  }
-
-  return `EUR ${(value / 1_000).toFixed(0)}K`;
-}
 
 function paginate<T>(items: T[], page: number, pageSize: number) {
   const start = (page - 1) * pageSize;
@@ -662,9 +646,8 @@ function TierInsightCard({ tier, detail }: { tier: StrategicAssetTier; detail: s
 }
 
 function StrategicAssetCard({ asset }: { asset: StrategicAsset }) {
-  const { player, tier, description, summary } = asset;
+  const { player, tier, description, summary, marketValueLabel, liquidityLabel, potentialLabel, outlookLabel } = asset;
   const color = getAssetTierColor(tier);
-  const marketValue = parseMarketValueLabel(player.marketValue);
 
   return (
     <div className="rounded-[18px] bg-[rgba(255,255,255,0.03)] p-6 shadow-[0_4px_16px_rgba(0,0,0,0.2)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
@@ -690,15 +673,15 @@ function StrategicAssetCard({ asset }: { asset: StrategicAsset }) {
       </div>
 
       <div className="mb-5 grid grid-cols-2 gap-4">
-        <AssetMetric label="Market Value" value={marketValue ? formatCompactCurrency(marketValue) : player.marketValue} />
-        <AssetMetric label="Liquidity Score" value={player.liquidity.score.toFixed(1)} highlight="#00FF9C" />
+        <AssetMetric label="Market Value" value={marketValueLabel} />
+        <AssetMetric label="Liquidity Score" value={liquidityLabel} highlight="#00FF9C" />
         <AssetMetric label="Resale Window" value={player.liquidity.resaleWindow} />
-        <AssetMetric label="Potential" value={player.potential.toFixed(0)} highlight="#00C2FF" />
+        <AssetMetric label="Potential" value={potentialLabel} highlight="#00C2FF" />
       </div>
 
       <p className="mb-4 text-sm leading-7 text-gray-300">{description}</p>
       <p className="rounded-[14px] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm leading-6 text-gray-400">
-        {player.name} combina overall {player.overallRating}, potencial {player.potential} e liquidez {player.liquidity.score.toFixed(1)}, com janela de revenda em {player.liquidity.resaleWindow.toLowerCase()}.
+        {outlookLabel}
       </p>
     </div>
   );

@@ -5,11 +5,12 @@ import {
   type DashboardViewModel,
   type RiskBucket,
   type StrategicAsset,
+  type StrategicAssetTier,
 } from "../../adapters/dashboard";
 import { getDataSource } from "../../config/dataSource";
 import { getExtendedPlayers } from "../players";
 
-export type { ChartDatum, DashboardViewModel, RiskBucket, StrategicAsset };
+export type { ChartDatum, DashboardViewModel, RiskBucket, StrategicAsset, StrategicAssetTier };
 
 export async function getDashboardData(limit = 80): Promise<ApiEnvelope<DashboardViewModel>> {
   const playersResponse = await getExtendedPlayers(1, limit);

@@ -17,6 +17,10 @@ export type StrategicAsset = {
   description: string;
   score: number;
   summary: string;
+  marketValueLabel: string;
+  liquidityLabel: string;
+  potentialLabel: string;
+  outlookLabel: string;
 };
 
 export type RiskPlayerEntry = {
@@ -39,25 +43,8 @@ export interface DashboardViewModel {
 
 const CHART_DATA_LIMIT = 20;
 
-function parseMarketValueLabel(label: string) {
-  if (!label || label === "N/A") {
-    return 0;
-  }
-
-  const normalized = label.toUpperCase().replace(",", ".");
-  const parsed = Number.parseFloat(normalized.replace(/[^\d.]/g, ""));
-  if (!Number.isFinite(parsed)) {
-    return 0;
-  }
-
-  if (normalized.includes("B")) return parsed * 1_000_000_000;
-  if (normalized.includes("M")) return parsed * 1_000_000;
-  if (normalized.includes("K")) return parsed * 1_000;
-  return parsed;
-}
-
 function formatTotalMarketValue(players: PlayerExtended[]) {
-  const total = players.reduce((sum, player) => sum + parseMarketValueLabel(player.marketValue), 0);
+  const total = players.reduce((sum, player) => sum + (player.marketValueAmount ?? 0), 0);
   if (!total) {
     return "N/A";
   }
@@ -101,16 +88,23 @@ function buildRiskEntry(player: PlayerExtended): RiskPlayerEntry {
 }
 
 function buildStrategicAsset(player: PlayerExtended): StrategicAsset | null {
-  const marketValue = parseMarketValueLabel(player.marketValue);
+  const marketValue = player.marketValueAmount ?? 0;
   const liquidity = player.liquidity.score;
   const risk = player.risk.level;
   const upside = player.potential - player.overallRating;
   const valueEfficiency = marketValue > 0 ? (player.overallRating + player.potential) / (marketValue / 1_000_000) : 0;
   const immediateImpact = player.overallRating >= 86 && liquidity >= 7.5;
+  const baseAsset = {
+    player,
+    marketValueLabel: player.marketValueLabel,
+    liquidityLabel: player.liquidity.score.toFixed(1),
+    potentialLabel: player.potential.toFixed(0),
+    outlookLabel: `${player.name} combina overall ${player.overallRating}, potencial ${player.potential} e liquidez ${player.liquidity.score.toFixed(1)}, com janela de revenda em ${player.liquidity.resaleWindow.toLowerCase()}.`,
+  };
 
   if (player.overallRating >= 90 && liquidity >= 8 && marketValue >= 60_000_000) {
     return {
-      player,
+      ...baseAsset,
       tier: "Elite Asset",
       description: "Jogador com alta liquidez e impacto imediato, ideal para reforco de curto prazo com baixa friccao de mercado.",
       summary: "Impacto imediato",
@@ -120,7 +114,7 @@ function buildStrategicAsset(player: PlayerExtended): StrategicAsset | null {
 
   if (player.age <= 23 && player.potential >= 86 && upside >= 4 && liquidity >= 6.5) {
     return {
-      player,
+      ...baseAsset,
       tier: "Growth Asset",
       description: "Ativo jovem com upside real de performance e valorizacao, adequado para ciclo de desenvolvimento com revenda futura.",
       summary: "Upside e valorizacao",
@@ -130,7 +124,7 @@ function buildStrategicAsset(player: PlayerExtended): StrategicAsset | null {
 
   if (risk === "LOW" && player.overallRating >= 80 && liquidity >= 6) {
     return {
-      player,
+      ...baseAsset,
       tier: "Stable Asset",
       description: "Perfil consistente, de baixo risco e retorno esportivo previsivel, indicado para compor base competitiva com estabilidade.",
       summary: "Base segura",
@@ -140,7 +134,7 @@ function buildStrategicAsset(player: PlayerExtended): StrategicAsset | null {
 
   if ((valueEfficiency >= 5.5 || upside >= 6 || immediateImpact) && marketValue > 0 && marketValue <= 45_000_000) {
     return {
-      player,
+      ...baseAsset,
       tier: "Opportunity Asset",
       description: "Ativo com leitura favoravel de custo-beneficio, interessante para capturar desempenho acima do preco de entrada.",
       summary: "Custo-beneficio",

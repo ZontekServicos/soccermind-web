@@ -539,6 +539,8 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
       dribbling: profile.dri ?? 0,
     },
     marketValue: card.marketValueLabel,
+    marketValueAmount: card.marketValue,
+    marketValueLabel: card.marketValueLabel,
     contract: "N/A",
     structuralRisk: {
       score: finalStructuralRiskScore,

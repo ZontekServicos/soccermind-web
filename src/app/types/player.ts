@@ -13,6 +13,8 @@ export interface PlayerExtended extends PlayerProfile {
   potential: number;
   stats: PlayerStats;
   marketValue: string;
+  marketValueAmount: number | null;
+  marketValueLabel: string;
   contract: string;
   risk: {
     score: number;
@@ -55,6 +57,8 @@ export const EMPTY_PLAYER: PlayerExtended = {
   capitalEfficiency: 0,
   riskLevel: "MEDIUM",
   marketValue: "N/A",
+  marketValueAmount: null,
+  marketValueLabel: "N/A",
   contract: "N/A",
   risk: {
     score: 0,
