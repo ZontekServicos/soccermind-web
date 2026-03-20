@@ -10,7 +10,6 @@ import {
   ChevronUp,
   Copy,
   Download,
-  Eye,
   FileText,
   Filter,
   History as HistoryIcon,
@@ -23,7 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
-import { getAnalysisHistory, type AnalysisHistoryEntry as AnalysisHistory } from "../services/history";
+import { getAnalyses, type AnalysisViewModel as AnalysisHistory } from "../services/analysis";
 
 type FilterType = "all" | AnalysisHistory["type"];
 type PeriodType = "7d" | "30d" | "90d" | "custom";
@@ -45,7 +44,6 @@ const FALLBACK_BADGE_STYLE: BadgeStyle = {
 const TYPE_BADGE_STYLES: Record<AnalysisHistory["type"], BadgeStyle> = {
   comparison: { bg: "rgba(122,92,255,0.15)", text: "#7A5CFF", border: "rgba(122,92,255,0.3)" },
   report: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
-  dashboard: { bg: "rgba(0,194,255,0.15)", text: "#00C2FF", border: "rgba(0,194,255,0.3)" },
 };
 
 const STATUS_BADGE_STYLES: Record<AnalysisHistory["status"], BadgeStyle> = {
@@ -58,7 +56,6 @@ const TYPE_OPTIONS: Array<{ value: FilterType; label: string }> = [
   { value: "all", label: "Todos os tipos" },
   { value: "comparison", label: "Comparacao" },
   { value: "report", label: "Relatorio" },
-  { value: "dashboard", label: "Dashboard" },
 ];
 
 export default function History() {
@@ -78,7 +75,7 @@ export default function History() {
       setIsLoading(true);
 
       try {
-        const response = await getAnalysisHistory();
+        const response = await getAnalyses();
         if (!active) {
           return;
         }
@@ -111,6 +108,7 @@ export default function History() {
       filtered = filtered.filter(
         (item) =>
           item.id.toLowerCase().includes(normalizedQuery) ||
+          item.title.toLowerCase().includes(normalizedQuery) ||
           item.players.some((player) => player.toLowerCase().includes(normalizedQuery)) ||
           item.user.toLowerCase().includes(normalizedQuery),
       );
@@ -488,7 +486,7 @@ const ActivityTable = memo(({ data, sortField, sortOrder, onSort, isLoading }: A
           <thead className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
             <tr>
               <TableHeader label="Tipo" field="type" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">ID</th>
+              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Analise</th>
               <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Jogadores</th>
               <TableHeader label="Analista" field="user" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
               <TableHeader label="Data" field="date" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
@@ -547,7 +545,10 @@ const ActivityRow = memo(({ item }: { item: AnalysisHistory }) => {
         <TypeBadge type={item.type} label={item.typeLabel} />
       </td>
       <td className="py-4 px-5">
-        <span className="text-xs text-gray-500 font-mono">{item.id}</span>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-gray-200">{item.title}</p>
+          <span className="text-xs text-gray-500 font-mono">{item.id}</span>
+        </div>
       </td>
       <td className="py-4 px-5">
         <span className="text-sm text-gray-300">{item.players.join(", ")}</span>
@@ -571,7 +572,6 @@ const ActivityRow = memo(({ item }: { item: AnalysisHistory }) => {
       </td>
       <td className="py-4 px-5">
         <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <ActionButton icon={Eye} tooltip="Ver detalhes" />
           <ActionButton icon={Copy} tooltip="Duplicar" />
           <ActionButton icon={FileText} tooltip="Gerar relatorio" />
           <ActionButton icon={Trash2} tooltip="Excluir" variant="danger" />

@@ -15,11 +15,14 @@ import {
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend } from "recharts";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
+import { Button } from "../components/ui/button";
 import { CapitalGauge } from "../components/CapitalGauge";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { RiskBadge } from "../components/RiskBadge";
 import { TierBadge } from "../components/TierBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { useAuth } from "../contexts/AuthContext";
+import { createComparisonAnalysis } from "../services/analysis";
 import {
   getCompareDataByIds,
   getCompareDataByNames,
@@ -70,6 +73,7 @@ function dedupePlayers(players: PlayerExtended[]) {
 }
 
 export default function Compare() {
+  const { user } = useAuth();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
   const [filters, setFilters] = useState<PlayersFiltersState>(initialFilters);
@@ -86,6 +90,9 @@ export default function Compare() {
   const [compareError, setCompareError] = useState<string | null>(null);
   const [comparisonData, setComparisonData] = useState<CompareViewModel | null>(null);
   const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [saveFeedbackTone, setSaveFeedbackTone] = useState<"success" | "error">("success");
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -344,6 +351,33 @@ export default function Compare() {
     });
   };
 
+  const handleSaveAnalysis = async () => {
+    if (!playerA.id || !playerB.id || playerA.id === EMPTY_PLAYER.id || playerB.id === EMPTY_PLAYER.id) {
+      setSaveFeedbackTone("error");
+      setSaveFeedback("Selecione dois jogadores validos para salvar a analise.");
+      return;
+    }
+
+    setSaveLoading(true);
+    setSaveFeedback(null);
+
+    try {
+      const response = await createComparisonAnalysis({
+        playerIds: [playerA.id, playerB.id],
+        title: `Comparacao - ${displayPlayerA.name} vs ${displayPlayerB.name}`,
+        analyst: user?.name,
+      });
+
+      setSaveFeedbackTone("success");
+      setSaveFeedback(`Analise salva com sucesso: ${response.data.title}. Ela ja esta disponivel na tela de Analises.`);
+    } catch (error) {
+      setSaveFeedbackTone("error");
+      setSaveFeedback(error instanceof Error ? error.message : "Nao foi possivel salvar a analise.");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-[#07142A]">
       <AppSidebar />
@@ -366,7 +400,18 @@ export default function Compare() {
                   </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="flex flex-col gap-4">
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleSaveAnalysis}
+                      disabled={saveLoading || !playerA.id || !playerB.id || playerA.id === EMPTY_PLAYER.id || playerB.id === EMPTY_PLAYER.id}
+                      className="bg-[#00FF9C] text-[#07142A] hover:bg-[#36ffb0] rounded-[12px] h-11 px-6 font-semibold shadow-[0_4px_16px_rgba(0,255,156,0.24)]"
+                    >
+                      {saveLoading ? "Salvando analise..." : "Salvar analise"}
+                    </Button>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-3">
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
                     <div className="flex items-center gap-3">
                       <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[rgba(122,92,255,0.18)]">
@@ -390,9 +435,23 @@ export default function Compare() {
                     <p className="mt-2 text-lg font-semibold text-white">Tempo real</p>
                     <p className="mt-1 text-xs text-gray-500">Busca com debounce de 300ms</p>
                   </div>
+                  </div>
                 </div>
               </div>
             </section>
+
+            {saveFeedback && (
+              <div
+                className="rounded-[16px] px-5 py-4 text-sm"
+                style={{
+                  border: saveFeedbackTone === "success" ? "1px solid rgba(0,255,156,0.18)" : "1px solid rgba(255,77,79,0.22)",
+                  background: saveFeedbackTone === "success" ? "rgba(0,255,156,0.08)" : "rgba(255,77,79,0.08)",
+                  color: saveFeedbackTone === "success" ? "#9CFFD1" : "#FFB4B5",
+                }}
+              >
+                {saveFeedback}
+              </div>
+            )}
 
             <PlayersFiltersPanel
               filters={filters}
