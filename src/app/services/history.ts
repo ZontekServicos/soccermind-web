@@ -3,61 +3,76 @@ import { getDataSource } from "../config/data-source";
 
 type UnknownRecord = Record<string, unknown>;
 
+export type AnalysisHistoryType = "comparison" | "report" | "dashboard";
+export type AnalysisHistoryStatus = "completed" | "in_progress" | "archived";
+
 export interface AnalysisHistoryEntry {
   id: string;
   date: string;
-  type: "Comparação" | "Relatório" | "Dashboard";
+  type: AnalysisHistoryType;
+  typeLabel: string;
   players: string[];
   user: string;
   club: string;
-  status: "Concluído" | "Em andamento" | "Arquivado";
+  status: AnalysisHistoryStatus;
+  statusLabel: string;
 }
 
 const MOCK_HISTORY: AnalysisHistoryEntry[] = [
   {
     id: "AH-001",
     date: "2026-02-26T14:35:00",
-    type: "Comparação",
+    type: "comparison",
+    typeLabel: "Comparacao",
     players: ["Gabriel Barbosa", "Pedro Guilherme"],
-    user: "João Silva",
+    user: "Joao Silva",
     club: "Corinthians",
-    status: "Concluído",
+    status: "completed",
+    statusLabel: "Concluido",
   },
   {
     id: "AH-002",
     date: "2026-02-25T11:20:00",
-    type: "Relatório",
+    type: "report",
+    typeLabel: "Relatorio",
     players: ["Vitor Roque"],
     user: "Maria Oliveira",
     club: "Flamengo",
-    status: "Concluído",
+    status: "completed",
+    statusLabel: "Concluido",
   },
   {
     id: "AH-003",
     date: "2026-02-24T16:45:00",
-    type: "Comparação",
+    type: "comparison",
+    typeLabel: "Comparacao",
     players: ["Luiz Henrique", "Gabriel Barbosa"],
-    user: "João Silva",
+    user: "Joao Silva",
     club: "Corinthians",
-    status: "Concluído",
+    status: "completed",
+    statusLabel: "Concluido",
   },
   {
     id: "AH-004",
     date: "2026-02-23T09:15:00",
-    type: "Dashboard",
+    type: "dashboard",
+    typeLabel: "Dashboard",
     players: ["Elenco Completo"],
     user: "Carlos Mendes",
     club: "Palmeiras",
-    status: "Em andamento",
+    status: "in_progress",
+    statusLabel: "Em andamento",
   },
   {
     id: "AH-005",
     date: "2026-02-22T13:30:00",
-    type: "Relatório",
+    type: "report",
+    typeLabel: "Relatorio",
     players: ["Pedro Guilherme"],
     user: "Maria Oliveira",
     club: "Flamengo",
-    status: "Concluído",
+    status: "completed",
+    statusLabel: "Concluido",
   },
 ];
 
@@ -69,26 +84,82 @@ function toText(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
-function normalizeHistoryType(value: unknown): AnalysisHistoryEntry["type"] {
-  const normalized = toText(value, "COMPARE").toUpperCase();
-  if (normalized === "SINGLE") {
-    return "Relatório";
-  }
-  if (normalized === "COMPARE") {
-    return "Comparação";
-  }
-  return "Dashboard";
+function normalizeKey(value: unknown) {
+  return toText(value, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z]+/g, "");
 }
 
-function normalizeHistoryStatus(value: unknown): AnalysisHistoryEntry["status"] {
-  const normalized = toText(value, "PENDING").toUpperCase();
-  if (normalized === "APPROVED" || normalized === "DONE") {
-    return "Concluído";
+function getHistoryTypeLabel(type: AnalysisHistoryType) {
+  switch (type) {
+    case "comparison":
+      return "Comparacao";
+    case "report":
+      return "Relatorio";
+    case "dashboard":
+      return "Dashboard";
   }
-  if (normalized === "REJECTED" || normalized === "ARCHIVED") {
-    return "Arquivado";
+}
+
+function getHistoryStatusLabel(status: AnalysisHistoryStatus) {
+  switch (status) {
+    case "completed":
+      return "Concluido";
+    case "in_progress":
+      return "Em andamento";
+    case "archived":
+      return "Arquivado";
   }
-  return "Em andamento";
+}
+
+function normalizeHistoryType(value: unknown): AnalysisHistoryType {
+  const normalized = normalizeKey(value);
+
+  if (
+    normalized === "comparison" ||
+    normalized === "compare" ||
+    normalized === "comparacao" ||
+    normalized === "comparaao"
+  ) {
+    return "comparison";
+  }
+
+  if (
+    normalized === "report" ||
+    normalized === "single" ||
+    normalized === "relatorio" ||
+    normalized === "relatrio"
+  ) {
+    return "report";
+  }
+
+  return "dashboard";
+}
+
+function normalizeHistoryStatus(value: unknown): AnalysisHistoryStatus {
+  const normalized = normalizeKey(value);
+
+  if (
+    normalized === "approved" ||
+    normalized === "done" ||
+    normalized === "completed" ||
+    normalized === "concluido" ||
+    normalized === "concludo"
+  ) {
+    return "completed";
+  }
+
+  if (
+    normalized === "rejected" ||
+    normalized === "archived" ||
+    normalized === "arquivado"
+  ) {
+    return "archived";
+  }
+
+  return "in_progress";
 }
 
 function extractPlayers(report: UnknownRecord) {
@@ -105,20 +176,24 @@ function extractPlayers(report: UnknownRecord) {
   ].filter(Boolean);
 
   const deduped = Array.from(new Set(names));
-  return deduped.length > 0 ? deduped : ["Análise estratégica"];
+  return deduped.length > 0 ? deduped : ["Analise estrategica"];
 }
 
 function mapReportToHistory(report: unknown): AnalysisHistoryEntry {
   const source = isRecord(report) ? report : {};
+  const type = normalizeHistoryType(source.type);
+  const status = normalizeHistoryStatus(source.decisionStatus);
 
   return {
     id: toText(source.id, "N/A"),
     date: toText(source.createdAt, new Date().toISOString()),
-    type: normalizeHistoryType(source.type),
+    type,
+    typeLabel: getHistoryTypeLabel(type),
     players: extractPlayers(source),
     user: toText(source.requestedBy, "Sistema SoccerMind"),
-    club: "SoccerMind",
-    status: normalizeHistoryStatus(source.decisionStatus),
+    club: toText(source.clubName ?? source.club ?? source.clube, "SoccerMind"),
+    status,
+    statusLabel: getHistoryStatusLabel(status),
   };
 }
 

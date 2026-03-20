@@ -4,32 +4,62 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
-  History as HistoryIcon,
-  Users,
-  FileText,
-  Plus,
-  Download,
-  Search,
-  Filter,
-  X,
-  ChevronDown,
-  Eye,
-  Copy,
-  Trash2,
-  MoreVertical,
-  TrendingUp,
-  Calendar,
-  ChevronUp,
   AlertCircle,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Download,
+  Eye,
+  FileText,
+  Filter,
+  History as HistoryIcon,
   Loader2,
+  Plus,
+  Search,
+  Trash2,
+  TrendingUp,
+  Users,
+  X,
 } from "lucide-react";
-import { useEffect, useState, useMemo, memo } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { getAnalysisHistory, type AnalysisHistoryEntry as AnalysisHistory } from "../services/history";
 
-type FilterType = "all" | "ComparaÃ§Ã£o" | "RelatÃ³rio" | "Dashboard";
+type FilterType = "all" | AnalysisHistory["type"];
 type PeriodType = "7d" | "30d" | "90d" | "custom";
 type SortField = "date" | "type" | "user";
 type SortOrder = "asc" | "desc";
+
+type BadgeStyle = {
+  bg: string;
+  text: string;
+  border: string;
+};
+
+const FALLBACK_BADGE_STYLE: BadgeStyle = {
+  bg: "rgba(148,163,184,0.15)",
+  text: "#94a3b8",
+  border: "rgba(148,163,184,0.3)",
+};
+
+const TYPE_BADGE_STYLES: Record<AnalysisHistory["type"], BadgeStyle> = {
+  comparison: { bg: "rgba(122,92,255,0.15)", text: "#7A5CFF", border: "rgba(122,92,255,0.3)" },
+  report: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
+  dashboard: { bg: "rgba(0,194,255,0.15)", text: "#00C2FF", border: "rgba(0,194,255,0.3)" },
+};
+
+const STATUS_BADGE_STYLES: Record<AnalysisHistory["status"], BadgeStyle> = {
+  completed: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
+  in_progress: { bg: "rgba(251,191,36,0.15)", text: "#fbbf24", border: "rgba(251,191,36,0.3)" },
+  archived: { bg: "rgba(148,163,184,0.15)", text: "#94a3b8", border: "rgba(148,163,184,0.3)" },
+};
+
+const TYPE_OPTIONS: Array<{ value: FilterType; label: string }> = [
+  { value: "all", label: "Todos os tipos" },
+  { value: "comparison", label: "Comparacao" },
+  { value: "report", label: "Relatorio" },
+  { value: "dashboard", label: "Dashboard" },
+];
 
 export default function History() {
   const [historyItems, setHistoryItems] = useState<AnalysisHistory[]>([]);
@@ -46,13 +76,19 @@ export default function History() {
 
     async function loadHistory() {
       setIsLoading(true);
-      const response = await getAnalysisHistory();
-      if (!active) {
-        return;
-      }
 
-      setHistoryItems(response.data as unknown as AnalysisHistory[]);
-      setIsLoading(false);
+      try {
+        const response = await getAnalysisHistory();
+        if (!active) {
+          return;
+        }
+
+        setHistoryItems(Array.isArray(response.data) ? response.data : []);
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
     }
 
     loadHistory();
@@ -62,63 +98,65 @@ export default function History() {
     };
   }, []);
 
-  // Filter and sort logic
+  const availableClubs = useMemo(() => {
+    const clubs = Array.from(new Set(historyItems.map((item) => item.club).filter(Boolean)));
+    return clubs.sort((a, b) => a.localeCompare(b));
+  }, [historyItems]);
+
   const filteredData = useMemo(() => {
     let filtered = [...historyItems];
 
-    // Search
     if (searchQuery) {
+      const normalizedQuery = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (item) =>
-          item.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.players.some((p) => p.toLowerCase().includes(searchQuery.toLowerCase())) ||
-          item.user.toLowerCase().includes(searchQuery.toLowerCase())
+          item.id.toLowerCase().includes(normalizedQuery) ||
+          item.players.some((player) => player.toLowerCase().includes(normalizedQuery)) ||
+          item.user.toLowerCase().includes(normalizedQuery),
       );
     }
 
-    // Type filter
     if (filterType !== "all") {
       filtered = filtered.filter((item) => item.type === filterType);
     }
 
-    // Club filter
     if (filterClub !== "all") {
       filtered = filtered.filter((item) => item.club === filterClub);
     }
 
-    // Sort
     filtered.sort((a, b) => {
       let comparison = 0;
+
       if (sortField === "date") {
         comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
       } else if (sortField === "type") {
-        comparison = a.type.localeCompare(b.type);
+        comparison = a.typeLabel.localeCompare(b.typeLabel);
       } else if (sortField === "user") {
         comparison = a.user.localeCompare(b.user);
       }
+
       return sortOrder === "asc" ? comparison : -comparison;
     });
 
     return filtered;
-  }, [historyItems, searchQuery, filterType, filterClub, sortField, sortOrder]);
+  }, [filterClub, filterType, historyItems, searchQuery, sortField, sortOrder]);
 
   const stats = useMemo(() => {
     const total = historyItems.length;
-    const comparisons = historyItems.filter((h) => h.type === "Compara??o").length;
-    const reports = historyItems.filter((h) => h.type === "Relat?rio").length;
+    const comparisons = historyItems.filter((item) => item.type === "comparison").length;
+    const reports = historyItems.filter((item) => item.type === "report").length;
 
     return {
-      total: { value: total, change: +12 },
-      comparisons: { value: comparisons, change: +8 },
-      reports: { value: reports, change: +15 },
+      total: { value: total, change: 12 },
+      comparisons: { value: comparisons, change: 8 },
+      reports: { value: reports, change: 15 },
     };
   }, [historyItems]);
 
-  const activeFiltersCount = [
-    filterType !== "all",
-    filterClub !== "all",
-    searchQuery !== "",
-  ].filter(Boolean).length;
+  const activeFiltersCount = [filterType !== "all", filterClub !== "all", searchQuery !== ""].filter(Boolean).length;
+
+  const filterTypeLabel =
+    filterType === "all" ? "Todos os tipos" : TYPE_OPTIONS.find((option) => option.value === filterType)?.label ?? filterType;
 
   const handleClearFilters = () => {
     setSearchQuery("");
@@ -129,11 +167,12 @@ export default function History() {
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("desc");
+      setSortOrder((current) => (current === "asc" ? "desc" : "asc"));
+      return;
     }
+
+    setSortField(field);
+    setSortOrder("desc");
   };
 
   return (
@@ -143,27 +182,22 @@ export default function History() {
         <AppHeader />
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-[1600px] mx-auto">
-            {/* Header with Actions */}
             <HeaderSection />
-
-            {/* KPI Cards */}
             <KPISection stats={stats} onFilterClick={setFilterType} />
-
-            {/* Filters Bar */}
             <FiltersSection
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               filterType={filterType}
               setFilterType={setFilterType}
+              filterTypeLabel={filterTypeLabel}
               filterPeriod={filterPeriod}
               setFilterPeriod={setFilterPeriod}
               filterClub={filterClub}
               setFilterClub={setFilterClub}
+              availableClubs={availableClubs}
               activeFiltersCount={activeFiltersCount}
               onClearFilters={handleClearFilters}
             />
-
-            {/* Activity Table */}
             <ActivityTable
               data={filteredData}
               sortField={sortField}
@@ -178,16 +212,13 @@ export default function History() {
   );
 }
 
-// ========================================
-// HEADER SECTION
-// ========================================
 const HeaderSection = memo(() => {
   return (
     <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-10">
       <div>
-        <h1 className="text-4xl font-semibold mb-3">AnÃ¡lises</h1>
+        <h1 className="text-4xl font-semibold mb-3">Analises</h1>
         <p className="text-sm text-gray-500">
-          Hub de monitoramento estratÃ©gico de anÃ¡lises e comparaÃ§Ãµes
+          Hub de monitoramento estrategico de analises e comparacoes
         </p>
       </div>
       <div className="flex items-center gap-3">
@@ -200,7 +231,7 @@ const HeaderSection = memo(() => {
         </Button>
         <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold shadow-[0_4px_16px_rgba(0,194,255,0.25)] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)] transition-all">
           <Plus className="w-4 h-4 mr-2" />
-          Nova AnÃ¡lise
+          Nova Analise
         </Button>
       </div>
     </div>
@@ -209,9 +240,6 @@ const HeaderSection = memo(() => {
 
 HeaderSection.displayName = "HeaderSection";
 
-// ========================================
-// KPI SECTION
-// ========================================
 interface KPISectionProps {
   stats: {
     total: { value: number; change: number };
@@ -228,31 +256,31 @@ const KPISection = memo(({ stats, onFilterClick }: KPISectionProps) => {
         icon={HistoryIcon}
         iconColor="#00C2FF"
         iconBg="rgba(0,194,255,0.15)"
-        label="Total de AnÃ¡lises"
+        label="Total de Analises"
         value={stats.total.value}
         change={stats.total.change}
-        subtitle="Ãšltimos 30 dias"
+        subtitle="Ultimos 30 dias"
         onClick={() => onFilterClick("all")}
       />
       <KPICard
         icon={Users}
         iconColor="#7A5CFF"
         iconBg="rgba(122,92,255,0.15)"
-        label="ComparaÃ§Ãµes"
+        label="Comparacoes"
         value={stats.comparisons.value}
         change={stats.comparisons.change}
-        subtitle="AnÃ¡lises comparativas"
-        onClick={() => onFilterClick("ComparaÃ§Ã£o")}
+        subtitle="Analises comparativas"
+        onClick={() => onFilterClick("comparison")}
       />
       <KPICard
         icon={FileText}
         iconColor="#00FF9C"
         iconBg="rgba(0,255,156,0.15)"
-        label="RelatÃ³rios"
+        label="Relatorios"
         value={stats.reports.value}
         change={stats.reports.change}
-        subtitle="RelatÃ³rios gerados"
-        onClick={() => onFilterClick("RelatÃ³rio")}
+        subtitle="Relatorios gerados"
+        onClick={() => onFilterClick("report")}
       />
     </div>
   );
@@ -271,16 +299,7 @@ interface KPICardProps {
   onClick: () => void;
 }
 
-const KPICard = memo(({
-  icon: Icon,
-  iconColor,
-  iconBg,
-  label,
-  value,
-  change,
-  subtitle,
-  onClick,
-}: KPICardProps) => {
+const KPICard = memo(({ icon: Icon, iconColor, iconBg, label, value, change, subtitle, onClick }: KPICardProps) => {
   return (
     <button
       onClick={onClick}
@@ -288,15 +307,10 @@ const KPICard = memo(({
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-[10px] flex items-center justify-center"
-            style={{ background: iconBg }}
-          >
+          <div className="w-10 h-10 rounded-[10px] flex items-center justify-center" style={{ background: iconBg }}>
             <Icon className="w-5 h-5" style={{ color: iconColor }} />
           </div>
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">
-            {label}
-          </span>
+          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">{label}</span>
         </div>
         <div
           className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
@@ -320,18 +334,17 @@ const KPICard = memo(({
 
 KPICard.displayName = "KPICard";
 
-// ========================================
-// FILTERS SECTION
-// ========================================
 interface FiltersSectionProps {
   searchQuery: string;
   setSearchQuery: (value: string) => void;
   filterType: FilterType;
   setFilterType: (value: FilterType) => void;
+  filterTypeLabel: string;
   filterPeriod: PeriodType;
   setFilterPeriod: (value: PeriodType) => void;
   filterClub: string;
   setFilterClub: (value: string) => void;
+  availableClubs: string[];
   activeFiltersCount: number;
   onClearFilters: () => void;
 }
@@ -341,30 +354,29 @@ const FiltersSection = memo(({
   setSearchQuery,
   filterType,
   setFilterType,
+  filterTypeLabel,
   filterPeriod,
   setFilterPeriod,
   filterClub,
   setFilterClub,
+  availableClubs,
   activeFiltersCount,
   onClearFilters,
 }: FiltersSectionProps) => {
   return (
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] p-6 border border-[rgba(255,255,255,0.06)] mb-8">
-      {/* Search and Filters */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
-        {/* Search */}
         <div className="lg:col-span-4 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
           <Input
             type="text"
             placeholder="Buscar por jogador, analista ou ID..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(event) => setSearchQuery(event.target.value)}
             className="pl-11 bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] focus:border-[#00C2FF] rounded-[12px] h-11"
           />
         </div>
 
-        {/* Type Filter */}
         <div className="lg:col-span-3">
           <Select value={filterType} onValueChange={(value) => setFilterType(value as FilterType)}>
             <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
@@ -372,31 +384,30 @@ const FiltersSection = memo(({
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
-              <SelectItem value="all">Todos os tipos</SelectItem>
-              <SelectItem value="ComparaÃ§Ã£o">ComparaÃ§Ã£o</SelectItem>
-              <SelectItem value="RelatÃ³rio">RelatÃ³rio</SelectItem>
-              <SelectItem value="Dashboard">Dashboard</SelectItem>
+              {TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Period Filter */}
         <div className="lg:col-span-2">
           <Select value={filterPeriod} onValueChange={(value) => setFilterPeriod(value as PeriodType)}>
             <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
               <Calendar className="w-4 h-4 mr-2 text-gray-500" />
-              <SelectValue placeholder="PerÃ­odo" />
+              <SelectValue placeholder="Periodo" />
             </SelectTrigger>
             <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
-              <SelectItem value="7d">Ãšltimos 7 dias</SelectItem>
-              <SelectItem value="30d">Ãšltimos 30 dias</SelectItem>
-              <SelectItem value="90d">Ãšltimos 90 dias</SelectItem>
+              <SelectItem value="7d">Ultimos 7 dias</SelectItem>
+              <SelectItem value="30d">Ultimos 30 dias</SelectItem>
+              <SelectItem value="90d">Ultimos 90 dias</SelectItem>
               <SelectItem value="custom">Personalizado</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        {/* Club Filter */}
         <div className="lg:col-span-3">
           <Select value={filterClub} onValueChange={setFilterClub}>
             <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
@@ -404,36 +415,31 @@ const FiltersSection = memo(({
             </SelectTrigger>
             <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
               <SelectItem value="all">Todos os clubes</SelectItem>
-              <SelectItem value="Corinthians">Corinthians</SelectItem>
-              <SelectItem value="Flamengo">Flamengo</SelectItem>
-              <SelectItem value="Palmeiras">Palmeiras</SelectItem>
+              {availableClubs.map((club) => (
+                <SelectItem key={club} value={club}>
+                  {club}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Active Filters */}
       {activeFiltersCount > 0 && (
         <div className="flex items-center gap-3">
           <span className="text-xs text-gray-500">
             {activeFiltersCount} filtro{activeFiltersCount > 1 ? "s" : ""} ativo{activeFiltersCount > 1 ? "s" : ""}
           </span>
           <div className="flex items-center gap-2 flex-wrap">
-            {filterType !== "all" && (
-              <FilterChip label={`Tipo: ${filterType}`} onRemove={() => setFilterType("all")} />
-            )}
-            {filterClub !== "all" && (
-              <FilterChip label={`Clube: ${filterClub}`} onRemove={() => setFilterClub("all")} />
-            )}
-            {searchQuery && (
-              <FilterChip label={`Busca: "${searchQuery}"`} onRemove={() => setSearchQuery("")} />
-            )}
+            {filterType !== "all" && <FilterChip label={`Tipo: ${filterTypeLabel}`} onRemove={() => setFilterType("all")} />}
+            {filterClub !== "all" && <FilterChip label={`Clube: ${filterClub}`} onRemove={() => setFilterClub("all")} />}
+            {searchQuery && <FilterChip label={`Busca: "${searchQuery}"`} onRemove={() => setSearchQuery("")} />}
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClearFilters}
-            className="text-xs text-gray-500 hover:text-gray-300 ml-auto"
+            className="ml-auto text-gray-500 hover:text-gray-300 hover:bg-[rgba(255,255,255,0.04)] rounded-[8px]"
           >
             Limpar filtros
           </Button>
@@ -447,23 +453,17 @@ FiltersSection.displayName = "FiltersSection";
 
 const FilterChip = memo(({ label, onRemove }: { label: string; onRemove: () => void }) => {
   return (
-    <div className="flex items-center gap-1.5 bg-[rgba(0,194,255,0.1)] border border-[rgba(0,194,255,0.3)] rounded-[8px] px-2.5 py-1">
-      <span className="text-xs text-[#00C2FF]">{label}</span>
-      <button
-        onClick={onRemove}
-        className="hover:bg-[rgba(0,194,255,0.2)] rounded-full p-0.5 transition-colors"
-      >
-        <X className="w-3 h-3 text-[#00C2FF]" />
+    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-xs text-gray-300">
+      {label}
+      <button onClick={onRemove} className="hover:text-white transition-colors" aria-label={`Remover filtro ${label}`}>
+        <X className="w-3 h-3" />
       </button>
-    </div>
+    </span>
   );
 });
 
 FilterChip.displayName = "FilterChip";
 
-// ========================================
-// ACTIVITY TABLE
-// ========================================
 interface ActivityTableProps {
   data: AnalysisHistory[];
   sortField: SortField;
@@ -484,27 +484,19 @@ const ActivityTable = memo(({ data, sortField, sortOrder, onSort, isLoading }: A
   return (
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="sticky top-0 bg-[rgba(255,255,255,0.04)] backdrop-blur-sm z-10 border-b border-[rgba(255,255,255,0.06)]">
+        <table className="w-full min-w-[980px]">
+          <thead className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
             <tr>
               <TableHeader label="Tipo" field="type" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">
-                ID
-              </th>
-              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">
-                Jogadores
-              </th>
-              <TableHeader label="ResponsÃ¡vel" field="user" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <TableHeader label="Data/Hora" field="date" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <th className="text-center py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">
-                Status
-              </th>
-              <th className="text-center py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">
-                AÃ§Ãµes
-              </th>
+              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">ID</th>
+              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Jogadores</th>
+              <TableHeader label="Analista" field="user" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
+              <TableHeader label="Data" field="date" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
+              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Status</th>
+              <th className="text-center py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Acoes</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[rgba(255,255,255,0.04)]">
+          <tbody>
             {data.map((item) => (
               <ActivityRow key={item.id} item={item} />
             ))}
@@ -535,13 +527,12 @@ const TableHeader = memo(({ label, field, sortField, sortOrder, onSort }: TableH
         className="flex items-center gap-2 text-[10px] text-gray-500 uppercase tracking-wider font-medium hover:text-gray-300 transition-colors"
       >
         {label}
-        {isActive && (
-          sortOrder === "asc" ? (
+        {isActive &&
+          (sortOrder === "asc" ? (
             <ChevronUp className="w-3.5 h-3.5 text-[#00C2FF]" />
           ) : (
             <ChevronDown className="w-3.5 h-3.5 text-[#00C2FF]" />
-          )
-        )}
+          ))}
       </button>
     </th>
   );
@@ -553,7 +544,7 @@ const ActivityRow = memo(({ item }: { item: AnalysisHistory }) => {
   return (
     <tr className="hover:bg-[rgba(255,255,255,0.02)] transition-colors group">
       <td className="py-4 px-5">
-        <TypeBadge type={item.type} />
+        <TypeBadge type={item.type} label={item.typeLabel} />
       </td>
       <td className="py-4 px-5">
         <span className="text-xs text-gray-500 font-mono">{item.id}</span>
@@ -576,13 +567,13 @@ const ActivityRow = memo(({ item }: { item: AnalysisHistory }) => {
         </span>
       </td>
       <td className="py-4 px-5">
-        <StatusBadge status={item.status} />
+        <StatusBadge status={item.status} label={item.statusLabel} />
       </td>
       <td className="py-4 px-5">
         <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <ActionButton icon={Eye} tooltip="Ver detalhes" />
           <ActionButton icon={Copy} tooltip="Duplicar" />
-          <ActionButton icon={FileText} tooltip="Gerar relatÃ³rio" />
+          <ActionButton icon={FileText} tooltip="Gerar relatorio" />
           <ActionButton icon={Trash2} tooltip="Excluir" variant="danger" />
         </div>
       </td>
@@ -592,42 +583,30 @@ const ActivityRow = memo(({ item }: { item: AnalysisHistory }) => {
 
 ActivityRow.displayName = "ActivityRow";
 
-const TypeBadge = memo(({ type }: { type: string }) => {
-  const config = {
-    "ComparaÃ§Ã£o": { bg: "rgba(122,92,255,0.15)", text: "#7A5CFF", border: "rgba(122,92,255,0.3)" },
-    "RelatÃ³rio": { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
-    Dashboard: { bg: "rgba(0,194,255,0.15)", text: "#00C2FF", border: "rgba(0,194,255,0.3)" },
-  };
-
-  const colors = config[type as keyof typeof config];
+const TypeBadge = memo(({ type, label }: { type: AnalysisHistory["type"]; label: string }) => {
+  const colors = TYPE_BADGE_STYLES[type] ?? FALLBACK_BADGE_STYLE;
 
   return (
     <span
       className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-[6px] font-semibold border"
       style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
     >
-      {type}
+      {label}
     </span>
   );
 });
 
 TypeBadge.displayName = "TypeBadge";
 
-const StatusBadge = memo(({ status }: { status: string }) => {
-  const config = {
-    "ConcluÃ­do": { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
-    "Em andamento": { bg: "rgba(251,191,36,0.15)", text: "#fbbf24", border: "rgba(251,191,36,0.3)" },
-    Arquivado: { bg: "rgba(148,163,184,0.15)", text: "#94a3b8", border: "rgba(148,163,184,0.3)" },
-  };
-
-  const colors = config[status as keyof typeof config];
+const StatusBadge = memo(({ status, label }: { status: AnalysisHistory["status"]; label: string }) => {
+  const colors = STATUS_BADGE_STYLES[status] ?? FALLBACK_BADGE_STYLE;
 
   return (
     <span
       className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-[6px] font-semibold border"
       style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
     >
-      {status}
+      {label}
     </span>
   );
 });
@@ -660,9 +639,6 @@ const ActionButton = memo(({
 
 ActionButton.displayName = "ActionButton";
 
-// ========================================
-// EMPTY & LOADING STATES
-// ========================================
 const EmptyState = memo(() => {
   return (
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-16 text-center">
@@ -670,13 +646,13 @@ const EmptyState = memo(() => {
         <div className="w-16 h-16 bg-[rgba(0,194,255,0.1)] rounded-[14px] flex items-center justify-center mx-auto mb-6">
           <AlertCircle className="w-8 h-8 text-[#00C2FF]" />
         </div>
-        <h3 className="text-xl font-semibold mb-3">Nenhuma anÃ¡lise encontrada</h3>
+        <h3 className="text-xl font-semibold mb-3">Nenhuma analise encontrada</h3>
         <p className="text-sm text-gray-500 mb-6">
-          Ajuste os filtros ou crie uma nova anÃ¡lise para comeÃ§ar
+          Ajuste os filtros ou crie uma nova analise para comecar
         </p>
         <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold">
           <Plus className="w-4 h-4 mr-2" />
-          Nova AnÃ¡lise
+          Nova Analise
         </Button>
       </div>
     </div>
@@ -689,7 +665,7 @@ const LoadingState = memo(() => {
   return (
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-16 text-center">
       <Loader2 className="w-12 h-12 text-[#00C2FF] animate-spin mx-auto mb-4" />
-      <p className="text-sm text-gray-500">Carregando anÃ¡lises...</p>
+      <p className="text-sm text-gray-500">Carregando analises...</p>
     </div>
   );
 });
