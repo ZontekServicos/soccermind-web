@@ -799,10 +799,6 @@ const EmptyState = memo(() => {
         </div>
         <h3 className="mb-3 text-xl font-semibold">Nenhuma analise encontrada</h3>
         <p className="mb-6 text-sm text-gray-500">Ajuste os filtros ou crie uma nova analise para comecar</p>
-        <Button className="h-11 rounded-[12px] bg-[#00C2FF]/90 px-6 font-semibold text-[#07142A] hover:bg-[#00C2FF]">
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Analise
-        </Button>
       </div>
     </div>
   );
