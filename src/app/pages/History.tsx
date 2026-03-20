@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import { deleteAnalysis, getAnalyses, type AnalysisViewModel as AnalysisHistory } from "../services/analysis";
 
 type FilterType = "all" | AnalysisHistory["type"];
@@ -73,6 +74,7 @@ const PERIOD_IN_DAYS: Partial<Record<Exclude<PeriodType, "custom">, number>> = {
 };
 
 export default function History() {
+  const navigate = useNavigate();
   const [historyItems, setHistoryItems] = useState<AnalysisHistory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
@@ -256,7 +258,7 @@ export default function History() {
         <AppHeader />
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-[1600px] mx-auto">
-            <HeaderSection />
+            <HeaderSection onCreateAnalysis={() => navigate("/compare")} />
             <KPISection stats={stats} onFilterClick={setFilterType} />
             <FiltersSection
               searchQuery={searchQuery}
@@ -301,7 +303,7 @@ export default function History() {
   );
 }
 
-const HeaderSection = memo(() => {
+const HeaderSection = memo(({ onCreateAnalysis }: { onCreateAnalysis: () => void }) => {
   return (
     <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
       <div>
@@ -316,7 +318,10 @@ const HeaderSection = memo(() => {
           <Download className="mr-2 h-4 w-4" />
           Exportar
         </Button>
-        <Button className="h-11 rounded-[12px] bg-[#00C2FF]/90 px-6 font-semibold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.25)] transition-all hover:bg-[#00C2FF] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)]">
+        <Button
+          onClick={onCreateAnalysis}
+          className="h-11 rounded-[12px] bg-[#00C2FF]/90 px-6 font-semibold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.25)] transition-all hover:bg-[#00C2FF] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)]"
+        >
           <Plus className="mr-2 h-4 w-4" />
           Nova Analise
         </Button>
