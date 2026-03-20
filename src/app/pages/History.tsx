@@ -22,9 +22,10 @@ import {
   X,
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
-import { getAnalyses, type AnalysisViewModel as AnalysisHistory } from "../services/analysis";
+import { deleteAnalysis, getAnalyses, type AnalysisViewModel as AnalysisHistory } from "../services/analysis";
 
 type FilterType = "all" | AnalysisHistory["type"];
+type FilterStatus = "all" | AnalysisHistory["status"];
 type PeriodType = "7d" | "30d" | "90d" | "custom";
 type SortField = "date" | "type" | "user";
 type SortOrder = "asc" | "desc";
@@ -58,15 +59,33 @@ const TYPE_OPTIONS: Array<{ value: FilterType; label: string }> = [
   { value: "report", label: "Relatorio" },
 ];
 
+const STATUS_OPTIONS: Array<{ value: FilterStatus; label: string }> = [
+  { value: "all", label: "Todos os status" },
+  { value: "completed", label: "Concluido" },
+  { value: "in_progress", label: "Em andamento" },
+  { value: "archived", label: "Arquivado" },
+];
+
+const PERIOD_IN_DAYS: Partial<Record<Exclude<PeriodType, "custom">, number>> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
+
 export default function History() {
   const [historyItems, setHistoryItems] = useState<AnalysisHistory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [filterPeriod, setFilterPeriod] = useState<PeriodType>("30d");
   const [filterClub, setFilterClub] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -81,6 +100,14 @@ export default function History() {
         }
 
         setHistoryItems(Array.isArray(response.data) ? response.data : []);
+        setLoadError(null);
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setHistoryItems([]);
+        setLoadError(error instanceof Error ? error.message : "Nao foi possivel carregar a central de analises.");
       } finally {
         if (active) {
           setIsLoading(false);
@@ -109,6 +136,7 @@ export default function History() {
         (item) =>
           item.id.toLowerCase().includes(normalizedQuery) ||
           item.title.toLowerCase().includes(normalizedQuery) ||
+          item.description.toLowerCase().includes(normalizedQuery) ||
           item.players.some((player) => player.toLowerCase().includes(normalizedQuery)) ||
           item.user.toLowerCase().includes(normalizedQuery),
       );
@@ -118,8 +146,20 @@ export default function History() {
       filtered = filtered.filter((item) => item.type === filterType);
     }
 
+    if (filterStatus !== "all") {
+      filtered = filtered.filter((item) => item.status === filterStatus);
+    }
+
     if (filterClub !== "all") {
       filtered = filtered.filter((item) => item.club === filterClub);
+    }
+
+    if (filterPeriod !== "custom") {
+      const periodDays = PERIOD_IN_DAYS[filterPeriod];
+      if (periodDays) {
+        const cutoff = Date.now() - periodDays * 24 * 60 * 60 * 1000;
+        filtered = filtered.filter((item) => new Date(item.date).getTime() >= cutoff);
+      }
     }
 
     filtered.sort((a, b) => {
@@ -137,7 +177,7 @@ export default function History() {
     });
 
     return filtered;
-  }, [filterClub, filterType, historyItems, searchQuery, sortField, sortOrder]);
+  }, [filterClub, filterPeriod, filterStatus, filterType, historyItems, searchQuery, sortField, sortOrder]);
 
   const stats = useMemo(() => {
     const total = historyItems.length;
@@ -151,14 +191,25 @@ export default function History() {
     };
   }, [historyItems]);
 
-  const activeFiltersCount = [filterType !== "all", filterClub !== "all", searchQuery !== ""].filter(Boolean).length;
+  const activeFiltersCount = [
+    filterType !== "all",
+    filterStatus !== "all",
+    filterClub !== "all",
+    searchQuery !== "",
+  ].filter(Boolean).length;
 
   const filterTypeLabel =
     filterType === "all" ? "Todos os tipos" : TYPE_OPTIONS.find((option) => option.value === filterType)?.label ?? filterType;
 
+  const filterStatusLabel =
+    filterStatus === "all"
+      ? "Todos os status"
+      : STATUS_OPTIONS.find((option) => option.value === filterStatus)?.label ?? filterStatus;
+
   const handleClearFilters = () => {
     setSearchQuery("");
     setFilterType("all");
+    setFilterStatus("all");
     setFilterClub("all");
     setFilterPeriod("30d");
   };
@@ -171,6 +222,31 @@ export default function History() {
 
     setSortField(field);
     setSortOrder("desc");
+  };
+
+  const handleDeleteAnalysis = async (analysisId: string) => {
+    if (deletingId) {
+      return;
+    }
+
+    const confirmed = window.confirm("Deseja remover esta analise da central?");
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingId(analysisId);
+    setActionFeedback(null);
+    setActionError(null);
+
+    try {
+      await deleteAnalysis(analysisId);
+      setHistoryItems((current) => current.filter((item) => item.id !== analysisId));
+      setActionFeedback("Analise removida da central com sucesso.");
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Nao foi possivel excluir a analise.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -188,6 +264,9 @@ export default function History() {
               filterType={filterType}
               setFilterType={setFilterType}
               filterTypeLabel={filterTypeLabel}
+              filterStatus={filterStatus}
+              setFilterStatus={setFilterStatus}
+              filterStatusLabel={filterStatusLabel}
               filterPeriod={filterPeriod}
               setFilterPeriod={setFilterPeriod}
               filterClub={filterClub}
@@ -196,12 +275,24 @@ export default function History() {
               activeFiltersCount={activeFiltersCount}
               onClearFilters={handleClearFilters}
             />
+            {actionFeedback && (
+              <div className="mb-6 rounded-[16px] border border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] px-5 py-4 text-sm text-[#9CFFD1]">
+                {actionFeedback}
+              </div>
+            )}
+            {(loadError || actionError) && (
+              <div className="mb-6 rounded-[16px] border border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+                {loadError ?? actionError}
+              </div>
+            )}
             <ActivityTable
               data={filteredData}
               sortField={sortField}
               sortOrder={sortOrder}
               onSort={handleSort}
               isLoading={isLoading}
+              deletingId={deletingId}
+              onDelete={handleDeleteAnalysis}
             />
           </div>
         </main>
@@ -212,23 +303,21 @@ export default function History() {
 
 const HeaderSection = memo(() => {
   return (
-    <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6 mb-10">
+    <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
       <div>
-        <h1 className="text-4xl font-semibold mb-3">Analises</h1>
-        <p className="text-sm text-gray-500">
-          Hub de monitoramento estrategico de analises e comparacoes
-        </p>
+        <h1 className="mb-3 text-4xl font-semibold">Analises</h1>
+        <p className="text-sm text-gray-500">Hub de monitoramento estrategico de analises e comparacoes</p>
       </div>
       <div className="flex items-center gap-3">
         <Button
           variant="outline"
-          className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)] rounded-[12px] h-11 px-5"
+          className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] px-5 hover:bg-[rgba(255,255,255,0.04)]"
         >
-          <Download className="w-4 h-4 mr-2" />
+          <Download className="mr-2 h-4 w-4" />
           Exportar
         </Button>
-        <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold shadow-[0_4px_16px_rgba(0,194,255,0.25)] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)] transition-all">
-          <Plus className="w-4 h-4 mr-2" />
+        <Button className="h-11 rounded-[12px] bg-[#00C2FF]/90 px-6 font-semibold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.25)] transition-all hover:bg-[#00C2FF] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)]">
+          <Plus className="mr-2 h-4 w-4" />
           Nova Analise
         </Button>
       </div>
@@ -249,7 +338,7 @@ interface KPISectionProps {
 
 const KPISection = memo(({ stats, onFilterClick }: KPISectionProps) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
       <KPICard
         icon={HistoryIcon}
         iconColor="#00C2FF"
@@ -301,28 +390,28 @@ const KPICard = memo(({ icon: Icon, iconColor, iconBg, label, value, change, sub
   return (
     <button
       onClick={onClick}
-      className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] p-6 border border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.04)] hover:border-[rgba(255,255,255,0.1)] transition-all text-left group"
+      className="group rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 text-left backdrop-blur-sm transition-all hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)]"
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[10px] flex items-center justify-center" style={{ background: iconBg }}>
-            <Icon className="w-5 h-5" style={{ color: iconColor }} />
+          <div className="flex h-10 w-10 items-center justify-center rounded-[10px]" style={{ background: iconBg }}>
+            <Icon className="h-5 w-5" style={{ color: iconColor }} />
           </div>
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">{label}</span>
+          <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">{label}</span>
         </div>
         <div
-          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+          className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
           style={{
             background: change > 0 ? "rgba(0,255,156,0.15)" : "rgba(255,77,79,0.15)",
             color: change > 0 ? "#00FF9C" : "#FF4D4F",
           }}
         >
-          <TrendingUp className="w-3 h-3" />
+          <TrendingUp className="h-3 w-3" />
           {change > 0 ? "+" : ""}
           {change}%
         </div>
       </div>
-      <p className="text-4xl font-bold mb-2" style={{ color: iconColor }}>
+      <p className="mb-2 text-4xl font-bold" style={{ color: iconColor }}>
         {value}
       </p>
       <p className="text-xs text-gray-600">{subtitle}</p>
@@ -338,6 +427,9 @@ interface FiltersSectionProps {
   filterType: FilterType;
   setFilterType: (value: FilterType) => void;
   filterTypeLabel: string;
+  filterStatus: FilterStatus;
+  setFilterStatus: (value: FilterStatus) => void;
+  filterStatusLabel: string;
   filterPeriod: PeriodType;
   setFilterPeriod: (value: PeriodType) => void;
   filterClub: string;
@@ -353,6 +445,9 @@ const FiltersSection = memo(({
   filterType,
   setFilterType,
   filterTypeLabel,
+  filterStatus,
+  setFilterStatus,
+  filterStatusLabel,
   filterPeriod,
   setFilterPeriod,
   filterClub,
@@ -362,26 +457,26 @@ const FiltersSection = memo(({
   onClearFilters,
 }: FiltersSectionProps) => {
   return (
-    <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] p-6 border border-[rgba(255,255,255,0.06)] mb-8">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
-        <div className="lg:col-span-4 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+    <div className="mb-8 rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 backdrop-blur-sm">
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
+        <div className="relative lg:col-span-4">
+          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
           <Input
             type="text"
             placeholder="Buscar por jogador, analista ou ID..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            className="pl-11 bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] focus:border-[#00C2FF] rounded-[12px] h-11"
+            className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] pl-11 focus:border-[#00C2FF]"
           />
         </div>
 
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-2">
           <Select value={filterType} onValueChange={(value) => setFilterType(value as FilterType)}>
-            <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
-              <Filter className="w-4 h-4 mr-2 text-gray-500" />
+            <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+              <Filter className="mr-2 h-4 w-4 text-gray-500" />
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
-            <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
+            <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
               {TYPE_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -392,12 +487,27 @@ const FiltersSection = memo(({
         </div>
 
         <div className="lg:col-span-2">
+          <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as FilterStatus)}>
+            <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
+              {STATUS_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="lg:col-span-2">
           <Select value={filterPeriod} onValueChange={(value) => setFilterPeriod(value as PeriodType)}>
-            <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
-              <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+            <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+              <Calendar className="mr-2 h-4 w-4 text-gray-500" />
               <SelectValue placeholder="Periodo" />
             </SelectTrigger>
-            <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
+            <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
               <SelectItem value="7d">Ultimos 7 dias</SelectItem>
               <SelectItem value="30d">Ultimos 30 dias</SelectItem>
               <SelectItem value="90d">Ultimos 90 dias</SelectItem>
@@ -406,12 +516,12 @@ const FiltersSection = memo(({
           </Select>
         </div>
 
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-2">
           <Select value={filterClub} onValueChange={setFilterClub}>
-            <SelectTrigger className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] rounded-[12px] h-11">
+            <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
               <SelectValue placeholder="Clube" />
             </SelectTrigger>
-            <SelectContent className="bg-[#0A1B35] border-[rgba(255,255,255,0.1)]">
+            <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
               <SelectItem value="all">Todos os clubes</SelectItem>
               {availableClubs.map((club) => (
                 <SelectItem key={club} value={club}>
@@ -428,8 +538,11 @@ const FiltersSection = memo(({
           <span className="text-xs text-gray-500">
             {activeFiltersCount} filtro{activeFiltersCount > 1 ? "s" : ""} ativo{activeFiltersCount > 1 ? "s" : ""}
           </span>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex flex-wrap items-center gap-2">
             {filterType !== "all" && <FilterChip label={`Tipo: ${filterTypeLabel}`} onRemove={() => setFilterType("all")} />}
+            {filterStatus !== "all" && (
+              <FilterChip label={`Status: ${filterStatusLabel}`} onRemove={() => setFilterStatus("all")} />
+            )}
             {filterClub !== "all" && <FilterChip label={`Clube: ${filterClub}`} onRemove={() => setFilterClub("all")} />}
             {searchQuery && <FilterChip label={`Busca: "${searchQuery}"`} onRemove={() => setSearchQuery("")} />}
           </div>
@@ -437,7 +550,7 @@ const FiltersSection = memo(({
             variant="ghost"
             size="sm"
             onClick={onClearFilters}
-            className="ml-auto text-gray-500 hover:text-gray-300 hover:bg-[rgba(255,255,255,0.04)] rounded-[8px]"
+            className="ml-auto rounded-[8px] text-gray-500 hover:bg-[rgba(255,255,255,0.04)] hover:text-gray-300"
           >
             Limpar filtros
           </Button>
@@ -451,10 +564,10 @@ FiltersSection.displayName = "FiltersSection";
 
 const FilterChip = memo(({ label, onRemove }: { label: string; onRemove: () => void }) => {
   return (
-    <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] text-xs text-gray-300">
+    <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-xs text-gray-300">
       {label}
-      <button onClick={onRemove} className="hover:text-white transition-colors" aria-label={`Remover filtro ${label}`}>
-        <X className="w-3 h-3" />
+      <button onClick={onRemove} className="transition-colors hover:text-white" aria-label={`Remover filtro ${label}`}>
+        <X className="h-3 w-3" />
       </button>
     </span>
   );
@@ -468,9 +581,19 @@ interface ActivityTableProps {
   sortOrder: SortOrder;
   onSort: (field: SortField) => void;
   isLoading: boolean;
+  deletingId: string | null;
+  onDelete: (analysisId: string) => void;
 }
 
-const ActivityTable = memo(({ data, sortField, sortOrder, onSort, isLoading }: ActivityTableProps) => {
+const ActivityTable = memo(({
+  data,
+  sortField,
+  sortOrder,
+  onSort,
+  isLoading,
+  deletingId,
+  onDelete,
+}: ActivityTableProps) => {
   if (isLoading) {
     return <LoadingState />;
   }
@@ -480,23 +603,23 @@ const ActivityTable = memo(({ data, sortField, sortOrder, onSort, isLoading }: A
   }
 
   return (
-    <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] overflow-hidden">
+    <div className="overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] backdrop-blur-sm">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[980px]">
           <thead className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
             <tr>
               <TableHeader label="Tipo" field="type" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Analise</th>
-              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Jogadores</th>
+              <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">Analise</th>
+              <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">Jogadores</th>
               <TableHeader label="Analista" field="user" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
               <TableHeader label="Data" field="date" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <th className="text-left py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Status</th>
-              <th className="text-center py-4 px-5 text-[10px] text-gray-500 uppercase tracking-wider font-medium">Acoes</th>
+              <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">Status</th>
+              <th className="px-5 py-4 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500">Acoes</th>
             </tr>
           </thead>
           <tbody>
             {data.map((item) => (
-              <ActivityRow key={item.id} item={item} />
+              <ActivityRow key={item.id} item={item} deleting={deletingId === item.id} onDelete={onDelete} />
             ))}
           </tbody>
         </table>
@@ -519,17 +642,17 @@ const TableHeader = memo(({ label, field, sortField, sortOrder, onSort }: TableH
   const isActive = sortField === field;
 
   return (
-    <th className="text-left py-4 px-5">
+    <th className="px-5 py-4 text-left">
       <button
         onClick={() => onSort(field)}
-        className="flex items-center gap-2 text-[10px] text-gray-500 uppercase tracking-wider font-medium hover:text-gray-300 transition-colors"
+        className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-300"
       >
         {label}
         {isActive &&
           (sortOrder === "asc" ? (
-            <ChevronUp className="w-3.5 h-3.5 text-[#00C2FF]" />
+            <ChevronUp className="h-3.5 w-3.5 text-[#00C2FF]" />
           ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-[#00C2FF]" />
+            <ChevronDown className="h-3.5 w-3.5 text-[#00C2FF]" />
           ))}
       </button>
     </th>
@@ -538,26 +661,35 @@ const TableHeader = memo(({ label, field, sortField, sortOrder, onSort }: TableH
 
 TableHeader.displayName = "TableHeader";
 
-const ActivityRow = memo(({ item }: { item: AnalysisHistory }) => {
+const ActivityRow = memo(({
+  item,
+  deleting,
+  onDelete,
+}: {
+  item: AnalysisHistory;
+  deleting: boolean;
+  onDelete: (analysisId: string) => void;
+}) => {
   return (
-    <tr className="hover:bg-[rgba(255,255,255,0.02)] transition-colors group">
-      <td className="py-4 px-5">
+    <tr className="group transition-colors hover:bg-[rgba(255,255,255,0.02)]">
+      <td className="px-5 py-4">
         <TypeBadge type={item.type} label={item.typeLabel} />
       </td>
-      <td className="py-4 px-5">
+      <td className="px-5 py-4">
         <div className="space-y-1">
           <p className="text-sm font-medium text-gray-200">{item.title}</p>
-          <span className="text-xs text-gray-500 font-mono">{item.id}</span>
+          {item.description && <p className="max-w-[320px] text-xs text-gray-500">{item.description}</p>}
+          <span className="font-mono text-xs text-gray-500">{item.id}</span>
         </div>
       </td>
-      <td className="py-4 px-5">
+      <td className="px-5 py-4">
         <span className="text-sm text-gray-300">{item.players.join(", ")}</span>
       </td>
-      <td className="py-4 px-5">
+      <td className="px-5 py-4">
         <span className="text-sm text-[#00C2FF]">{item.user}</span>
       </td>
-      <td className="py-4 px-5">
-        <span className="text-xs text-gray-500 tabular-nums">
+      <td className="px-5 py-4">
+        <span className="tabular-nums text-xs text-gray-500">
           {new Date(item.date).toLocaleString("pt-BR", {
             day: "2-digit",
             month: "2-digit",
@@ -567,14 +699,20 @@ const ActivityRow = memo(({ item }: { item: AnalysisHistory }) => {
           })}
         </span>
       </td>
-      <td className="py-4 px-5">
+      <td className="px-5 py-4">
         <StatusBadge status={item.status} label={item.statusLabel} />
       </td>
-      <td className="py-4 px-5">
-        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <td className="px-5 py-4">
+        <div className="flex items-center justify-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
           <ActionButton icon={Copy} tooltip="Duplicar" />
           <ActionButton icon={FileText} tooltip="Gerar relatorio" />
-          <ActionButton icon={Trash2} tooltip="Excluir" variant="danger" />
+          <ActionButton
+            icon={Trash2}
+            tooltip={deleting ? "Excluindo..." : "Excluir"}
+            variant="danger"
+            disabled={deleting}
+            onClick={() => onDelete(item.id)}
+          />
         </div>
       </td>
     </tr>
@@ -588,7 +726,7 @@ const TypeBadge = memo(({ type, label }: { type: AnalysisHistory["type"]; label:
 
   return (
     <span
-      className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-[6px] font-semibold border"
+      className="inline-flex items-center rounded-[6px] border px-2.5 py-1 text-[10px] font-semibold"
       style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
     >
       {label}
@@ -603,7 +741,7 @@ const StatusBadge = memo(({ status, label }: { status: AnalysisHistory["status"]
 
   return (
     <span
-      className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-[6px] font-semibold border"
+      className="inline-flex items-center rounded-[6px] border px-2.5 py-1 text-[10px] font-semibold"
       style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
     >
       {label}
@@ -617,22 +755,28 @@ const ActionButton = memo(({
   icon: Icon,
   tooltip,
   variant = "default",
+  disabled = false,
+  onClick,
 }: {
   icon: React.ElementType;
   tooltip: string;
   variant?: "default" | "danger";
+  disabled?: boolean;
+  onClick?: () => void;
 }) => {
   return (
     <button
-      className={`w-8 h-8 rounded-[8px] flex items-center justify-center transition-colors ${
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${
         variant === "danger"
           ? "hover:bg-[rgba(255,77,79,0.15)] hover:text-[#FF4D4F]"
           : "hover:bg-[rgba(0,194,255,0.15)] hover:text-[#00C2FF]"
-      }`}
+      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
       title={tooltip}
       aria-label={tooltip}
     >
-      <Icon className="w-4 h-4" />
+      <Icon className="h-4 w-4" />
     </button>
   );
 });
@@ -641,17 +785,15 @@ ActionButton.displayName = "ActionButton";
 
 const EmptyState = memo(() => {
   return (
-    <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-16 text-center">
-      <div className="max-w-md mx-auto">
-        <div className="w-16 h-16 bg-[rgba(0,194,255,0.1)] rounded-[14px] flex items-center justify-center mx-auto mb-6">
-          <AlertCircle className="w-8 h-8 text-[#00C2FF]" />
+    <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-16 text-center backdrop-blur-sm">
+      <div className="mx-auto max-w-md">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[14px] bg-[rgba(0,194,255,0.1)]">
+          <AlertCircle className="h-8 w-8 text-[#00C2FF]" />
         </div>
-        <h3 className="text-xl font-semibold mb-3">Nenhuma analise encontrada</h3>
-        <p className="text-sm text-gray-500 mb-6">
-          Ajuste os filtros ou crie uma nova analise para comecar
-        </p>
-        <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold">
-          <Plus className="w-4 h-4 mr-2" />
+        <h3 className="mb-3 text-xl font-semibold">Nenhuma analise encontrada</h3>
+        <p className="mb-6 text-sm text-gray-500">Ajuste os filtros ou crie uma nova analise para comecar</p>
+        <Button className="h-11 rounded-[12px] bg-[#00C2FF]/90 px-6 font-semibold text-[#07142A] hover:bg-[#00C2FF]">
+          <Plus className="mr-2 h-4 w-4" />
           Nova Analise
         </Button>
       </div>
@@ -663,8 +805,8 @@ EmptyState.displayName = "EmptyState";
 
 const LoadingState = memo(() => {
   return (
-    <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-16 text-center">
-      <Loader2 className="w-12 h-12 text-[#00C2FF] animate-spin mx-auto mb-4" />
+    <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-16 text-center backdrop-blur-sm">
+      <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-[#00C2FF]" />
       <p className="text-sm text-gray-500">Carregando analises...</p>
     </div>
   );

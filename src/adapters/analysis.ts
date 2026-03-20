@@ -11,6 +11,7 @@ export interface AnalysisPlayerViewModel {
 export interface AnalysisViewModel {
   id: string;
   title: string;
+  description: string;
   date: string;
   type: "comparison" | "report";
   typeLabel: string;
@@ -69,6 +70,7 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
   return {
     id: toText(record.id, "N/A"),
     title: toText(record.title, "Analise"),
+    description: toText(record.description, ""),
     date: toText(record.createdAt, new Date().toISOString()),
     type: mapType(record.type),
     typeLabel: toText(record.typeLabel, record.type === "COMPARISON" ? "Comparacao" : "Relatorio"),

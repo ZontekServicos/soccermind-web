@@ -16,11 +16,13 @@ import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Lege
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
 import { CapitalGauge } from "../components/CapitalGauge";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { RiskBadge } from "../components/RiskBadge";
 import { TierBadge } from "../components/TierBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Textarea } from "../components/ui/textarea";
 import { useAuth } from "../contexts/AuthContext";
 import { createComparisonAnalysis } from "../services/analysis";
 import {
@@ -93,6 +95,8 @@ export default function Compare() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveFeedbackTone, setSaveFeedbackTone] = useState<"success" | "error">("success");
+  const [analysisTitle, setAnalysisTitle] = useState("");
+  const [analysisDescription, setAnalysisDescription] = useState("");
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -233,6 +237,12 @@ export default function Compare() {
   const displayPlayerA = comparisonData?.playerA ?? playerA;
   const displayPlayerB = comparisonData?.playerB ?? playerB;
   const positionContext = comparisonData?.positionContext ?? null;
+  const hasValidPlayers =
+    Boolean(playerA.id) &&
+    Boolean(playerB.id) &&
+    playerA.id !== EMPTY_PLAYER.id &&
+    playerB.id !== EMPTY_PLAYER.id &&
+    playerA.id !== playerB.id;
 
   const radarData = comparisonData?.radarData || [
     { attribute: "Pace", A: displayPlayerA.stats.pace, B: displayPlayerB.stats.pace },
@@ -352,9 +362,9 @@ export default function Compare() {
   };
 
   const handleSaveAnalysis = async () => {
-    if (!playerA.id || !playerB.id || playerA.id === EMPTY_PLAYER.id || playerB.id === EMPTY_PLAYER.id) {
+    if (!hasValidPlayers) {
       setSaveFeedbackTone("error");
-      setSaveFeedback("Selecione dois jogadores validos para salvar a analise.");
+      setSaveFeedback("Selecione dois jogadores validos e diferentes para salvar a analise.");
       return;
     }
 
@@ -364,12 +374,14 @@ export default function Compare() {
     try {
       const response = await createComparisonAnalysis({
         playerIds: [playerA.id, playerB.id],
-        title: `Comparacao - ${displayPlayerA.name} vs ${displayPlayerB.name}`,
+        title: analysisTitle.trim() || `Comparacao - ${displayPlayerA.name} vs ${displayPlayerB.name}`,
+        description: analysisDescription.trim() || undefined,
         analyst: user?.name,
       });
 
       setSaveFeedbackTone("success");
       setSaveFeedback(`Analise salva com sucesso: ${response.data.title}. Ela ja esta disponivel na tela de Analises.`);
+      setAnalysisDescription("");
     } catch (error) {
       setSaveFeedbackTone("error");
       setSaveFeedback(error instanceof Error ? error.message : "Nao foi possivel salvar a analise.");
@@ -401,15 +413,33 @@ export default function Compare() {
                 </div>
 
                 <div className="flex flex-col gap-4">
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      onClick={handleSaveAnalysis}
-                      disabled={saveLoading || !playerA.id || !playerB.id || playerA.id === EMPTY_PLAYER.id || playerB.id === EMPTY_PLAYER.id}
-                      className="bg-[#00FF9C] text-[#07142A] hover:bg-[#36ffb0] rounded-[12px] h-11 px-6 font-semibold shadow-[0_4px_16px_rgba(0,255,156,0.24)]"
-                    >
-                      {saveLoading ? "Salvando analise..." : "Salvar analise"}
-                    </Button>
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-4 backdrop-blur-sm">
+                    <div className="grid gap-3">
+                      <Input
+                        value={analysisTitle}
+                        onChange={(event) => setAnalysisTitle(event.target.value)}
+                        maxLength={160}
+                        placeholder={`Comparacao - ${displayPlayerA.name} vs ${displayPlayerB.name}`}
+                        className="h-10 rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500"
+                      />
+                      <Textarea
+                        value={analysisDescription}
+                        onChange={(event) => setAnalysisDescription(event.target.value)}
+                        maxLength={1000}
+                        placeholder="Descricao opcional para contextualizar a comparacao"
+                        className="min-h-[76px] rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500"
+                      />
+                      <div className="flex justify-end">
+                        <Button
+                          type="button"
+                          onClick={handleSaveAnalysis}
+                          disabled={saveLoading || !hasValidPlayers}
+                          className="h-10 rounded-[12px] border border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.12)] px-5 font-semibold text-[#9BE7FF] shadow-[0_4px_16px_rgba(0,194,255,0.14)] hover:bg-[rgba(0,194,255,0.18)]"
+                        >
+                          {saveLoading ? "Salvando analise..." : "Salvar na central de analises"}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-3">
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
@@ -450,6 +480,12 @@ export default function Compare() {
                 }}
               >
                 {saveFeedback}
+              </div>
+            )}
+
+            {!hasValidPlayers && playerA.id && playerB.id && (
+              <div className="rounded-[16px] border border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+                A analise so pode ser salva quando a comparacao tiver dois jogadores diferentes e validos.
               </div>
             )}
 

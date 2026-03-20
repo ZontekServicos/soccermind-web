@@ -7,6 +7,7 @@ export type { AnalysisViewModel };
 export interface CreateComparisonAnalysisPayload {
   playerIds: string[];
   title?: string;
+  description?: string;
   analyst?: string;
 }
 
@@ -14,6 +15,7 @@ const MOCK_ANALYSES: AnalysisViewModel[] = [
   {
     id: "AN-001",
     title: "Comparacao - Gabriel Barbosa vs Pedro Guilherme",
+    description: "",
     date: "2026-02-26T14:35:00",
     type: "comparison",
     typeLabel: "Comparacao",
@@ -27,6 +29,7 @@ const MOCK_ANALYSES: AnalysisViewModel[] = [
   {
     id: "AN-002",
     title: "Relatorio - Vitor Roque",
+    description: "",
     date: "2026-02-25T11:20:00",
     type: "report",
     typeLabel: "Relatorio",
@@ -61,20 +64,11 @@ export async function getAnalyses() {
     };
   }
 
-  try {
-    const response = await getAnalysesFromApi();
-    return {
-      ...response,
-      meta: { ...(response.meta ?? {}), source: "api" as const },
-    };
-  } catch {
-    return {
-      success: true,
-      data: MOCK_ANALYSES,
-      error: null,
-      meta: { source: "mock-fallback" as const },
-    };
-  }
+  const response = await getAnalysesFromApi();
+  return {
+    ...response,
+    meta: { ...(response.meta ?? {}), source: "api" as const },
+  };
 }
 
 export async function createComparisonAnalysis(payload: CreateComparisonAnalysisPayload) {
@@ -87,4 +81,10 @@ export async function createComparisonAnalysis(payload: CreateComparisonAnalysis
     ...response,
     data: mapAnalysisResponse(response.data),
   };
+}
+
+export async function deleteAnalysis(id: string) {
+  return apiFetch<{ id: string; message: string }>(`/analysis/${id}`, {
+    method: "DELETE",
+  });
 }
