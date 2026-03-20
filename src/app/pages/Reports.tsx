@@ -16,8 +16,6 @@ import { AppHeader } from "../components/AppHeader";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { comparePlayers, comparePlayersByName } from "../services/compare";
-import { searchExtendedPlayers, type PlayerFilterOptions } from "../services/players";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import {
   buildApiFilters,
@@ -28,8 +26,15 @@ import {
   type PlayersFiltersState,
   parseFiltersFromSearchParams,
 } from "../utils/playerFilters";
-import { buildExecutiveReportModel, formatExecutiveMetric, type ExecutiveReportMetric } from "../utils/executiveReport";
+import { formatExecutiveMetric, type ExecutiveReportMetric } from "../utils/executiveReport";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
+import {
+  getExecutiveReportData,
+  getReportShortlist,
+  type CompareViewModel,
+  type ExecutiveReportModel,
+  type PlayerFilterOptions,
+} from "../services/reports";
 
 type ActiveFilterChip = {
   key: string;
@@ -73,7 +78,8 @@ export default function Reports() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [comparisonData, setComparisonData] = useState<Awaited<ReturnType<typeof comparePlayers>>["data"] | null>(null);
+  const [comparisonData, setComparisonData] = useState<CompareViewModel | null>(null);
+  const [reportModel, setReportModel] = useState<ExecutiveReportModel | null>(null);
   const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
 
   useEffect(() => {
@@ -117,20 +123,16 @@ export default function Reports() {
       setPlayersLoading(true);
 
       try {
-        const response = await searchExtendedPlayers({ ...apiFilters, page: 1, limit: 80 });
+        const response = await getReportShortlist({ ...apiFilters, page: 1, limit: 80 });
         if (!active) {
           return;
         }
 
-        const mappedPlayers = Array.isArray(response.data) ? response.data : [];
+        const mappedPlayers = Array.isArray(response.data.players) ? response.data.players : [];
 
         setAvailablePlayers(mappedPlayers);
         setPlayersError(null);
-
-        const nextMeta = (response.meta || {}) as { filterOptions?: PlayerFilterOptions };
-        if (nextMeta.filterOptions) {
-          setFilterOptions(nextMeta.filterOptions);
-        }
+        setFilterOptions(response.data.filterOptions ?? EMPTY_FILTER_OPTIONS);
 
         setPlayerA((current) => (current.id && current.id !== EMPTY_PLAYER.id ? current : mappedPlayers[0] ?? EMPTY_PLAYER));
         setPlayerB((current) =>
@@ -169,16 +171,14 @@ export default function Reports() {
       setReportLoading(true);
 
       try {
-        const response =
-          playerA.id && playerB.id && playerA.id !== EMPTY_PLAYER.id && playerB.id !== EMPTY_PLAYER.id
-            ? await comparePlayers(playerA.id, playerB.id)
-            : await comparePlayersByName(playerA.name, playerB.name);
+        const response = await getExecutiveReportData(playerA, playerB);
 
         if (!active) {
           return;
         }
 
-        setComparisonData(response.data);
+        setComparisonData(response.data?.comparisonData ?? null);
+        setReportModel(response.data?.reportModel ?? null);
         setReportError(null);
       } catch (error) {
         if (!active) {
@@ -186,6 +186,7 @@ export default function Reports() {
         }
 
         setComparisonData(null);
+        setReportModel(null);
         setReportError(error instanceof Error ? error.message : "Erro ao gerar o relatorio executivo");
       } finally {
         if (active) {
@@ -216,19 +217,6 @@ export default function Reports() {
 
   const displayPlayerA = comparisonData?.playerA ?? playerA;
   const displayPlayerB = comparisonData?.playerB ?? playerB;
-
-  const reportModel = useMemo(() => {
-    if (!displayPlayerA.id || !displayPlayerB.id || displayPlayerA.id === EMPTY_PLAYER.id || displayPlayerB.id === EMPTY_PLAYER.id) {
-      return null;
-    }
-
-    return buildExecutiveReportModel({
-      playerA: displayPlayerA,
-      playerB: displayPlayerB,
-      winner: comparisonData?.winner ?? "DRAW",
-      comparison: comparisonData?.comparison,
-    });
-  }, [comparisonData, displayPlayerA, displayPlayerB]);
 
   const activeFilterChips = useMemo<ActiveFilterChip[]>(() => {
     const chips: ActiveFilterChip[] = [];

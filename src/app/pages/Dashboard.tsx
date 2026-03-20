@@ -17,69 +17,14 @@ import { TierBadge } from "../components/TierBadge";
 import { RiskBadge } from "../components/RiskBadge";
 import { CapitalGauge } from "../components/CapitalGauge";
 import { useLanguage } from "../contexts/LanguageContext";
-import { getDashboardPlayers } from "../services/dashboard";
+import { type ChartDatum, type RiskBucket, type StrategicAsset, getDashboardData } from "../services/dashboard";
 import type { PlayerExtended } from "../types/player";
 
-type RiskBucket = "LOW" | "MEDIUM" | "HIGH";
 type RiskTab = "ALL" | RiskBucket;
-type StrategicAssetTier = "Elite Asset" | "Growth Asset" | "Stable Asset" | "Opportunity Asset";
 
-type ChartDatum = {
-  name: string;
-  shortName: string;
-  value: number;
-  metricLabel: string;
-  accent: string;
-};
-
-type StrategicAsset = {
-  player: PlayerExtended;
-  tier: StrategicAssetTier;
-  description: string;
-  score: number;
-  summary: string;
-};
-
-type RiskPlayerEntry = {
-  player: PlayerExtended;
-  riskBucket: RiskBucket;
-  explanation: string;
-};
-
-const CHART_DATA_LIMIT = 20;
 const CHART_PAGE_SIZE = 10;
 const RISK_PAGE_SIZE = 10;
 const ASSET_PAGE_SIZE = 4;
-
-function parseMarketValueLabel(label: string) {
-  if (!label || label === "N/A") {
-    return 0;
-  }
-
-  const normalized = label.toUpperCase().replace(",", ".");
-  const parsed = Number.parseFloat(normalized.replace(/[^\d.]/g, ""));
-  if (!Number.isFinite(parsed)) {
-    return 0;
-  }
-
-  if (normalized.includes("B")) return parsed * 1_000_000_000;
-  if (normalized.includes("M")) return parsed * 1_000_000;
-  if (normalized.includes("K")) return parsed * 1_000;
-  return parsed;
-}
-
-function formatTotalMarketValue(players: PlayerExtended[]) {
-  const total = players.reduce((sum, player) => sum + parseMarketValueLabel(player.marketValue), 0);
-  if (!total) {
-    return "N/A";
-  }
-
-  if (total >= 1_000_000_000) {
-    return `EUR ${(total / 1_000_000_000).toFixed(2)}B`;
-  }
-
-  return `EUR ${(total / 1_000_000).toFixed(1)}M`;
-}
 
 function formatCompactCurrency(value: number) {
   if (!value) {
@@ -97,94 +42,12 @@ function formatCompactCurrency(value: number) {
   return `EUR ${(value / 1_000).toFixed(0)}K`;
 }
 
-function buildRiskEntry(player: PlayerExtended): RiskPlayerEntry {
-  return {
-    player,
-    riskBucket: player.risk.level,
-    explanation: player.risk.explanation,
-  };
-}
-
-function buildStrategicAsset(player: PlayerExtended): StrategicAsset | null {
-  const marketValue = parseMarketValueLabel(player.marketValue);
-  const liquidity = player.liquidity.score;
-  const risk = player.risk.level;
-  const upside = player.potential - player.overallRating;
-  const valueEfficiency = marketValue > 0 ? (player.overallRating + player.potential) / (marketValue / 1_000_000) : 0;
-  const immediateImpact = player.overallRating >= 86 && liquidity >= 7.5;
-
-  if (player.overallRating >= 90 && liquidity >= 8 && marketValue >= 60_000_000) {
-    return {
-      player,
-      tier: "Elite Asset",
-      description: "Jogador com alta liquidez e impacto imediato, ideal para reforco de curto prazo com baixa friccao de mercado.",
-      summary: "Impacto imediato",
-      score: player.overallRating * 2.6 + liquidity * 7 + player.capitalEfficiency * 4,
-    };
-  }
-
-  if (player.age <= 23 && player.potential >= 86 && upside >= 4 && liquidity >= 6.5) {
-    return {
-      player,
-      tier: "Growth Asset",
-      description: "Ativo jovem com upside real de performance e valorizacao, adequado para ciclo de desenvolvimento com revenda futura.",
-      summary: "Upside e valorizacao",
-      score: player.potential * 2.1 + upside * 8 + liquidity * 5 + Math.max(0, 25 - player.age) * 2,
-    };
-  }
-
-  if (risk === "LOW" && player.overallRating >= 80 && liquidity >= 6) {
-    return {
-      player,
-      tier: "Stable Asset",
-      description: "Perfil consistente, de baixo risco e retorno esportivo previsivel, indicado para compor base competitiva com estabilidade.",
-      summary: "Base segura",
-      score: player.overallRating * 2 + player.capitalEfficiency * 5 + liquidity * 5,
-    };
-  }
-
-  if ((valueEfficiency >= 5.5 || upside >= 6 || immediateImpact) && marketValue > 0 && marketValue <= 45_000_000) {
-    return {
-      player,
-      tier: "Opportunity Asset",
-      description: "Ativo com leitura favoravel de custo-beneficio, interessante para capturar desempenho acima do preco de entrada.",
-      summary: "Custo-beneficio",
-      score: player.capitalEfficiency * 8 + upside * 5 + liquidity * 4 + Math.max(0, 50 - marketValue / 1_000_000),
-    };
-  }
-
-  return null;
-}
-
 function paginate<T>(items: T[], page: number, pageSize: number) {
   const start = (page - 1) * pageSize;
   return items.slice(start, start + pageSize);
 }
 
-function getShortName(name: string) {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length <= 2) {
-    return name.length > 18 ? `${name.slice(0, 18)}...` : name;
-  }
-
-  const compact = `${parts[0]} ${parts[parts.length - 1]}`;
-  return compact.length > 18 ? `${compact.slice(0, 18)}...` : compact;
-}
-
-function buildChartData(players: PlayerExtended[], metric: "capitalEfficiency" | "overallRating", metricLabel: string, accent: string) {
-  return [...players]
-    .sort((a, b) => b[metric] - a[metric])
-    .slice(0, CHART_DATA_LIMIT)
-    .map((player) => ({
-      name: player.name,
-      shortName: getShortName(player.name),
-      value: player[metric],
-      metricLabel,
-      accent,
-    }));
-}
-
-function getAssetTierColor(tier: StrategicAssetTier) {
+function getAssetTierColor(tier: StrategicAsset["tier"]) {
   switch (tier) {
     case "Elite Asset":
       return "#A855F7";
@@ -237,6 +100,14 @@ function getVisibleRange(total: number, page: number, pageSize: number, currentC
 export default function Dashboard() {
   const { t, language } = useLanguage();
   const [players, setPlayers] = useState<PlayerExtended[]>([]);
+  const [averageEfficiency, setAverageEfficiency] = useState(0);
+  const [totalMarketValue, setTotalMarketValue] = useState("N/A");
+  const [riskCounts, setRiskCounts] = useState<Record<RiskBucket, number>>({ LOW: 0, MEDIUM: 0, HIGH: 0 });
+  const [topEfficiencyPlayers, setTopEfficiencyPlayers] = useState<PlayerExtended[]>([]);
+  const [efficiencyChartData, setEfficiencyChartData] = useState<ChartDatum[]>([]);
+  const [ratingChartData, setRatingChartData] = useState<ChartDatum[]>([]);
+  const [riskTaggedPlayers, setRiskTaggedPlayers] = useState<Array<{ player: PlayerExtended; riskBucket: RiskBucket; explanation: string }>>([]);
+  const [strategicAssets, setStrategicAssets] = useState<StrategicAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [efficiencyPage, setEfficiencyPage] = useState(1);
@@ -250,12 +121,22 @@ export default function Dashboard() {
 
     async function loadPlayers() {
       try {
-        const response = await getDashboardPlayers(80);
+        const response = await getDashboardData(80);
         if (!active) {
           return;
         }
 
-        setPlayers(Array.isArray(response.data) ? response.data : []);
+        const dashboardData = response.data;
+
+        setPlayers(Array.isArray(dashboardData.players) ? dashboardData.players : []);
+        setAverageEfficiency(dashboardData.averageEfficiency ?? 0);
+        setTotalMarketValue(dashboardData.totalMarketValue ?? "N/A");
+        setRiskCounts(dashboardData.riskCounts ?? { LOW: 0, MEDIUM: 0, HIGH: 0 });
+        setTopEfficiencyPlayers(dashboardData.topEfficiencyPlayers ?? []);
+        setEfficiencyChartData(dashboardData.efficiencyChartData ?? []);
+        setRatingChartData(dashboardData.ratingChartData ?? []);
+        setRiskTaggedPlayers(dashboardData.riskTaggedPlayers ?? []);
+        setStrategicAssets(dashboardData.strategicAssets ?? []);
         setError(null);
       } catch (fetchError) {
         if (!active) {
@@ -263,6 +144,14 @@ export default function Dashboard() {
         }
 
         setPlayers([]);
+        setAverageEfficiency(0);
+        setTotalMarketValue("N/A");
+        setRiskCounts({ LOW: 0, MEDIUM: 0, HIGH: 0 });
+        setTopEfficiencyPlayers([]);
+        setEfficiencyChartData([]);
+        setRatingChartData([]);
+        setRiskTaggedPlayers([]);
+        setStrategicAssets([]);
         setError(fetchError instanceof Error ? fetchError.message : "API request failed");
       } finally {
         if (active) {
@@ -277,38 +166,6 @@ export default function Dashboard() {
       active = false;
     };
   }, []);
-
-  const averageEfficiency = players.length
-    ? players.reduce((sum, player) => sum + player.capitalEfficiency, 0) / players.length
-    : 0;
-
-  const riskTaggedPlayers = useMemo(() => players.map(buildRiskEntry), [players]);
-
-  const riskCounts = useMemo(
-    () => ({
-      LOW: getRiskCount(players, "LOW"),
-      MEDIUM: getRiskCount(players, "MEDIUM"),
-      HIGH: getRiskCount(players, "HIGH"),
-    }),
-    [players],
-  );
-
-  const topEfficiencyPlayers = useMemo(
-    () => [...players].sort((a, b) => b.capitalEfficiency - a.capitalEfficiency).slice(0, 3),
-    [players],
-  );
-
-  const totalMarketValue = useMemo(() => formatTotalMarketValue(players), [players]);
-
-  const efficiencyChartData = useMemo(
-    () => buildChartData(players, "capitalEfficiency", "Capital Efficiency", "#00C2FF"),
-    [players],
-  );
-
-  const ratingChartData = useMemo(
-    () => buildChartData(players, "overallRating", "Overall Rating", "#7A5CFF"),
-    [players],
-  );
 
   const efficiencyTotalPages = Math.max(1, Math.ceil(efficiencyChartData.length / CHART_PAGE_SIZE));
   const ratingTotalPages = Math.max(1, Math.ceil(ratingChartData.length / CHART_PAGE_SIZE));
@@ -337,16 +194,6 @@ export default function Dashboard() {
     () => paginate(filteredRiskPlayers, riskPage, RISK_PAGE_SIZE),
     [filteredRiskPlayers, riskPage],
   );
-
-  const strategicAssets = useMemo(
-    () =>
-      players
-        .map((player) => buildStrategicAsset(player))
-        .filter((asset): asset is StrategicAsset => Boolean(asset))
-        .sort((a, b) => b.score - a.score),
-    [players],
-  );
-
   const assetTotalPages = Math.max(1, Math.ceil(strategicAssets.length / ASSET_PAGE_SIZE));
 
   const pagedAssets = useMemo(
@@ -401,7 +248,7 @@ export default function Dashboard() {
                 title={t("dashboard.avg_efficiency")}
                 value={averageEfficiency.toFixed(1)}
                 icon={Target}
-                trend={`Ranking limitado aos ${CHART_DATA_LIMIT} mais relevantes`}
+                trend={`Ranking limitado aos 20 mais relevantes`}
                 trendUp={true}
                 color="#00FF9C"
               />

@@ -23,12 +23,12 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useEffect, useState, useMemo, memo } from "react";
-import { getProfileUpsells } from "../services/profile";
+import { getProfileUpsells, type ProfileUpsell } from "../services/profile";
 import clubLogo from "../../assets/club-logo.png";
 
 const fallbackImage = "/placeholder.png";
 
-interface Upsell {
+interface Upsell extends Omit<ProfileUpsell, "iconKey"> {
   id: string;
   title: string;
   description: string;
@@ -38,49 +38,6 @@ interface Upsell {
   color: string;
   category: string;
 }
-
-const mockUpsells: Upsell[] = [
-  {
-    id: "1",
-    title: "Análise Avançada com IA",
-    description: "Relatórios preditivos com Machine Learning",
-    status: "Ativo",
-    activatedDate: "2025-01-15",
-    icon: TrendingUp,
-    color: "#00C2FF",
-    category: "Analytics",
-  },
-  {
-    id: "2",
-    title: "Dashboard Premium",
-    description: "Visualizações personalizadas e métricas exclusivas",
-    status: "Ativo",
-    activatedDate: "2025-01-01",
-    icon: BarChart3,
-    color: "#00FF9C",
-    category: "Visualização",
-  },
-  {
-    id: "3",
-    title: "Comparação Ilimitada",
-    description: "Compare até 10 jogadores simultaneamente",
-    status: "Ativo",
-    activatedDate: "2025-01-01",
-    icon: Users,
-    color: "#7A5CFF",
-    category: "Analytics",
-  },
-  {
-    id: "4",
-    title: "API de Integração",
-    description: "Conecte aos seus sistemas internos de gestão",
-    status: "Ativo",
-    activatedDate: "2025-02-10",
-    icon: CheckCircle,
-    color: "#00FF9C",
-    category: "Integração",
-  },
-];
 
 type FilterType = "all" | "Ativo" | "Inativo" | "Pendente";
 type SortType = "date-desc" | "date-asc" | "name-asc" | "name-desc";
@@ -156,7 +113,7 @@ export default function Profile() {
   const progressPercent = Math.round((elapsedDays / totalDays) * 100);
   const remainingMonths = Math.floor(remainingDays / 30);
 
-  const contractStatus = remainingDays > 180 ? "Saudável" : remainingDays > 60 ? "Atenção" : "Crítico";
+  const contractStatus = remainingDays > 180 ? "Saudavel" : remainingDays > 60 ? "Atencao" : "Critico";
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -226,7 +183,7 @@ const ProfileHeader = memo(() => {
                 <span className="text-gray-500">ID da Conta:</span> <span className="font-mono">ACC-2025-8742</span>
               </div>
               <div>
-                <span className="text-gray-500">Responsável:</span> Ricardo Santos
+                <span className="text-gray-500">ResponsÃƒÂ¡vel:</span> Ricardo Santos
               </div>
               <div>
                 <span className="text-gray-500">Atualizado:</span> 28/02/2026
@@ -242,7 +199,7 @@ const ProfileHeader = memo(() => {
             className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)] rounded-[12px] h-11 px-5"
           >
             <Settings className="w-4 h-4 mr-2" />
-            Configurações
+            ConfiguraÃƒÂ§ÃƒÂµes
           </Button>
           <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold shadow-[0_4px_16px_rgba(0,194,255,0.25)] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)] transition-all">
             <ExternalLink className="w-4 h-4 mr-2" />
@@ -270,9 +227,9 @@ interface ContractStatusCardProps {
 const ContractStatusCard = memo(
   ({ startDate, endDate, remainingMonths, progressPercent, status }: ContractStatusCardProps) => {
     const statusConfig = {
-      Saudável: { color: "#00FF9C", bg: "rgba(0,255,156,0.12)", icon: CheckCircle },
-      Atenção: { color: "#fbbf24", bg: "rgba(251,191,36,0.12)", icon: AlertTriangle },
-      Crítico: { color: "#FF4D4F", bg: "rgba(255,77,79,0.12)", icon: AlertTriangle },
+      Saudavel: { color: "#00FF9C", bg: "rgba(0,255,156,0.12)", icon: CheckCircle },
+      Atencao: { color: "#fbbf24", bg: "rgba(251,191,36,0.12)", icon: AlertTriangle },
+      Critico: { color: "#FF4D4F", bg: "rgba(255,77,79,0.12)", icon: AlertTriangle },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig];
@@ -286,7 +243,7 @@ const ContractStatusCard = memo(
             <div className="w-10 h-10 rounded-[10px] bg-[rgba(0,194,255,0.12)] flex items-center justify-center">
               <Calendar className="w-5 h-5 text-[#00C2FF]" />
             </div>
-            <h2 className="text-xl font-semibold">Vigência de Contrato</h2>
+            <h2 className="text-xl font-semibold">VigÃƒÂªncia de Contrato</h2>
           </div>
           <div
             className="flex items-center gap-2 px-3 py-1.5 rounded-[8px] border"
@@ -300,13 +257,13 @@ const ContractStatusCard = memo(
         {/* Date Grid */}
         <div className="grid grid-cols-3 gap-6 mb-8">
           <MetricBox
-            label="Data de Início"
+            label="Data de InÃƒÂ­cio"
             value={startDate.toLocaleDateString("pt-BR")}
             icon={Calendar}
             color="#00C2FF"
           />
           <MetricBox
-            label="Data de Término"
+            label="Data de TÃƒÂ©rmino"
             value={endDate.toLocaleDateString("pt-BR")}
             icon={Calendar}
             color="#00C2FF"
@@ -318,7 +275,7 @@ const ContractStatusCard = memo(
         <div className="bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] rounded-[14px] p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm text-gray-400 font-medium">Progresso do Contrato</span>
-            <span className="text-sm text-[#00C2FF] font-semibold tabular-nums">{progressPercent}% concluído</span>
+            <span className="text-sm text-[#00C2FF] font-semibold tabular-nums">{progressPercent}% concluÃƒÂ­do</span>
           </div>
           <div className="w-full bg-[rgba(255,255,255,0.04)] rounded-full h-3 overflow-hidden">
             <div
@@ -333,7 +290,7 @@ const ContractStatusCard = memo(
         </div>
 
         {/* Alert (if needed) */}
-        {status !== "Saudável" && (
+        {status !== "Saudavel" && (
           <div
             className="mt-6 flex items-start gap-3 p-4 rounded-[12px] border"
             style={{ background: config.bg, borderColor: config.color + "40" }}
@@ -341,12 +298,12 @@ const ContractStatusCard = memo(
             <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: config.color }} />
             <div className="flex-1">
               <p className="text-sm font-semibold mb-1" style={{ color: config.color }}>
-                {status === "Atenção" ? "Contrato se aproxima do fim" : "Renovação Urgente"}
+                {status === "Atencao" ? "Contrato se aproxima do fim" : "RenovaÃƒÂ§ÃƒÂ£o Urgente"}
               </p>
               <p className="text-xs text-gray-400">
-                {status === "Atenção"
-                  ? "Recomendamos iniciar o processo de renovação nos próximos 60 dias."
-                  : "Entre em contato com nosso time comercial para garantir a continuidade do serviço."}
+                {status === "Atencao"
+                  ? "Recomendamos iniciar o processo de renovacao nos proximos 60 dias."
+                  : "Entre em contato com nosso time comercial para garantir a continuidade do servico."}
               </p>
             </div>
           </div>
@@ -388,16 +345,16 @@ MetricBox.displayName = "MetricBox";
 // ========================================
 const UsageStatsCard = memo(() => {
   const stats = [
-    { label: "Análises", value: 247, change: +18, icon: BarChart3, color: "#00C2FF" },
-    { label: "Relatórios", value: 89, change: +12, icon: FileText, color: "#7A5CFF" },
-    { label: "Comparações", value: 134, change: +25, icon: Users, color: "#00FF9C" },
-    { label: "Usuários", value: 12, change: +8, icon: Users, color: "#00C2FF" },
+    { label: "AnÃƒÂ¡lises", value: 247, change: +18, icon: BarChart3, color: "#00C2FF" },
+    { label: "RelatÃƒÂ³rios", value: 89, change: +12, icon: FileText, color: "#7A5CFF" },
+    { label: "ComparaÃƒÂ§ÃƒÂµes", value: 134, change: +25, icon: Users, color: "#00FF9C" },
+    { label: "UsuÃƒÂ¡rios", value: 12, change: +8, icon: Users, color: "#00C2FF" },
   ];
 
   return (
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-8">
       <div className="flex items-center justify-between mb-8">
-        <h2 className="text-xl font-semibold">Estatísticas de Uso</h2>
+        <h2 className="text-xl font-semibold">EstatÃƒÂ­sticas de Uso</h2>
         <button
           className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
           title="Atualizar"
@@ -414,7 +371,7 @@ const UsageStatsCard = memo(() => {
 
       <div className="mt-6 pt-6 border-t border-[rgba(255,255,255,0.06)]">
         <p className="text-xs text-gray-600">
-          Período: <span className="text-gray-400">Últimos 30 dias</span>
+          PerÃƒÂ­odo: <span className="text-gray-400">ÃƒÅ¡ltimos 30 dias</span>
         </p>
       </div>
     </div>
@@ -486,7 +443,7 @@ const UpsellsSection = memo(({ upsells, filterStatus, setFilterStatus, sortBy, s
           <div className="w-10 h-10 rounded-[10px] bg-[rgba(122,92,255,0.12)] flex items-center justify-center">
             <Package className="w-5 h-5 text-[#7A5CFF]" />
           </div>
-          <h2 className="text-xl font-semibold">Serviços Adquiridos</h2>
+          <h2 className="text-xl font-semibold">ServiÃƒÂ§os Adquiridos</h2>
           <span className="text-sm text-gray-500">({upsells.length} itens)</span>
         </div>
 
@@ -529,7 +486,7 @@ const UpsellsSection = memo(({ upsells, filterStatus, setFilterStatus, sortBy, s
       {upsells.length === 0 && (
         <div className="text-center py-12">
           <Package className="w-12 h-12 text-gray-700 mx-auto mb-4" />
-          <p className="text-sm text-gray-500">Nenhum serviço encontrado com os filtros aplicados</p>
+          <p className="text-sm text-gray-500">Nenhum servico encontrado com os filtros aplicados</p>
         </div>
       )}
     </div>

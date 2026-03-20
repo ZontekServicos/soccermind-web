@@ -1,4 +1,4 @@
-﻿import { AppSidebar } from "../components/AppSidebar";
+import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -24,65 +24,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useEffect, useState, useMemo, memo } from "react";
-import { getAnalysisHistory } from "../services/history";
-
-interface AnalysisHistory {
-  id: string;
-  date: string;
-  type: "ComparaÃ§Ã£o" | "RelatÃ³rio" | "Dashboard";
-  players: string[];
-  user: string;
-  club: string;
-  status: "ConcluÃ­do" | "Em andamento" | "Arquivado";
-}
-
-const mockHistory: AnalysisHistory[] = [
-  {
-    id: "AH-001",
-    date: "2026-02-26T14:35:00",
-    type: "ComparaÃ§Ã£o",
-    players: ["Gabriel Barbosa", "Pedro Guilherme"],
-    user: "JoÃ£o Silva",
-    club: "Corinthians",
-    status: "ConcluÃ­do",
-  },
-  {
-    id: "AH-002",
-    date: "2026-02-25T11:20:00",
-    type: "RelatÃ³rio",
-    players: ["Vitor Roque"],
-    user: "Maria Oliveira",
-    club: "Flamengo",
-    status: "ConcluÃ­do",
-  },
-  {
-    id: "AH-003",
-    date: "2026-02-24T16:45:00",
-    type: "ComparaÃ§Ã£o",
-    players: ["Luiz Henrique", "Gabriel Barbosa"],
-    user: "JoÃ£o Silva",
-    club: "Corinthians",
-    status: "ConcluÃ­do",
-  },
-  {
-    id: "AH-004",
-    date: "2026-02-23T09:15:00",
-    type: "Dashboard",
-    players: ["Elenco Completo"],
-    user: "Carlos Mendes",
-    club: "Palmeiras",
-    status: "Em andamento",
-  },
-  {
-    id: "AH-005",
-    date: "2026-02-22T13:30:00",
-    type: "RelatÃ³rio",
-    players: ["Pedro Guilherme"],
-    user: "Maria Oliveira",
-    club: "Flamengo",
-    status: "ConcluÃ­do",
-  },
-];
+import { getAnalysisHistory, type AnalysisHistoryEntry as AnalysisHistory } from "../services/history";
 
 type FilterType = "all" | "ComparaÃ§Ã£o" | "RelatÃ³rio" | "Dashboard";
 type PeriodType = "7d" | "30d" | "90d" | "custom";

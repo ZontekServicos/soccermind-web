@@ -20,9 +20,13 @@ import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { RiskBadge } from "../components/RiskBadge";
 import { TierBadge } from "../components/TierBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { mapCompareResponse } from "../mappers/compare.mapper";
-import { comparePlayers, comparePlayersByName } from "../services/compare";
-import { searchExtendedPlayers, type PlayerFilterOptions } from "../services/players";
+import {
+  getCompareDataByIds,
+  getCompareDataByNames,
+  getCompareShortlist,
+  type CompareViewModel,
+  type PlayerFilterOptions,
+} from "../services/compare";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import {
   buildApiFilters,
@@ -39,7 +43,7 @@ type ActiveFilterChip = {
   onRemove: () => void;
 };
 
-type PositionContext = ReturnType<typeof mapCompareResponse>["positionContext"];
+type PositionContext = CompareViewModel["positionContext"];
 
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
   positions: [],
@@ -80,7 +84,7 @@ export default function Compare() {
   const [playersError, setPlayersError] = useState<string | null>(null);
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState<string | null>(null);
-  const [comparisonData, setComparisonData] = useState<ReturnType<typeof mapCompareResponse> | null>(null);
+  const [comparisonData, setComparisonData] = useState<CompareViewModel | null>(null);
   const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
 
   useEffect(() => {
@@ -124,20 +128,17 @@ export default function Compare() {
       setPlayersLoading(true);
 
       try {
-        const response = await searchExtendedPlayers({ ...apiFilters, page: 1, limit: 80 });
+        const response = await getCompareShortlist({ ...apiFilters, page: 1, limit: 80 });
         if (!active) {
           return;
         }
 
-        const mappedPlayers = Array.isArray(response.data) ? response.data : [];
+        const mappedPlayers = Array.isArray(response.data.players) ? response.data.players : [];
 
         setAvailablePlayers(mappedPlayers);
         setPlayersError(null);
 
-        const nextMeta = (response.meta || {}) as { filterOptions?: PlayerFilterOptions };
-        if (nextMeta.filterOptions) {
-          setFilterOptions(nextMeta.filterOptions);
-        }
+        setFilterOptions(response.data.filterOptions ?? EMPTY_FILTER_OPTIONS);
 
         setPlayerA((current) => (current.id && current.id !== EMPTY_PLAYER.id ? current : mappedPlayers[0] ?? EMPTY_PLAYER));
         setPlayerB((current) =>
@@ -177,8 +178,8 @@ export default function Compare() {
       try {
         const response =
           playerA.id && playerB.id && playerA.id !== "empty-player" && playerB.id !== "empty-player"
-            ? await comparePlayers(playerA.id, playerB.id)
-            : await comparePlayersByName(playerA.name, playerB.name);
+            ? await getCompareDataByIds(playerA.id, playerB.id)
+            : await getCompareDataByNames(playerA.name, playerB.name);
 
         if (!active) {
           return;

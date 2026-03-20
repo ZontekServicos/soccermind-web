@@ -15,11 +15,8 @@ import { AppHeader } from "../components/AppHeader";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { AppSidebar } from "../components/AppSidebar";
 import type { PlayerCardModel } from "../mappers/player.mapper";
-import {
-  searchPlayers,
-  type PlayerFilterOptions,
-  type PlayersResponseMeta,
-} from "../services/players";
+import { getRankingData } from "../services/ranking";
+import { type PlayerFilterOptions, type PlayersResponseMeta } from "../services/players";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 import {
   buildApiFilters,
@@ -173,17 +170,15 @@ export default function PlayersRanking() {
     async function loadPlayers() {
       setLoading(true);
       try {
-        const response = await searchPlayers({ ...apiFilters, page, limit });
+        const response = await getRankingData({ ...apiFilters, page, limit });
         if (!active) {
           return;
         }
 
-        const nextMeta = (response.meta || {}) as PaginationMeta;
-        setPlayers(Array.isArray(response.data) ? response.data : []);
+        const nextMeta = (response.data.meta || response.meta || {}) as PaginationMeta;
+        setPlayers(Array.isArray(response.data.players) ? response.data.players : []);
         setMeta(nextMeta);
-        if (nextMeta.filterOptions) {
-          setFilterOptions(nextMeta.filterOptions);
-        }
+        setFilterOptions(response.data.filterOptions ?? EMPTY_FILTER_OPTIONS);
         setError(null);
       } catch (fetchError) {
         if (!active) {

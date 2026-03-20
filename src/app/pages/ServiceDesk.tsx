@@ -4,70 +4,11 @@ import { useEffect, useState } from "react";
 import { useLanguage } from "../contexts/LanguageContext";
 import { Plus, Search, Calendar, User, X, Paperclip, UserPlus, Key, UserMinus, Lock, Zap, GraduationCap, Rocket } from "lucide-react";
 import { Button } from "../components/ui/button";
-import { getServiceDeskTickets } from "../services/serviceDesk";
-
-// Mock data for tickets
-const mockTickets = [
-  {
-    id: "TK-001",
-    type: "ticket.create_user",
-    category: "user_management",
-    status: "open" as const,
-    priority: "high" as const,
-    date: "2026-03-01",
-    assignee: "Suporte Soccer Mind",
-    title: "Criar novo login de usuário",
-    description: "Preciso criar um novo usuário para o novo scout do clube com permissões de análise",
-  },
-  {
-    id: "TK-002",
-    type: "ticket.technical_support",
-    category: "platform",
-    status: "in_progress" as const,
-    priority: "medium" as const,
-    date: "2026-03-02",
-    assignee: "Equipe Técnica",
-    title: "Suporte técnico - Exportação de relatórios",
-    description: "Erro ao exportar relatório de análise de jogadores em formato PDF",
-  },
-  {
-    id: "TK-003",
-    type: "ticket.request_training",
-    category: "platform",
-    status: "resolved" as const,
-    priority: "low" as const,
-    date: "2026-02-28",
-    assignee: "Time de Onboarding",
-    title: "Treinamento para novos gestores",
-    description: "Solicitação de treinamento para novos gestores da equipe técnica",
-  },
-  {
-    id: "TK-004",
-    type: "ticket.change_permissions",
-    category: "user_management",
-    status: "open" as const,
-    priority: "medium" as const,
-    date: "2026-03-03",
-    assignee: "Suporte Soccer Mind",
-    title: "Alterar permissões de acesso",
-    description: "Alterar permissões de acesso do usuário João Silva para incluir relatórios",
-  },
-  {
-    id: "TK-005",
-    type: "ticket.request_module",
-    category: "commercial",
-    status: "in_progress" as const,
-    priority: "high" as const,
-    date: "2026-03-04",
-    assignee: "Time Comercial",
-    title: "Solicitar novo módulo - Análise Tática",
-    description: "Interesse em contratar módulo de análise tática avançada para a equipe",
-  },
-];
+import { getServiceDeskTickets, type ServiceDeskTicket } from "../services/serviceDesk";
 
 export default function ServiceDesk() {
   const { t, language } = useLanguage();
-  const [tickets, setTickets] = useState<typeof mockTickets>([]);
+  const [tickets, setTickets] = useState<ServiceDeskTicket[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [filterPriority, setFilterPriority] = useState<string>("all");
@@ -82,7 +23,7 @@ export default function ServiceDesk() {
         return;
       }
 
-      setTickets(response.data as typeof mockTickets);
+      setTickets(response.data as ServiceDeskTicket[]);
     }
 
     loadTickets();
@@ -174,7 +115,7 @@ export default function ServiceDesk() {
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                 <input
                   type="text"
-                  placeholder="Buscar chamados por ID, título ou descrição..."
+                  placeholder="Buscar chamados por ID, tÃ­tulo ou descriÃ§Ã£o..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-12 pr-4 py-3.5 bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-[#00C2FF] focus:ring-2 focus:ring-[#00C2FF]/20 transition-all shadow-[0_4px_16px_rgba(0,0,0,0.2)]"
@@ -292,7 +233,7 @@ function PriorityFilterButton({ label, isActive, onClick, color = "#00C2FF" }: P
 // TICKET CARD COMPONENT
 // ========================================
 interface TicketCardProps {
-  ticket: typeof mockTickets[0];
+  ticket: ServiceDeskTicket;
   t: (key: string) => string;
 }
 
@@ -376,7 +317,7 @@ function TicketCard({ ticket, t }: TicketCardProps) {
         {/* View Details Button */}
         <button className="ml-6 text-[#00C2FF] hover:text-white transition-colors font-medium text-sm flex items-center gap-1 group-hover:gap-2 transition-all">
           {t("servicedesk.view_details")}
-          <span className="text-lg">→</span>
+          <span className="text-lg">â†’</span>
         </button>
       </div>
     </div>
@@ -465,7 +406,7 @@ function CreateTicketModal({ onClose, t }: CreateTicketModalProps) {
               }}
             >
               <option value="" disabled className="bg-[#0A1428] text-gray-500">
-                Selecione o tipo de solicitação
+                Selecione o tipo de solicitaÃ§Ã£o
               </option>
               {ticketTypes.map((category) => (
                 <optgroup key={category.category} label={category.category} className="bg-[#0A1428] text-gray-400 font-semibold py-2">
@@ -482,7 +423,7 @@ function CreateTicketModal({ onClose, t }: CreateTicketModalProps) {
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-3">
-              Título do Chamado *
+              TÃ­tulo do Chamado *
             </label>
             <input
               type="text"
@@ -545,7 +486,7 @@ function CreateTicketModal({ onClose, t }: CreateTicketModalProps) {
               onChange={(e) => setDescription(e.target.value)}
               required
               rows={6}
-              placeholder="Descreva detalhadamente sua solicitação..."
+              placeholder="Descreva detalhadamente sua solicitaÃ§Ã£o..."
               className="w-full px-4 py-3.5 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-[#00C2FF] focus:ring-2 focus:ring-[#00C2FF]/20 transition-all resize-none"
             />
           </div>
@@ -560,7 +501,7 @@ function CreateTicketModal({ onClose, t }: CreateTicketModalProps) {
                 <Paperclip className="w-8 h-8 text-[#00C2FF]/70 group-hover:text-[#00C2FF] transition-all" />
               </div>
               <p className="text-sm text-gray-400 mb-1">Clique para selecionar ou arraste arquivos aqui</p>
-              <p className="text-xs text-gray-600">PDF, PNG, JPG até 10MB</p>
+              <p className="text-xs text-gray-600">PDF, PNG, JPG atÃ© 10MB</p>
             </div>
           </div>
 
