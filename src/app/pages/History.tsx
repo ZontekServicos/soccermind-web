@@ -670,6 +670,8 @@ const ActivityRow = memo(({
   deleting: boolean;
   onDelete: (analysisId: string) => void;
 }) => {
+  const canDelete = item.type === "comparison";
+
   return (
     <tr className="group transition-colors hover:bg-[rgba(255,255,255,0.02)]">
       <td className="px-5 py-4">
@@ -708,10 +710,10 @@ const ActivityRow = memo(({
           <ActionButton icon={FileText} tooltip="Gerar relatorio" />
           <ActionButton
             icon={Trash2}
-            tooltip={deleting ? "Excluindo..." : "Excluir"}
+            tooltip={!canDelete ? "Disponivel apenas para comparacoes salvas" : deleting ? "Excluindo..." : "Excluir"}
             variant="danger"
-            disabled={deleting}
-            onClick={() => onDelete(item.id)}
+            disabled={deleting || !canDelete}
+            onClick={canDelete ? () => onDelete(item.id) : undefined}
           />
         </div>
       </td>
