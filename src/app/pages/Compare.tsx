@@ -15,6 +15,7 @@ import {
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Legend } from "recharts";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
+import { ActivePlayersFilterChips } from "../components/ActivePlayersFilterChips";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { CapitalGauge } from "../components/CapitalGauge";
@@ -35,18 +36,12 @@ import {
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import {
   buildApiFilters,
-  buildRangeLabel,
   countActiveFilters,
+  DEFAULT_PLAYERS_FILTERS,
   type FilterFieldKey,
   type PlayersFiltersState,
   parseFiltersFromSearchParams,
 } from "../utils/playerFilters";
-
-type ActiveFilterChip = {
-  key: string;
-  label: string;
-  onRemove: () => void;
-};
 
 type PositionContext = CompareViewModel["positionContext"];
 
@@ -262,69 +257,6 @@ export default function Compare() {
     { name: "Physical", a: displayPlayerA.stats.physical, b: displayPlayerB.stats.physical },
   ];
 
-  const activeFilterChips = useMemo<ActiveFilterChip[]>(() => {
-    const chips: ActiveFilterChip[] = [];
-
-    if (filters.search) {
-      chips.push({
-        key: "search",
-        label: `Busca: ${filters.search}`,
-        onRemove: () => setFilters((current) => ({ ...current, search: "" })),
-      });
-    }
-
-    filters.positions.forEach((position) => {
-      chips.push({
-        key: `position-${position}`,
-        label: `Posição: ${position}`,
-        onRemove: () => {
-          setFilters((current) => ({
-            ...current,
-            positions: current.positions.filter((item) => item !== position),
-          }));
-        },
-      });
-    });
-
-    [
-      ["nationality", filters.nationality, "Nacionalidade"],
-      ["team", filters.team, "Clube"],
-      ["league", filters.league, "Liga"],
-      ["source", filters.source, "Source"],
-    ].forEach(([key, value, label]) => {
-      if (typeof value === "string" && value) {
-        chips.push({
-          key: String(key),
-          label: `${label}: ${value}`,
-          onRemove: () => {
-            const field = key as FilterFieldKey;
-            setFilters((current) => ({ ...current, [field]: "" }));
-          },
-        });
-      }
-    });
-
-    [
-      ["age", buildRangeLabel("Idade", filters.minAge, filters.maxAge), ["minAge", "maxAge"]],
-      ["overall", buildRangeLabel("Overall", filters.minOverall, filters.maxOverall), ["minOverall", "maxOverall"]],
-      ["potential", buildRangeLabel("Potential", filters.minPotential, filters.maxPotential), ["minPotential", "maxPotential"]],
-      ["value", buildRangeLabel("Valor", filters.minValue, filters.maxValue), ["minValue", "maxValue"]],
-    ].forEach(([key, label, fields]) => {
-      if (typeof label === "string" && label) {
-        chips.push({
-          key: String(key),
-          label,
-          onRemove: () => {
-            const [minField, maxField] = fields as [FilterFieldKey, FilterFieldKey];
-            setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }));
-          },
-        });
-      }
-    });
-
-    return chips;
-  }, [filters]);
-
   const handleFieldChange = (field: FilterFieldKey, value: string) => {
     setFilters((current) => ({ ...current, [field]: value }));
   };
@@ -343,22 +275,7 @@ export default function Compare() {
   };
 
   const handleClearFilters = () => {
-    setFilters({
-      search: "",
-      positions: [],
-      nationality: "",
-      team: "",
-      league: "",
-      source: "",
-      minAge: "",
-      maxAge: "",
-      minOverall: "",
-      maxOverall: "",
-      minPotential: "",
-      maxPotential: "",
-      minValue: "",
-      maxValue: "",
-    });
+    setFilters(DEFAULT_PLAYERS_FILTERS);
   };
 
   const handleSaveAnalysis = async () => {
@@ -409,7 +326,7 @@ export default function Compare() {
                   </div>
                   <h1 className="text-4xl font-semibold text-white">Player vs Player</h1>
                   <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400">
-                    Refine a shortlist antes da comparação e navegue por perfis reais de scouting com contexto esportivo, potencial e faixa financeira.
+                    Refine a shortlist antes da comparaÃ§Ã£o e navegue por perfis reais de scouting com contexto esportivo, potencial e faixa financeira.
                   </p>
                 </div>
 
@@ -462,7 +379,7 @@ export default function Compare() {
                   </div>
 
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Atualização</p>
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">AtualizaÃ§Ã£o</p>
                     <p className="mt-2 text-lg font-semibold text-white">Tempo real</p>
                     <p className="mt-1 text-xs text-gray-500">Busca com debounce de 300ms</p>
                   </div>
@@ -502,21 +419,20 @@ export default function Compare() {
               onClearFilters={handleClearFilters}
             />
 
-            {activeFilterChips.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {activeFilterChips.map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    onClick={chip.onRemove}
-                    className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3.5 py-2 text-xs font-medium text-gray-300 transition-all hover:border-[rgba(0,194,255,0.22)] hover:text-[#9BE7FF]"
-                  >
-                    <span>{chip.label}</span>
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ))}
-              </div>
-            )}
+            <ActivePlayersFilterChips
+              filters={filters}
+              onClearSearch={() => setFilters((current) => ({ ...current, search: "" }))}
+              onRemovePosition={(position) =>
+                setFilters((current) => ({
+                  ...current,
+                  positions: current.positions.filter((item) => item !== position),
+                }))
+              }
+              onClearField={(field) => setFilters((current) => ({ ...current, [field]: "" }))}
+              onClearRange={([minField, maxField]) =>
+                setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }))
+              }
+            />
 
             {playersError && (
               <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
@@ -592,7 +508,7 @@ export default function Compare() {
 
             {playersLoading && (
               <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-400">
-                Carregando shortlist para comparação...
+                Carregando shortlist para comparaÃ§Ã£o...
               </div>
             )}
 
@@ -613,7 +529,7 @@ export default function Compare() {
             <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[20px] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)] mb-10">
               <h2 className="text-2xl font-semibold mb-8 flex items-center gap-3">
                 <Target className="w-6 h-6 text-[#00C2FF]" />
-                Performance técnica
+                Performance tÃ©cnica
               </h2>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
@@ -630,7 +546,7 @@ export default function Compare() {
                 </div>
 
                 <div className="space-y-5">
-                  {compareLoading && <p className="text-sm text-gray-500">Carregando comparação...</p>}
+                  {compareLoading && <p className="text-sm text-gray-500">Carregando comparaÃ§Ã£o...</p>}
                   {comparisonStats.map((stat) => (
                     <ComparisonBar key={`${stat.name}-${stat.a}-${stat.b}`} label={stat.name} valueA={stat.a} valueB={stat.b} />
                   ))}
@@ -639,7 +555,7 @@ export default function Compare() {
             </div>
 
             <div className="mb-8">
-              <h2 className="text-2xl font-semibold mb-8">Análise estratégica</h2>
+              <h2 className="text-2xl font-semibold mb-8">AnÃ¡lise estratÃ©gica</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 <StrategicComparisonCard title="Capital Efficiency" icon={Target} iconColor="#00C2FF">
                   <div className="grid grid-cols-2 gap-6 pt-2">

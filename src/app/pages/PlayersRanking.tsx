@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
+import { ActivePlayersFilterChips } from "../components/ActivePlayersFilterChips";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { AppSidebar } from "../components/AppSidebar";
 import type { PlayerCardModel } from "../mappers/player.mapper";
@@ -34,12 +35,6 @@ interface PaginationMeta extends PlayersResponseMeta {
   page?: number;
   totalPages?: number;
   total?: number;
-}
-
-interface ActiveFilterChip {
-  key: string;
-  label: string;
-  onRemove: () => void;
 }
 
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
@@ -82,22 +77,6 @@ function parseSortBy(searchParams: URLSearchParams): SortBy {
 
 function parseSortOrder(searchParams: URLSearchParams): SortOrder {
   return searchParams.get("sortOrder") === "asc" ? "asc" : "desc";
-}
-
-function buildRangeLabel(label: string, minValue: string, maxValue: string) {
-  if (minValue && maxValue) {
-    return `${label}: ${minValue} - ${maxValue}`;
-  }
-
-  if (minValue) {
-    return `${label}: >= ${minValue}`;
-  }
-
-  if (maxValue) {
-    return `${label}: <= ${maxValue}`;
-  }
-
-  return "";
 }
 
 export default function PlayersRanking() {
@@ -237,72 +216,6 @@ export default function PlayersRanking() {
   }, [players, sortBy, sortOrder]);
 
   const activeFiltersCount = useMemo(() => countActiveFilters(filters), [filters]);
-
-  const activeFilterChips = useMemo<ActiveFilterChip[]>(() => {
-    const chips: ActiveFilterChip[] = [];
-
-    if (filters.search) {
-      chips.push({
-        key: "search",
-        label: `Busca: ${filters.search}`,
-        onRemove: () => setFilters((current) => ({ ...current, search: "" })),
-      });
-    }
-
-    filters.positions.forEach((position) => {
-      chips.push({
-        key: `position-${position}`,
-        label: `Posicao: ${position}`,
-        onRemove: () => {
-          setPage(1);
-          setFilters((current) => ({
-            ...current,
-            positions: current.positions.filter((item) => item !== position),
-          }));
-        },
-      });
-    });
-
-    [
-      ["nationality", filters.nationality, "Nacionalidade"],
-      ["team", filters.team, "Clube"],
-      ["league", filters.league, "Liga"],
-      ["source", filters.source, "Source"],
-    ].forEach(([key, value, label]) => {
-      if (typeof value === "string" && value) {
-        chips.push({
-          key: String(key),
-          label: `${label}: ${value}`,
-          onRemove: () => {
-            const field = key as FilterFieldKey;
-            setPage(1);
-            setFilters((current) => ({ ...current, [field]: "" }));
-          },
-        });
-      }
-    });
-
-    [
-      ["age", buildRangeLabel("Idade", filters.minAge, filters.maxAge), ["minAge", "maxAge"]],
-      ["overall", buildRangeLabel("Overall", filters.minOverall, filters.maxOverall), ["minOverall", "maxOverall"]],
-      ["potential", buildRangeLabel("Potential", filters.minPotential, filters.maxPotential), ["minPotential", "maxPotential"]],
-      ["value", buildRangeLabel("Valor", filters.minValue, filters.maxValue), ["minValue", "maxValue"]],
-    ].forEach(([key, label, fields]) => {
-      if (typeof label === "string" && label) {
-        chips.push({
-          key: String(key),
-          label,
-          onRemove: () => {
-            setPage(1);
-            const [minField, maxField] = fields as [FilterFieldKey, FilterFieldKey];
-            setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }));
-          },
-        });
-      }
-    });
-
-    return chips;
-  }, [filters]);
 
   const getStatColor = (value: number) => {
     if (value >= 85) return "bg-[#00FF9C]/90 text-[#07142A]";
@@ -448,21 +361,28 @@ export default function PlayersRanking() {
               onClearFilters={handleClearFilters}
             />
 
-            {activeFilterChips.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {activeFilterChips.map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    onClick={chip.onRemove}
-                    className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3.5 py-2 text-xs font-medium text-gray-300 transition-all hover:border-[rgba(0,194,255,0.22)] hover:text-[#9BE7FF]"
-                  >
-                    <span>{chip.label}</span>
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ))}
-              </div>
-            )}
+            <ActivePlayersFilterChips
+              filters={filters}
+              onClearSearch={() => {
+                setPage(1);
+                setFilters((current) => ({ ...current, search: "" }));
+              }}
+              onRemovePosition={(position) => {
+                setPage(1);
+                setFilters((current) => ({
+                  ...current,
+                  positions: current.positions.filter((item) => item !== position),
+                }));
+              }}
+              onClearField={(field) => {
+                setPage(1);
+                setFilters((current) => ({ ...current, [field]: "" }));
+              }}
+              onClearRange={([minField, maxField]) => {
+                setPage(1);
+                setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }));
+              }}
+            />
 
             {error && (
               <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">

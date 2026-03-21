@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
+import { ActivePlayersFilterChips } from "../components/ActivePlayersFilterChips";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
@@ -21,7 +22,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import {
   buildApiFilters,
-  buildRangeLabel,
   countActiveFilters,
   DEFAULT_PLAYERS_FILTERS,
   type FilterFieldKey,
@@ -38,12 +38,6 @@ import {
   type ExecutiveReportModel,
   type PlayerFilterOptions,
 } from "../services/reports";
-
-type ActiveFilterChip = {
-  key: string;
-  label: string;
-  onRemove: () => void;
-};
 
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
   positions: [],
@@ -231,69 +225,6 @@ export default function Reports() {
     displayPlayerB.id !== EMPTY_PLAYER.id &&
     displayPlayerA.id !== displayPlayerB.id;
 
-  const activeFilterChips = useMemo<ActiveFilterChip[]>(() => {
-    const chips: ActiveFilterChip[] = [];
-
-    if (filters.search) {
-      chips.push({
-        key: "search",
-        label: `Busca: ${filters.search}`,
-        onRemove: () => setFilters((current) => ({ ...current, search: "" })),
-      });
-    }
-
-    filters.positions.forEach((position) => {
-      chips.push({
-        key: `position-${position}`,
-        label: `Posicao: ${position}`,
-        onRemove: () => {
-          setFilters((current) => ({
-            ...current,
-            positions: current.positions.filter((item) => item !== position),
-          }));
-        },
-      });
-    });
-
-    [
-      ["nationality", filters.nationality, "Nacionalidade"],
-      ["team", filters.team, "Clube"],
-      ["league", filters.league, "Liga"],
-      ["source", filters.source, "Source"],
-    ].forEach(([key, value, label]) => {
-      if (typeof value === "string" && value) {
-        chips.push({
-          key: String(key),
-          label: `${label}: ${value}`,
-          onRemove: () => {
-            const field = key as FilterFieldKey;
-            setFilters((current) => ({ ...current, [field]: "" }));
-          },
-        });
-      }
-    });
-
-    [
-      ["age", buildRangeLabel("Idade", filters.minAge, filters.maxAge), ["minAge", "maxAge"]],
-      ["overall", buildRangeLabel("Overall", filters.minOverall, filters.maxOverall), ["minOverall", "maxOverall"]],
-      ["potential", buildRangeLabel("Potential", filters.minPotential, filters.maxPotential), ["minPotential", "maxPotential"]],
-      ["value", buildRangeLabel("Valor", filters.minValue, filters.maxValue), ["minValue", "maxValue"]],
-    ].forEach(([key, label, fields]) => {
-      if (typeof label === "string" && label) {
-        chips.push({
-          key: String(key),
-          label,
-          onRemove: () => {
-            const [minField, maxField] = fields as [FilterFieldKey, FilterFieldKey];
-            setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }));
-          },
-        });
-      }
-    });
-
-    return chips;
-  }, [filters]);
-
   const handleFieldChange = (field: FilterFieldKey, value: string) => {
     setFilters((current) => ({ ...current, [field]: value }));
   };
@@ -440,21 +371,20 @@ export default function Reports() {
               onClearFilters={handleClearFilters}
             />
 
-            {activeFilterChips.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {activeFilterChips.map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    onClick={chip.onRemove}
-                    className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3.5 py-2 text-xs font-medium text-gray-300 transition-all hover:border-[rgba(0,194,255,0.22)] hover:text-[#9BE7FF]"
-                  >
-                    <span>{chip.label}</span>
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                ))}
-              </div>
-            )}
+            <ActivePlayersFilterChips
+              filters={filters}
+              onClearSearch={() => setFilters((current) => ({ ...current, search: "" }))}
+              onRemovePosition={(position) =>
+                setFilters((current) => ({
+                  ...current,
+                  positions: current.positions.filter((item) => item !== position),
+                }))
+              }
+              onClearField={(field) => setFilters((current) => ({ ...current, [field]: "" }))}
+              onClearRange={([minField, maxField]) =>
+                setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }))
+              }
+            />
 
             <section className="grid gap-6 rounded-[24px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.3)] xl:grid-cols-[1fr_1fr]">
               <PlayerSelector

@@ -19,6 +19,15 @@ export interface PlayersFiltersState {
 
 export type FilterFieldKey = keyof Omit<PlayersFiltersState, "positions" | "search">;
 
+export interface ActivePlayerFilterDescriptor {
+  key: string;
+  label: string;
+  kind: "search" | "position" | "field" | "range";
+  field?: FilterFieldKey;
+  fields?: [FilterFieldKey, FilterFieldKey];
+  position?: string;
+}
+
 export const DEFAULT_PLAYERS_FILTERS: PlayersFiltersState = {
   search: "",
   positions: [],
@@ -109,4 +118,59 @@ export function buildRangeLabel(label: string, minValue: string, maxValue: strin
   }
 
   return "";
+}
+
+export function getActivePlayerFilterDescriptors(filters: PlayersFiltersState): ActivePlayerFilterDescriptor[] {
+  const descriptors: ActivePlayerFilterDescriptor[] = [];
+
+  if (filters.search) {
+    descriptors.push({
+      key: "search",
+      label: `Busca: ${filters.search}`,
+      kind: "search",
+    });
+  }
+
+  filters.positions.forEach((position) => {
+    descriptors.push({
+      key: `position-${position}`,
+      label: `Posicao: ${position}`,
+      kind: "position",
+      position,
+    });
+  });
+
+  [
+    ["nationality", filters.nationality, "Nacionalidade"],
+    ["team", filters.team, "Clube"],
+    ["league", filters.league, "Liga"],
+    ["source", filters.source, "Source"],
+  ].forEach(([key, value, label]) => {
+    if (typeof value === "string" && value) {
+      descriptors.push({
+        key: String(key),
+        label: `${label}: ${value}`,
+        kind: "field",
+        field: key as FilterFieldKey,
+      });
+    }
+  });
+
+  [
+    ["age", buildRangeLabel("Idade", filters.minAge, filters.maxAge), ["minAge", "maxAge"]],
+    ["overall", buildRangeLabel("Overall", filters.minOverall, filters.maxOverall), ["minOverall", "maxOverall"]],
+    ["potential", buildRangeLabel("Potential", filters.minPotential, filters.maxPotential), ["minPotential", "maxPotential"]],
+    ["value", buildRangeLabel("Valor", filters.minValue, filters.maxValue), ["minValue", "maxValue"]],
+  ].forEach(([key, label, fields]) => {
+    if (typeof label === "string" && label) {
+      descriptors.push({
+        key: String(key),
+        label,
+        kind: "range",
+        fields: fields as [FilterFieldKey, FilterFieldKey],
+      });
+    }
+  });
+
+  return descriptors;
 }
