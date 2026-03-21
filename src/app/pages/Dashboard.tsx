@@ -646,52 +646,62 @@ function TierInsightCard({ tier, detail }: { tier: StrategicAssetTier; detail: s
 }
 
 function StrategicAssetCard({ asset }: { asset: StrategicAsset }) {
-  const { player, tier, description, summary, marketValueLabel, liquidityLabel, potentialLabel, outlookLabel } = asset;
+  const { player, tier, description, summary, marketValueLabel, liquidityLabel, potentialLabel } = asset;
   const color = getAssetTierColor(tier);
+  const technicalDigest = `Overall ${player.overallRating} • Potencial ${player.potential} • Liquidez ${player.liquidity.score.toFixed(1)} • Revenda ${player.liquidity.resaleWindow}`;
 
   return (
-    <div className="rounded-[18px] bg-[rgba(255,255,255,0.03)] p-6 shadow-[0_4px_16px_rgba(0,0,0,0.2)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_8px_24px_rgba(0,0,0,0.3)]">
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <h3 className="text-xl font-semibold text-white">{player.name}</h3>
-            <TierBadge tier={player.tier} className="!px-3 !py-1 !text-xs" />
+    <div
+      className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] p-7 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(0,0,0,0.36)]"
+      style={{ boxShadow: `0 14px 36px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.02), 0 0 0 1px ${color}10` }}
+    >
+      <div className="mb-7 flex items-start justify-between gap-4">
+        <div className="max-w-[70%] space-y-3">
+          <div className="space-y-1.5">
+            <h3 className="text-[1.35rem] font-semibold leading-tight text-white">{player.name}</h3>
+            <p className="text-sm font-medium text-gray-400">
+              {player.position} • {player.club}
+            </p>
           </div>
-          <p className="text-sm text-gray-400">
-            {player.position} - {player.club}
-          </p>
-          <p className="text-xs uppercase tracking-[0.18em]" style={{ color }}>
+          <div
+            className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em]"
+            style={{ color: color === "#00FF9C" ? "#7DFFD0" : color, borderColor: `${color}40`, background: `${color}12` }}
+          >
             {summary}
-          </p>
+          </div>
         </div>
         <div
-          className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color, borderColor: `${color}66`, background: `${color}14` }}
+          className="rounded-full border px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em]"
+          style={{ color, borderColor: `${color}55`, background: `${color}16` }}
         >
           {tier}
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 gap-4">
-        <AssetMetric label="Market Value" value={marketValueLabel} />
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        <AssetMetric label="Valor de mercado" value={marketValueLabel} />
         <AssetMetric label="Liquidity Score" value={liquidityLabel} highlight="#00FF9C" />
         <AssetMetric label="Resale Window" value={player.liquidity.resaleWindow} />
         <AssetMetric label="Potential" value={potentialLabel} highlight="#00C2FF" />
       </div>
 
-      <p className="mb-4 text-sm leading-7 text-gray-300">{description}</p>
-      <p className="rounded-[14px] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm leading-6 text-gray-400">
-        {outlookLabel}
-      </p>
+      <div className="mb-4 rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.028)] px-4 py-4">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500">Resumo estrategico</p>
+        <p className="max-w-[46ch] text-sm leading-6 text-gray-200">{description}</p>
+      </div>
+
+      <div className="rounded-[14px] border border-[rgba(255,255,255,0.05)] bg-[rgba(5,12,24,0.42)] px-4 py-3">
+        <p className="text-sm leading-6 text-gray-400">{technicalDigest}</p>
+      </div>
     </div>
   );
 }
 
 function AssetMetric({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
   return (
-    <div>
-      <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">{label}</p>
-      <p className="text-sm font-semibold" style={{ color: highlight ?? "#FFFFFF" }}>
+    <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.028)] px-4 py-3.5">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{label}</p>
+      <p className="text-lg font-semibold leading-none" style={{ color: highlight ?? "#F8FAFC" }}>
         {value}
       </p>
     </div>
