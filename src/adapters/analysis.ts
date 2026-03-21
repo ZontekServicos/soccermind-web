@@ -21,6 +21,10 @@ export interface AnalysisViewModel {
   club: string;
   status: "completed" | "in_progress" | "archived";
   statusLabel: string;
+  canDelete: boolean;
+  isLegacy: boolean;
+  sourceOrigin: "analysis" | "scout_report";
+  sourceLabel: string;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -66,6 +70,9 @@ function mapPlayers(value: unknown): AnalysisPlayerViewModel[] {
 export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
   const record = isRecord(source) ? source : {};
   const players = mapPlayers(record.players);
+  const sourceMetadata = isRecord(record.sourceMetadata) ? record.sourceMetadata : {};
+  const isLegacy = sourceMetadata.legacy === true;
+  const canDelete = record.canDelete === true;
 
   return {
     id: toText(record.id, "N/A"),
@@ -80,5 +87,9 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
     club: players.map((player) => player.club).find(Boolean) ?? "SoccerMind",
     status: mapStatus(record.status),
     statusLabel: toText(record.statusLabel, "Em andamento"),
+    canDelete,
+    isLegacy,
+    sourceOrigin: sourceMetadata.origin === "ANALYSIS" ? "analysis" : "scout_report",
+    sourceLabel: isLegacy ? "Legado ScoutReport" : "Central Analysis",
   };
 }

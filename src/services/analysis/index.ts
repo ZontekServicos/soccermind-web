@@ -25,6 +25,10 @@ const MOCK_ANALYSES: AnalysisViewModel[] = [
     club: "Corinthians",
     status: "completed",
     statusLabel: "Concluido",
+    canDelete: true,
+    isLegacy: false,
+    sourceOrigin: "analysis",
+    sourceLabel: "Central Analysis",
   },
   {
     id: "AN-002",
@@ -39,6 +43,10 @@ const MOCK_ANALYSES: AnalysisViewModel[] = [
     club: "Flamengo",
     status: "completed",
     statusLabel: "Concluido",
+    canDelete: false,
+    isLegacy: true,
+    sourceOrigin: "scout_report",
+    sourceLabel: "Legado ScoutReport",
   },
 ];
 

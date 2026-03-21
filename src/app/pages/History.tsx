@@ -675,7 +675,7 @@ const ActivityRow = memo(({
   deleting: boolean;
   onDelete: (analysisId: string) => void;
 }) => {
-  const canDelete = item.type === "comparison";
+  const canDelete = item.canDelete;
 
   return (
     <tr className="group transition-colors hover:bg-[rgba(255,255,255,0.02)]">
@@ -686,6 +686,7 @@ const ActivityRow = memo(({
         <div className="space-y-1">
           <p className="text-sm font-medium text-gray-200">{item.title}</p>
           {item.description && <p className="max-w-[320px] text-xs text-gray-500">{item.description}</p>}
+          <span className={`text-[11px] ${item.isLegacy ? "text-[#fbbf24]" : "text-gray-500"}`}>{item.sourceLabel}</span>
           <span className="font-mono text-xs text-gray-500">{item.id}</span>
         </div>
       </td>
@@ -715,7 +716,7 @@ const ActivityRow = memo(({
           <ActionButton icon={FileText} tooltip="Gerar relatorio" />
           <ActionButton
             icon={Trash2}
-            tooltip={!canDelete ? "Disponivel apenas para comparacoes salvas" : deleting ? "Excluindo..." : "Excluir"}
+            tooltip={!canDelete ? "Entrada legada protegida; exclusao disponivel apenas para Analysis persistido" : deleting ? "Excluindo..." : "Excluir"}
             variant="danger"
             disabled={deleting || !canDelete}
             onClick={canDelete ? () => onDelete(item.id) : undefined}
