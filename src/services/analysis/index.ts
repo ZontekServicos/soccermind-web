@@ -18,6 +18,10 @@ type AnalysisHubUpdateDetail = {
   id: string;
 };
 
+function getDeleteEndpoint(entry: Pick<AnalysisViewModel, "id" | "deleteManagedBy">) {
+  return entry.deleteManagedBy === "scout_report" ? `/scout-reports/${entry.id}` : `/analysis/${entry.id}`;
+}
+
 const MOCK_ANALYSES: AnalysisViewModel[] = [
   {
     id: "AN-001",
@@ -52,12 +56,12 @@ const MOCK_ANALYSES: AnalysisViewModel[] = [
     club: "Flamengo",
     status: "completed",
     statusLabel: "Concluido",
-    canDelete: false,
+    canDelete: true,
     isLegacy: true,
     sourceOrigin: "scout_report",
     sourceLabel: "Legado ScoutReport",
     deleteManagedBy: "scout_report",
-    deleteHint: "Entrada legada protegida; exclusao disponivel apenas no fluxo ScoutReport.",
+    deleteHint: "Entrada legada removivel via ScoutReport.",
   },
 ];
 
@@ -130,12 +134,12 @@ export async function createComparisonAnalysis(payload: CreateComparisonAnalysis
   };
 }
 
-export async function deleteAnalysis(id: string) {
-  const response = await apiFetch<{ id: string; message: string }>(`/analysis/${id}`, {
+export async function deleteAnalysisHubEntry(entry: Pick<AnalysisViewModel, "id" | "deleteManagedBy">) {
+  const response = await apiFetch<{ id: string; message: string }>(getDeleteEndpoint(entry), {
     method: "DELETE",
   });
 
-  notifyAnalysisHubUpdated({ action: "deleted", id });
+  notifyAnalysisHubUpdated({ action: "deleted", id: entry.id });
 
   return response;
 }

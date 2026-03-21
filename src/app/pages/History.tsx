@@ -24,7 +24,7 @@ import {
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  deleteAnalysis,
+  deleteAnalysisHubEntry,
   getAnalyses,
   subscribeToAnalysisHubUpdates,
   type AnalysisViewModel as AnalysisHistory,
@@ -238,7 +238,7 @@ export default function History() {
     setSortOrder("desc");
   };
 
-  const handleDeleteAnalysis = async (analysisId: string) => {
+  const handleDeleteAnalysis = async (item: AnalysisHistory) => {
     if (deletingId) {
       return;
     }
@@ -248,12 +248,12 @@ export default function History() {
       return;
     }
 
-    setDeletingId(analysisId);
+    setDeletingId(item.id);
     setActionFeedback(null);
     setActionError(null);
 
     try {
-      await deleteAnalysis(analysisId);
+      await deleteAnalysisHubEntry(item);
       setActionFeedback("Analise removida da central com sucesso.");
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Nao foi possivel excluir a analise.");
@@ -598,7 +598,7 @@ interface ActivityTableProps {
   onSort: (field: SortField) => void;
   isLoading: boolean;
   deletingId: string | null;
-  onDelete: (analysisId: string) => void;
+  onDelete: (item: AnalysisHistory) => void;
 }
 
 const ActivityTable = memo(({
@@ -684,10 +684,14 @@ const ActivityRow = memo(({
 }: {
   item: AnalysisHistory;
   deleting: boolean;
-  onDelete: (analysisId: string) => void;
+  onDelete: (item: AnalysisHistory) => void;
 }) => {
   const canDelete = item.canDelete;
-  const deleteLabel = canDelete ? "Removivel via Analysis" : "Legado protegido";
+  const deleteLabel = !canDelete
+    ? "Remocao indisponivel"
+    : item.deleteManagedBy === "scout_report"
+      ? "Removivel via ScoutReport"
+      : "Removivel via Analysis";
 
   return (
     <tr className="group transition-colors hover:bg-[rgba(255,255,255,0.02)]">
@@ -744,7 +748,7 @@ const ActivityRow = memo(({
               tooltip={deleting ? "Excluindo..." : item.deleteHint}
               variant="danger"
               disabled={deleting}
-              onClick={() => onDelete(item.id)}
+              onClick={() => onDelete(item)}
             />
           ) : (
             <span className="text-center text-[11px] text-[#F8D98B]" title={item.deleteHint}>

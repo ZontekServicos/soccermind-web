@@ -75,8 +75,13 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
   const sourceMetadata = isRecord(record.sourceMetadata) ? record.sourceMetadata : {};
   const deletePolicy = isRecord(record.deletePolicy) ? record.deletePolicy : {};
   const isLegacy = sourceMetadata.legacy === true;
-  const canDelete =
-    deletePolicy.canDelete === true || (record.canDelete === true && sourceMetadata.origin === "ANALYSIS");
+  const canDelete = record.canDelete === true || deletePolicy.canDelete === true;
+  const deleteManagedBy =
+    record.deleteManagedBy === "scout_report" || record.deleteManagedBy === "analysis"
+      ? record.deleteManagedBy
+      : deletePolicy.managedBy === "SCOUT_REPORT"
+        ? "scout_report"
+        : "analysis";
 
   return {
     id: toText(record.id, "N/A"),
@@ -95,12 +100,12 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
     isLegacy,
     sourceOrigin: sourceMetadata.origin === "ANALYSIS" ? "analysis" : "scout_report",
     sourceLabel: isLegacy ? "Legado ScoutReport" : "Central Analysis",
-    deleteManagedBy: deletePolicy.managedBy === "ANALYSIS" ? "analysis" : "scout_report",
+    deleteManagedBy,
     deleteHint: toText(
-      deletePolicy.reason,
+      record.deleteHint ?? deletePolicy.reason,
       canDelete
         ? "Entrada persistida em Analysis; exclusao disponivel."
-        : "Entrada legada protegida; exclusao disponivel apenas no fluxo ScoutReport.",
+        : "Entrada protegida; exclusao indisponivel no momento.",
     ),
   };
 }
