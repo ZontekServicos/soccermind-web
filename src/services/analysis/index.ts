@@ -1,8 +1,14 @@
-import { mapAnalysisResponse, type AnalysisViewModel } from "../../adapters/analysis";
+import {
+  mapAnalysisDetailResponse,
+  mapAnalysisResponse,
+  type AnalysisDetailViewModel,
+  type AnalysisViewModel,
+} from "../../adapters/analysis";
 import { apiFetch, type ApiEnvelope } from "../../app/services/api";
 import { getDataSource } from "../../config/dataSource";
 
 export type { AnalysisViewModel };
+export type { AnalysisDetailViewModel };
 
 export interface CreateComparisonAnalysisPayload {
   playerIds: string[];
@@ -153,6 +159,15 @@ export async function createReportAnalysis(payload: CreateReportAnalysisPayload)
   return {
     ...response,
     data: analysis,
+  };
+}
+
+export async function getAnalysisById(id: string) {
+  const response = await apiFetch<unknown>(`/analysis/${id}`);
+
+  return {
+    ...response,
+    data: mapAnalysisDetailResponse(response.data),
   };
 }
 

@@ -16,6 +16,7 @@ import Dashboard from "./pages/Dashboard";
 import Compare from "./pages/Compare";
 import Reports from "./pages/Reports";
 import History from "./pages/History";
+import AnalysisDetail from "./pages/AnalysisDetail";
 import Governance from "./pages/Governance";
 import PlayersRanking from "./pages/PlayersRanking";
 import PlayerDetails from "./pages/PlayerDetails";
@@ -134,6 +135,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <History />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/analysis/:id",
+        element: (
+          <ProtectedRoute>
+            <AnalysisDetail />
           </ProtectedRoute>
         ),
       },

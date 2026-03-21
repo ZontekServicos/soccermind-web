@@ -1,3 +1,4 @@
+import { mapCompareResponse, type CompareViewModel } from "./compare";
 type UnknownRecord = Record<string, unknown>;
 
 export interface AnalysisPlayerViewModel {
@@ -27,6 +28,16 @@ export interface AnalysisViewModel {
   sourceLabel: string;
   deleteManagedBy: "analysis" | "scout_report";
   deleteHint: string;
+}
+
+export interface AnalysisDetailViewModel extends AnalysisViewModel {
+  reportContent: {
+    mode: "comparison" | "single_player";
+    canExportPdf: boolean;
+    contentStatus: "ready" | "partial";
+    contentMessage: string;
+    comparisonData: CompareViewModel | null;
+  } | null;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -107,5 +118,27 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
         ? "Entrada persistida em Analysis; exclusao disponivel."
         : "Entrada protegida; exclusao indisponivel no momento.",
     ),
+  };
+}
+
+export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewModel {
+  const base = mapAnalysisResponse(source);
+  const record = isRecord(source) ? source : {};
+  const reportContentRecord = isRecord(record.reportContent) ? record.reportContent : null;
+  const comparisonData = reportContentRecord?.comparisonData
+    ? mapCompareResponse(reportContentRecord.comparisonData)
+    : null;
+
+  return {
+    ...base,
+    reportContent: reportContentRecord
+      ? {
+          mode: reportContentRecord.mode === "single_player" ? "single_player" : "comparison",
+          canExportPdf: reportContentRecord.canExportPdf === true,
+          contentStatus: reportContentRecord.contentStatus === "partial" ? "partial" : "ready",
+          contentMessage: toText(reportContentRecord.contentMessage, ""),
+          comparisonData,
+        }
+      : null,
   };
 }

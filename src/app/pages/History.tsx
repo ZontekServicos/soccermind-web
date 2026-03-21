@@ -8,8 +8,8 @@ import {
   Calendar,
   ChevronDown,
   ChevronUp,
-  Copy,
   Download,
+  Eye,
   FileText,
   Filter,
   History as HistoryIcon,
@@ -305,6 +305,7 @@ export default function History() {
               onSort={handleSort}
               isLoading={isLoading}
               deletingId={deletingId}
+              onViewReport={(item) => navigate(`/analysis/${item.id}`)}
               onDelete={handleDeleteAnalysis}
             />
           </div>
@@ -598,6 +599,7 @@ interface ActivityTableProps {
   onSort: (field: SortField) => void;
   isLoading: boolean;
   deletingId: string | null;
+  onViewReport: (item: AnalysisHistory) => void;
   onDelete: (item: AnalysisHistory) => void;
 }
 
@@ -608,6 +610,7 @@ const ActivityTable = memo(({
   onSort,
   isLoading,
   deletingId,
+  onViewReport,
   onDelete,
 }: ActivityTableProps) => {
   if (isLoading) {
@@ -635,7 +638,13 @@ const ActivityTable = memo(({
           </thead>
           <tbody>
             {data.map((item) => (
-              <ActivityRow key={item.id} item={item} deleting={deletingId === item.id} onDelete={onDelete} />
+              <ActivityRow
+                key={item.id}
+                item={item}
+                deleting={deletingId === item.id}
+                onViewReport={onViewReport}
+                onDelete={onDelete}
+              />
             ))}
           </tbody>
         </table>
@@ -680,13 +689,16 @@ TableHeader.displayName = "TableHeader";
 const ActivityRow = memo(({
   item,
   deleting,
+  onViewReport,
   onDelete,
 }: {
   item: AnalysisHistory;
   deleting: boolean;
+  onViewReport: (item: AnalysisHistory) => void;
   onDelete: (item: AnalysisHistory) => void;
 }) => {
   const canDelete = item.canDelete;
+  const canViewReport = item.type === "report" && !item.isLegacy;
   const deleteLabel = !canDelete
     ? "Remocao indisponivel"
     : item.deleteManagedBy === "scout_report"
@@ -740,8 +752,20 @@ const ActivityRow = memo(({
       </td>
       <td className="px-5 py-4">
         <div className="flex items-center justify-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-          <ActionButton icon={Copy} tooltip="Duplicar" />
-          <ActionButton icon={FileText} tooltip="Gerar relatorio" />
+          {canViewReport ? (
+            <ActionButton icon={Eye} tooltip="Ver relatorio" onClick={() => onViewReport(item)} />
+          ) : (
+            <span
+              className="text-center text-[11px] text-gray-500"
+              title={
+                item.type === "report"
+                  ? "Visualizacao detalhada disponivel apenas para relatorios persistidos na central Analysis."
+                  : "Visualizacao detalhada desta analise ainda nao esta habilitada."
+              }
+            >
+              Sem viewer
+            </span>
+          )}
           {canDelete ? (
             <ActionButton
               icon={Trash2}
