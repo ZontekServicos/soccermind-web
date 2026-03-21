@@ -11,6 +11,13 @@ export interface CreateComparisonAnalysisPayload {
   analyst?: string;
 }
 
+export interface CreateReportAnalysisPayload {
+  playerIds: string[];
+  title?: string;
+  description?: string;
+  analyst?: string;
+}
+
 const ANALYSIS_HUB_UPDATED_EVENT = "soccermind:analysis-hub-updated";
 
 type AnalysisHubUpdateDetail = {
@@ -121,6 +128,21 @@ export async function getAnalyses() {
 
 export async function createComparisonAnalysis(payload: CreateComparisonAnalysisPayload) {
   const response = await apiFetch<unknown>("/analysis/comparison", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  const analysis = mapAnalysisResponse(response.data);
+  notifyAnalysisHubUpdated({ action: "created", id: analysis.id });
+
+  return {
+    ...response,
+    data: analysis,
+  };
+}
+
+export async function createReportAnalysis(payload: CreateReportAnalysisPayload) {
+  const response = await apiFetch<unknown>("/analysis/report", {
     method: "POST",
     body: JSON.stringify(payload),
   });

@@ -6,6 +6,7 @@ import {
   Download,
   FileText,
   LoaderCircle,
+  Save,
   ShieldAlert,
   Sparkles,
   TrendingUp,
@@ -16,6 +17,7 @@ import { AppHeader } from "../components/AppHeader";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { useAuth } from "../contexts/AuthContext";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import {
   buildApiFilters,
@@ -28,6 +30,7 @@ import {
 } from "../utils/playerFilters";
 import { formatExecutiveMetric, type ExecutiveReportMetric } from "../utils/executiveReport";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
+import { createReportAnalysis } from "../services/analysis";
 import {
   getExecutiveReportData,
   getReportShortlist,
@@ -63,6 +66,7 @@ function dedupePlayers(players: PlayerExtended[]) {
 }
 
 export default function Reports() {
+  const { user } = useAuth();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
   const [filters, setFilters] = useState<PlayersFiltersState>(initialFilters);
@@ -78,6 +82,9 @@ export default function Reports() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
+  const [saveFeedbackTone, setSaveFeedbackTone] = useState<"success" | "error">("success");
   const [comparisonData, setComparisonData] = useState<CompareViewModel | null>(null);
   const [reportModel, setReportModel] = useState<ExecutiveReportModel | null>(null);
   const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
@@ -217,6 +224,12 @@ export default function Reports() {
 
   const displayPlayerA = comparisonData?.playerA ?? playerA;
   const displayPlayerB = comparisonData?.playerB ?? playerB;
+  const hasValidPlayers =
+    Boolean(displayPlayerA.id) &&
+    Boolean(displayPlayerB.id) &&
+    displayPlayerA.id !== EMPTY_PLAYER.id &&
+    displayPlayerB.id !== EMPTY_PLAYER.id &&
+    displayPlayerA.id !== displayPlayerB.id;
 
   const activeFilterChips = useMemo<ActiveFilterChip[]>(() => {
     const chips: ActiveFilterChip[] = [];
@@ -316,6 +329,33 @@ export default function Reports() {
     }
   };
 
+  const handleSaveReport = async () => {
+    if (!reportModel || !hasValidPlayers) {
+      setSaveFeedbackTone("error");
+      setSaveFeedback("Selecione dois jogadores validos para salvar o relatorio executivo.");
+      return;
+    }
+
+    setSaving(true);
+    setSaveFeedback(null);
+
+    try {
+      const response = await createReportAnalysis({
+        playerIds: [displayPlayerA.id, displayPlayerB.id],
+        title: `${reportModel.title} - ${reportModel.subtitle}`,
+        analyst: user?.name,
+      });
+
+      setSaveFeedbackTone("success");
+      setSaveFeedback(`Relatorio salvo com sucesso: ${response.data.title}. Ele ja esta disponivel na central de Analises.`);
+    } catch (error) {
+      setSaveFeedbackTone("error");
+      setSaveFeedback(error instanceof Error ? error.message : "Nao foi possivel salvar o relatorio.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-[#07142A]">
       <AppSidebar />
@@ -349,24 +389,44 @@ export default function Reports() {
                 <div className="grid gap-4 sm:grid-cols-3">
                   <MetricHeroCard label="Shortlist" value={`${availablePlayers.length}`} caption="Apos aplicacao dos filtros" accent="cyan" />
                   <MetricHeroCard label="Filtros ativos" value={`${activeFiltersCount}`} caption="Refinando o radar atual" accent="violet" />
-                  <div className="flex flex-col justify-between rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Exportacao</p>
-                      <p className="mt-2 text-lg font-semibold text-white">PDF executivo</p>
-                      <p className="mt-1 text-xs text-gray-500">Baixa o relatorio atual da tela</p>
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-5 py-4 backdrop-blur-sm">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Acoes</p>
+                    <p className="mt-2 text-lg font-semibold text-white">Salvar ou exportar</p>
+                    <p className="mt-1 text-xs text-gray-500">Persista o parecer na central ou gere o PDF executivo.</p>
+                    <div className="mt-4 grid gap-3">
+                      <Button
+                        className="h-11 rounded-[14px] border border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.14)] px-4 font-semibold text-[#B6FFD8] shadow-[0_6px_18px_rgba(0,255,156,0.14)] hover:bg-[rgba(0,255,156,0.2)]"
+                        onClick={handleSaveReport}
+                        disabled={!reportModel || reportLoading || saving || !hasValidPlayers}
+                      >
+                        {saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                        Salvar relatorio
+                      </Button>
+                      <Button
+                        className="h-11 rounded-[14px] bg-[#00C2FF]/90 px-4 font-semibold text-[#07142A] shadow-[0_6px_18px_rgba(0,194,255,0.25)] hover:bg-[#00C2FF]"
+                        onClick={handleExportPdf}
+                        disabled={!reportModel || reportLoading || exporting}
+                      >
+                        {exporting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        Exportar PDF
+                      </Button>
                     </div>
-                    <Button
-                      className="mt-4 h-11 rounded-[14px] bg-[#00C2FF]/90 px-4 font-semibold text-[#07142A] shadow-[0_6px_18px_rgba(0,194,255,0.25)] hover:bg-[#00C2FF]"
-                      onClick={handleExportPdf}
-                      disabled={!reportModel || reportLoading || exporting}
-                    >
-                      {exporting ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                      Exportar PDF
-                    </Button>
                   </div>
                 </div>
               </div>
             </section>
+
+            {saveFeedback && (
+              <div
+                className={`rounded-[16px] border px-5 py-4 text-sm ${
+                  saveFeedbackTone === "success"
+                    ? "border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] text-[#9CFFD1]"
+                    : "border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] text-[#FFB4B5]"
+                }`}
+              >
+                {saveFeedback}
+              </div>
+            )}
 
             <PlayersFiltersPanel
               filters={filters}
@@ -430,6 +490,32 @@ export default function Reports() {
 
             {reportModel && (
               <>
+                <section className="relative overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(135deg,rgba(7,20,42,0.96),rgba(13,29,57,0.92))] px-7 py-7 shadow-[0_18px_56px_rgba(0,0,0,0.34)]">
+                  <div className="absolute inset-y-0 right-0 w-64 bg-[radial-gradient(circle_at_top_right,rgba(0,194,255,0.16),transparent_72%)]" />
+                  <div className="relative grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Decision Snapshot</p>
+                      <h2 className="mt-3 text-3xl font-semibold text-white">{reportModel.recommendationLabel}</h2>
+                      <p className="mt-4 max-w-3xl text-[15px] leading-[1.9] text-gray-300">{reportModel.recommendationSummary}</p>
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        {reportModel.takeaways.slice(0, 2).map((takeaway) => (
+                          <span
+                            key={takeaway}
+                            className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-xs text-gray-300"
+                          >
+                            {takeaway}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid gap-4 rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-5">
+                      <EditorialStat label="Status" value="Pronto para decisao" accent="#00FF9C" />
+                      <EditorialStat label="Recorte" value={reportModel.subtitle} accent="#00C2FF" />
+                      <EditorialStat label="Gerado em" value={reportModel.generatedAtLabel} accent="#7A5CFF" />
+                    </div>
+                  </div>
+                </section>
+
                 <SectionCard icon={FileText} iconColor="#00C2FF" iconBg="rgba(0,194,255,0.15)" title="Executive Summary">
                   <div className="max-w-[980px]">
                     <p className="text-[15px] leading-[1.9] text-gray-300">{reportModel.executiveSummary}</p>
@@ -507,6 +593,19 @@ export default function Reports() {
                     </p>
                   </div>
                 </section>
+
+                <SectionCard icon={CheckCircle} iconColor="#00FF9C" iconBg="rgba(0,255,156,0.15)" title="Decision Checklist">
+                  <div className="grid gap-4 lg:grid-cols-3">
+                    {reportModel.takeaways.map((takeaway) => (
+                      <div key={takeaway} className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-[10px] bg-[rgba(0,255,156,0.12)] text-[#00FF9C]">
+                          <CheckCircle className="h-4 w-4" />
+                        </div>
+                        <p className="text-sm leading-relaxed text-gray-300">{takeaway}</p>
+                      </div>
+                    ))}
+                  </div>
+                </SectionCard>
               </>
             )}
           </div>
@@ -536,6 +635,16 @@ function MetricHeroCard({
       <p className={`mt-2 text-2xl font-bold ${color}`}>{value}</p>
       <p className="mt-1 text-xs text-gray-500">{caption}</p>
       <div className={`mt-4 h-1 rounded-full ${bg}`} />
+    </div>
+  );
+}
+
+function EditorialStat({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-4 py-4">
+      <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{label}</p>
+      <p className="mt-2 text-base font-semibold text-white">{value}</p>
+      <div className="mt-3 h-1 rounded-full" style={{ background: `${accent}33` }} />
     </div>
   );
 }
