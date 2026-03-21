@@ -11,6 +11,13 @@ export interface CreateComparisonAnalysisPayload {
   analyst?: string;
 }
 
+const ANALYSIS_HUB_UPDATED_EVENT = "soccermind:analysis-hub-updated";
+
+type AnalysisHubUpdateDetail = {
+  action: "created" | "deleted";
+  id: string;
+};
+
 const MOCK_ANALYSES: AnalysisViewModel[] = [
   {
     id: "AN-001",
@@ -29,6 +36,8 @@ const MOCK_ANALYSES: AnalysisViewModel[] = [
     isLegacy: false,
     sourceOrigin: "analysis",
     sourceLabel: "Central Analysis",
+    deleteManagedBy: "analysis",
+    deleteHint: "Entrada persistida em Analysis; exclusao disponivel.",
   },
   {
     id: "AN-002",
@@ -47,6 +56,8 @@ const MOCK_ANALYSES: AnalysisViewModel[] = [
     isLegacy: true,
     sourceOrigin: "scout_report",
     sourceLabel: "Legado ScoutReport",
+    deleteManagedBy: "scout_report",
+    deleteHint: "Entrada legada protegida; exclusao disponivel apenas no fluxo ScoutReport.",
   },
 ];
 
@@ -57,6 +68,31 @@ async function getAnalysesFromApi(): Promise<ApiEnvelope<AnalysisViewModel[]>> {
   return {
     ...response,
     data: payload.map(mapAnalysisResponse),
+  };
+}
+
+function notifyAnalysisHubUpdated(detail: AnalysisHubUpdateDetail) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent<AnalysisHubUpdateDetail>(ANALYSIS_HUB_UPDATED_EVENT, { detail }));
+}
+
+export function subscribeToAnalysisHubUpdates(listener: (detail: AnalysisHubUpdateDetail) => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const handler = (event: Event) => {
+    const customEvent = event as CustomEvent<AnalysisHubUpdateDetail>;
+    listener(customEvent.detail);
+  };
+
+  window.addEventListener(ANALYSIS_HUB_UPDATED_EVENT, handler as EventListener);
+
+  return () => {
+    window.removeEventListener(ANALYSIS_HUB_UPDATED_EVENT, handler as EventListener);
   };
 }
 
@@ -85,14 +121,21 @@ export async function createComparisonAnalysis(payload: CreateComparisonAnalysis
     body: JSON.stringify(payload),
   });
 
+  const analysis = mapAnalysisResponse(response.data);
+  notifyAnalysisHubUpdated({ action: "created", id: analysis.id });
+
   return {
     ...response,
-    data: mapAnalysisResponse(response.data),
+    data: analysis,
   };
 }
 
 export async function deleteAnalysis(id: string) {
-  return apiFetch<{ id: string; message: string }>(`/analysis/${id}`, {
+  const response = await apiFetch<{ id: string; message: string }>(`/analysis/${id}`, {
     method: "DELETE",
   });
+
+  notifyAnalysisHubUpdated({ action: "deleted", id });
+
+  return response;
 }

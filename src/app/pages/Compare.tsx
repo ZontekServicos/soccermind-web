@@ -380,7 +380,8 @@ export default function Compare() {
       });
 
       setSaveFeedbackTone("success");
-      setSaveFeedback(`Analise salva com sucesso: ${response.data.title}. Ela ja esta disponivel na tela de Analises.`);
+      setSaveFeedback(`Analise salva com sucesso: ${response.data.title}. A central de analises foi sincronizada com o backend.`);
+      setAnalysisTitle("");
       setAnalysisDescription("");
     } catch (error) {
       setSaveFeedbackTone("error");

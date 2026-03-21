@@ -23,7 +23,12 @@ import {
 } from "lucide-react";
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { deleteAnalysis, getAnalyses, type AnalysisViewModel as AnalysisHistory } from "../services/analysis";
+import {
+  deleteAnalysis,
+  getAnalyses,
+  subscribeToAnalysisHubUpdates,
+  type AnalysisViewModel as AnalysisHistory,
+} from "../services/analysis";
 
 type FilterType = "all" | AnalysisHistory["type"];
 type FilterStatus = "all" | AnalysisHistory["status"];
@@ -92,8 +97,10 @@ export default function History() {
   useEffect(() => {
     let active = true;
 
-    async function loadHistory() {
-      setIsLoading(true);
+    async function loadHistory(options?: { silent?: boolean }) {
+      if (!options?.silent) {
+        setIsLoading(true);
+      }
 
       try {
         const response = await getAnalyses();
@@ -111,16 +118,21 @@ export default function History() {
         setHistoryItems([]);
         setLoadError(error instanceof Error ? error.message : "Nao foi possivel carregar a central de analises.");
       } finally {
-        if (active) {
+        if (active && !options?.silent) {
           setIsLoading(false);
         }
       }
     }
 
-    loadHistory();
+    void loadHistory();
+
+    const unsubscribe = subscribeToAnalysisHubUpdates(() => {
+      void loadHistory({ silent: true });
+    });
 
     return () => {
       active = false;
+      unsubscribe();
     };
   }, []);
 
@@ -242,7 +254,6 @@ export default function History() {
 
     try {
       await deleteAnalysis(analysisId);
-      setHistoryItems((current) => current.filter((item) => item.id !== analysisId));
       setActionFeedback("Analise removida da central com sucesso.");
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Nao foi possivel excluir a analise.");
@@ -676,6 +687,7 @@ const ActivityRow = memo(({
   onDelete: (analysisId: string) => void;
 }) => {
   const canDelete = item.canDelete;
+  const deleteLabel = canDelete ? "Removivel via Analysis" : "Legado protegido";
 
   return (
     <tr className="group transition-colors hover:bg-[rgba(255,255,255,0.02)]">
@@ -686,7 +698,19 @@ const ActivityRow = memo(({
         <div className="space-y-1">
           <p className="text-sm font-medium text-gray-200">{item.title}</p>
           {item.description && <p className="max-w-[320px] text-xs text-gray-500">{item.description}</p>}
-          <span className={`text-[11px] ${item.isLegacy ? "text-[#fbbf24]" : "text-gray-500"}`}>{item.sourceLabel}</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`text-[11px] ${item.isLegacy ? "text-[#fbbf24]" : "text-gray-500"}`}>{item.sourceLabel}</span>
+            <span
+              className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
+                canDelete
+                  ? "border-[rgba(0,255,156,0.22)] text-[#9CFFD1]"
+                  : "border-[rgba(251,191,36,0.28)] text-[#F8D98B]"
+              }`}
+              title={item.deleteHint}
+            >
+              {deleteLabel}
+            </span>
+          </div>
           <span className="font-mono text-xs text-gray-500">{item.id}</span>
         </div>
       </td>
@@ -714,13 +738,19 @@ const ActivityRow = memo(({
         <div className="flex items-center justify-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
           <ActionButton icon={Copy} tooltip="Duplicar" />
           <ActionButton icon={FileText} tooltip="Gerar relatorio" />
-          <ActionButton
-            icon={Trash2}
-            tooltip={!canDelete ? "Entrada legada protegida; exclusao disponivel apenas para Analysis persistido" : deleting ? "Excluindo..." : "Excluir"}
-            variant="danger"
-            disabled={deleting || !canDelete}
-            onClick={canDelete ? () => onDelete(item.id) : undefined}
-          />
+          {canDelete ? (
+            <ActionButton
+              icon={Trash2}
+              tooltip={deleting ? "Excluindo..." : item.deleteHint}
+              variant="danger"
+              disabled={deleting}
+              onClick={() => onDelete(item.id)}
+            />
+          ) : (
+            <span className="text-center text-[11px] text-[#F8D98B]" title={item.deleteHint}>
+              Gerenciado pelo legado
+            </span>
+          )}
         </div>
       </td>
     </tr>

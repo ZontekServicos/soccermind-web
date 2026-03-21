@@ -25,6 +25,8 @@ export interface AnalysisViewModel {
   isLegacy: boolean;
   sourceOrigin: "analysis" | "scout_report";
   sourceLabel: string;
+  deleteManagedBy: "analysis" | "scout_report";
+  deleteHint: string;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -71,8 +73,10 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
   const record = isRecord(source) ? source : {};
   const players = mapPlayers(record.players);
   const sourceMetadata = isRecord(record.sourceMetadata) ? record.sourceMetadata : {};
+  const deletePolicy = isRecord(record.deletePolicy) ? record.deletePolicy : {};
   const isLegacy = sourceMetadata.legacy === true;
-  const canDelete = record.canDelete === true;
+  const canDelete =
+    deletePolicy.canDelete === true || (record.canDelete === true && sourceMetadata.origin === "ANALYSIS");
 
   return {
     id: toText(record.id, "N/A"),
@@ -91,5 +95,12 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
     isLegacy,
     sourceOrigin: sourceMetadata.origin === "ANALYSIS" ? "analysis" : "scout_report",
     sourceLabel: isLegacy ? "Legado ScoutReport" : "Central Analysis",
+    deleteManagedBy: deletePolicy.managedBy === "ANALYSIS" ? "analysis" : "scout_report",
+    deleteHint: toText(
+      deletePolicy.reason,
+      canDelete
+        ? "Entrada persistida em Analysis; exclusao disponivel."
+        : "Entrada legada protegida; exclusao disponivel apenas no fluxo ScoutReport.",
+    ),
   };
 }
