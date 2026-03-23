@@ -172,7 +172,10 @@ export default function Reports() {
       setReportLoading(true);
 
       try {
-        const response = await getExecutiveReportData(playerA, playerB);
+        const response = await getExecutiveReportData(playerA, playerB, {
+          analyst: user?.name,
+          status: "Concluído",
+        });
 
         if (!active) {
           return;
@@ -201,7 +204,7 @@ export default function Reports() {
     return () => {
       active = false;
     };
-  }, [playerA.id, playerA.name, playerB.id, playerB.name]);
+  }, [playerA.id, playerA.name, playerB.id, playerB.name, user?.name]);
 
   const selectablePlayers = useMemo(
     () =>

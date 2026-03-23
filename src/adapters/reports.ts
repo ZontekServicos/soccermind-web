@@ -6,6 +6,11 @@ export function buildExecutiveReportData(
   comparisonData: CompareViewModel | null,
   playerA: PlayerExtended,
   playerB: PlayerExtended,
+  options?: {
+    analyst?: string;
+    generatedAt?: Date;
+    status?: string;
+  },
 ) {
   const displayPlayerA = comparisonData?.playerA ?? playerA;
   const displayPlayerB = comparisonData?.playerB ?? playerB;
@@ -19,5 +24,8 @@ export function buildExecutiveReportData(
     playerB: displayPlayerB,
     winner: comparisonData?.winner ?? "DRAW",
     comparison: comparisonData?.comparison,
+    analyst: options?.analyst,
+    generatedAt: options?.generatedAt,
+    status: options?.status,
   });
 }

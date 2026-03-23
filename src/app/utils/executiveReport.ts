@@ -24,10 +24,14 @@ export interface ExecutiveReportModel {
   subtitle: string;
   generatedAt: Date;
   generatedAtLabel: string;
+  generatedDateLabel: string;
   filename: string;
   winner: ExecutiveReportWinner;
   recommendedPlayer: PlayerExtended | null;
   secondaryPlayer: PlayerExtended | null;
+  analyst: string;
+  status: string;
+  statusTone: "success" | "warning" | "danger" | "neutral";
   executiveSummary: string;
   comparativeAnalysis: string;
   riskOverview: string;
@@ -45,6 +49,8 @@ interface BuildExecutiveReportParams {
   winner?: ExecutiveReportWinner;
   comparison?: unknown;
   generatedAt?: Date;
+  analyst?: string;
+  status?: string;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -78,6 +84,14 @@ function formatDateTime(value: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
     dateStyle: "medium",
     timeStyle: "short",
+  }).format(value);
+}
+
+function formatDate(value: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
   }).format(value);
 }
 
@@ -249,6 +263,8 @@ export function buildExecutiveReportModel({
   winner = "DRAW",
   comparison,
   generatedAt = new Date(),
+  analyst = "Sistema SoccerMind",
+  status = "Concluído",
 }: BuildExecutiveReportParams): ExecutiveReportModel {
   const seed = hashText(
     [playerA.id, playerB.id, playerA.name, playerB.name, playerA.overallRating, playerB.overallRating].join("|"),
@@ -412,10 +428,20 @@ export function buildExecutiveReportModel({
     subtitle: `${playerA.name} vs ${playerB.name}`,
     generatedAt,
     generatedAtLabel: formatDateTime(generatedAt),
+    generatedDateLabel: formatDate(generatedAt),
     filename: `executive-report-${slugify(playerA.name)}-vs-${slugify(playerB.name)}.pdf`,
     winner: recommendedSide,
     recommendedPlayer,
     secondaryPlayer,
+    analyst,
+    status,
+    statusTone: status.toLowerCase().includes("conclu") || status.toLowerCase().includes("complete")
+      ? "success"
+      : status.toLowerCase().includes("andamento") || status.toLowerCase().includes("progress")
+        ? "warning"
+        : status.toLowerCase().includes("risco") || status.toLowerCase().includes("erro")
+          ? "danger"
+          : "neutral",
     executiveSummary,
     comparativeAnalysis,
     riskOverview,

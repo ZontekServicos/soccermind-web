@@ -121,7 +121,11 @@ export default function AnalysisDetail() {
       return null;
     }
 
-    return buildExecutiveReportData(comparisonData, comparisonData.playerA, comparisonData.playerB);
+    return buildExecutiveReportData(comparisonData, comparisonData.playerA, comparisonData.playerB, {
+      analyst: analysis.user,
+      generatedAt: new Date(analysis.date),
+      status: analysis.statusLabel,
+    });
   }, [analysis]);
 
   const handleDelete = async () => {

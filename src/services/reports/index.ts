@@ -24,6 +24,11 @@ export async function getReportShortlist(
 export async function getExecutiveReportData(
   playerA: PlayerExtended,
   playerB: PlayerExtended,
+  options?: {
+    analyst?: string;
+    generatedAt?: Date;
+    status?: string;
+  },
 ): Promise<ApiEnvelope<ExecutiveReportResponse | null>> {
   if (!playerA.name || !playerB.name || playerA.id === EMPTY_PLAYER.id || playerB.id === EMPTY_PLAYER.id) {
     return {
@@ -44,7 +49,7 @@ export async function getExecutiveReportData(
     data: response.data
       ? {
           comparisonData: response.data,
-          reportModel: buildExecutiveReportData(response.data, playerA, playerB),
+          reportModel: buildExecutiveReportData(response.data, playerA, playerB, options),
         }
       : null,
   };
