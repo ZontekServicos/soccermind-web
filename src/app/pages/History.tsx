@@ -254,7 +254,12 @@ export default function History() {
 
     try {
       await deleteAnalysisHubEntry(item);
-      setActionFeedback("Analise removida da central com sucesso.");
+      setHistoryItems((current) => current.filter((entry) => entry.id !== item.id));
+      setActionFeedback(
+        item.deleteManagedBy === "scout_report"
+          ? "ScoutReport removido da central com sucesso."
+          : "Analise removida da central com sucesso.",
+      );
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Nao foi possivel excluir a analise.");
     } finally {

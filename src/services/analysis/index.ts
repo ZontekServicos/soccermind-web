@@ -4,6 +4,7 @@ import {
   type AnalysisDetailViewModel,
   type AnalysisViewModel,
 } from "../../adapters/analysis";
+import { deleteScoutReport as deleteScoutReportRequest } from "../../app/service/api";
 import { apiFetch, type ApiEnvelope } from "../../app/services/api";
 import { getDataSource } from "../../config/dataSource";
 
@@ -31,8 +32,10 @@ type AnalysisHubUpdateDetail = {
   id: string;
 };
 
-function getDeleteEndpoint(entry: Pick<AnalysisViewModel, "id" | "deleteManagedBy">) {
-  return entry.deleteManagedBy === "scout_report" ? `/scout-reports/${entry.id}` : `/analysis/${entry.id}`;
+async function deleteAnalysisEntry(id: string) {
+  return apiFetch<{ id: string; message: string }>(`/analysis/${id}`, {
+    method: "DELETE",
+  });
 }
 
 const MOCK_ANALYSES: AnalysisViewModel[] = [
@@ -172,9 +175,10 @@ export async function getAnalysisById(id: string) {
 }
 
 export async function deleteAnalysisHubEntry(entry: Pick<AnalysisViewModel, "id" | "deleteManagedBy">) {
-  const response = await apiFetch<{ id: string; message: string }>(getDeleteEndpoint(entry), {
-    method: "DELETE",
-  });
+  const response =
+    entry.deleteManagedBy === "scout_report"
+      ? await deleteScoutReportRequest(entry.id)
+      : await deleteAnalysisEntry(entry.id);
 
   notifyAnalysisHubUpdated({ action: "deleted", id: entry.id });
 

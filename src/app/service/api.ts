@@ -272,6 +272,10 @@ export async function getExplainabilityReport(id: string) {
   return client.get<ApiExplainability>(`/reports/${id}/explainability`);
 }
 
+export async function deleteScoutReport(id: string) {
+  return client.delete<{ message: string; id: string }>(`/scout-reports/${id}`);
+}
+
 // ========================================
 // Simulation
 // ========================================
