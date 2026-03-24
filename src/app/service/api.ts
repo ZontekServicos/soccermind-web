@@ -61,6 +61,29 @@ export interface ApiProjection {
   development?: any;
 }
 
+export interface ApiPlayerReportResponse {
+  analysisId: string;
+  player: Record<string, any>;
+  metrics: {
+    overall: number;
+    potential: number;
+    tier: string;
+    archetype: string;
+    archetypeConfidence?: number | null;
+    riskScore: number;
+    riskLevel: string;
+    riskSummary: string;
+    financialRisk: number;
+    liquidityScore: number;
+    capitalEfficiency: number;
+    marketValue: number | null;
+    growthProjection: Record<string, any>;
+  };
+  aiNarrative: string | null;
+  recommendation: string;
+  createdAt: string;
+}
+
 export interface ApiNote {
   id: string;
   playerId: string;
@@ -210,6 +233,10 @@ export async function searchPlayers(params: {
 
 export async function getPlayer(id: string) {
   return client.get<ApiPlayer>(`/player/${id}`);
+}
+
+export async function generatePlayerReport(playerId: string, analyst?: string) {
+  return client.post<ApiPlayerReportResponse>(`/player/${playerId}/report`, analyst ? { analyst } : {});
 }
 
 export async function getPlayerProjection(id: string) {

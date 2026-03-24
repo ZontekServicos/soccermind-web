@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
-import { ArrowLeft, TrendingUp, Shield, Star } from "lucide-react";
+import { ArrowLeft, TrendingUp, Shield, Star, FileText, Download, CheckCircle2, Loader2 } from "lucide-react";
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from "recharts";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
+import { useAuth } from "../contexts/AuthContext";
 import type { PlayerCardModel, PlayerProfileModel } from "../mappers/player.mapper";
-import { getPlayer, getPlayerProjection, getSimilarPlayers } from "../services/players";
+import { downloadPlayerReportPdf } from "../utils/playerReportPdf";
+import {
+  generatePlayerReport,
+  getPlayer,
+  getPlayerProjection,
+  getSimilarPlayers,
+  type PlayerReportResult,
+} from "../services/players";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 
 function formatMarketValue(value: number | null) {
@@ -29,15 +37,32 @@ function formatStatValue(value: number | null) {
   return value === null ? "-" : value;
 }
 
+function getTierStyles(tier: string) {
+  switch (tier) {
+    case "ELITE":
+      return "border-[rgba(168,85,247,0.34)] bg-[rgba(168,85,247,0.16)] text-[#E9D5FF]";
+    case "PREMIUM":
+      return "border-[rgba(0,194,255,0.28)] bg-[rgba(0,194,255,0.14)] text-[#9BE7FF]";
+    case "STANDARD":
+      return "border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.12)] text-[#B6FFD8]";
+    default:
+      return "border-[rgba(244,201,93,0.28)] bg-[rgba(244,201,93,0.14)] text-[#FBE7A1]";
+  }
+}
+
 export default function PlayerDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [player, setPlayer] = useState<PlayerProfileModel | null>(null);
   const [similarPlayers, setSimilarPlayers] = useState<PlayerCardModel[]>([]);
   const [projection, setProjection] = useState<Record<string, unknown> | null>(null);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportResult, setReportResult] = useState<PlayerReportResult | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -82,12 +107,15 @@ export default function PlayerDetails() {
 
     async function loadPlayerDetails() {
       if (!id) {
-        setError("Jogador n√£o encontrado");
+        setError("Jogador nao encontrado");
         setLoading(false);
         return;
       }
 
       setLoading(true);
+      setReportResult(null);
+      setReportError(null);
+
       try {
         const [playerResponse, projectionResponse, similarResponse] = await Promise.all([
           getPlayer(id),
@@ -166,6 +194,25 @@ export default function PlayerDetails() {
     }
   };
 
+  const handleGenerateReport = async () => {
+    if (!id || reportLoading) {
+      return;
+    }
+
+    setReportLoading(true);
+    setReportError(null);
+
+    try {
+      const response = await generatePlayerReport(id, { analyst: user?.name });
+      setReportResult(response.data);
+    } catch (generationError) {
+      setReportResult(null);
+      setReportError(generationError instanceof Error ? generationError.message : "Nao foi possivel gerar a analise individual.");
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-screen bg-[#07142A]">
@@ -186,7 +233,7 @@ export default function PlayerDetails() {
           <AppHeader />
           <main className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <p className="text-xl text-gray-400 mb-4">{error || "Jogador n√£o encontrado"}</p>
+              <p className="text-xl text-gray-400 mb-4">{error || "Jogador nao encontrado"}</p>
               <button
                 onClick={() => navigate("/players")}
                 className="px-4 py-2 bg-[#00C2FF] text-[#07142A] rounded-lg hover:bg-[#00A8E0] transition-colors"
@@ -292,11 +339,11 @@ export default function PlayerDetails() {
                   </div>
                   <div className="flex items-center gap-6 text-sm text-gray-400">
                     <span>{player.nationality || "-"}</span>
-                    <span>‚Ä¢</span>
+                    <span>ï</span>
                     <span>{player.age} anos</span>
-                    <span>‚Ä¢</span>
+                    <span>ï</span>
                     <span className="text-white">{player.team || "Sem clube"}</span>
-                    <span>‚Ä¢</span>
+                    <span>ï</span>
                     <span>{player.league || "-"}</span>
                   </div>
                 </div>
@@ -501,7 +548,7 @@ export default function PlayerDetails() {
                   >
                     <p className="font-semibold text-white">{similarPlayer.name}</p>
                     <p className="mt-1 text-sm text-gray-400">
-                      {(similarPlayer.position || "-")} ‚Ä¢ {(similarPlayer.team || "Sem clube")}
+                      {(similarPlayer.position || "-")} ï {(similarPlayer.team || "Sem clube")}
                     </p>
                     <p className="mt-2 text-xs text-[#00FF9C]">{formatMarketValue(similarPlayer.marketValue)}</p>
                   </button>
@@ -517,10 +564,122 @@ export default function PlayerDetails() {
             >
               Comparar com outro jogador
             </Link>
+            <button
+              type="button"
+              onClick={handleGenerateReport}
+              disabled={reportLoading}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#a855f7,#00C2FF)] py-3 text-white shadow-[0_10px_30px_rgba(0,194,255,0.18)] transition-transform hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {reportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              {reportLoading ? "Gerando analise..." : "Gerar Relatorio Individual"}
+            </button>
             <button className="flex-1 bg-[#0A1B35] hover:bg-[#1a2942] border border-[rgba(0,194,255,0.3)] py-3 rounded-lg transition-colors">
-              Adicionar ao Relat√≥rio
+              Adicionar ao Relatorio
             </button>
           </div>
+
+          {reportError && (
+            <div className="mt-6 rounded-[18px] border border-[rgba(255,77,79,0.28)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+              {reportError}
+            </div>
+          )}
+
+          {reportResult && (
+            <section className="mt-6 overflow-hidden rounded-[26px] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(135deg,rgba(10,27,53,0.98),rgba(7,20,42,0.94))] shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+              <div className="border-b border-[rgba(255,255,255,0.06)] px-7 py-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Relatorio Individual</p>
+                    <h2 className="mt-3 text-3xl font-semibold text-white">{reportResult.player.name}</h2>
+                    <p className="mt-3 max-w-4xl text-sm leading-relaxed text-gray-400">
+                      Analise persistida automaticamente na central de analises. Use os cards abaixo para leitura rapida e exporte o PDF premium quando quiser compartilhar a versao executiva.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <span className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${getTierStyles(reportResult.metrics.tier)}`}>
+                      {reportResult.metrics.tier}
+                    </span>
+                    <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-xs text-gray-300">
+                      {new Date(reportResult.createdAt).toLocaleString("pt-BR")}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-7 py-6">
+                <div className="grid gap-4 md:grid-cols-4">
+                  {[
+                    { label: "Overall", value: `${reportResult.metrics.overall}`, accent: "#00C2FF" },
+                    { label: "Risco", value: `${reportResult.metrics.riskScore.toFixed(1)} ∑ ${reportResult.metrics.riskLevel}`, accent: "#FF4D4F" },
+                    { label: "Liquidez", value: reportResult.metrics.liquidityScore.toFixed(1), accent: "#00FF9C" },
+                    { label: "Capital Efficiency", value: reportResult.metrics.capitalEfficiency.toFixed(1), accent: "#A855F7" },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                      <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{item.label}</p>
+                      <p className="mt-3 text-2xl font-semibold text-white">{item.value}</p>
+                      <div className="mt-4 h-1 rounded-full" style={{ background: `${item.accent}33` }} />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+                  <div className="rounded-[20px] border border-[rgba(0,194,255,0.2)] bg-[rgba(255,255,255,0.03)] p-6">
+                    <div className="mb-5 flex items-center gap-3">
+                      <div className="h-10 w-1 rounded-full bg-[#00C2FF]" />
+                      <div>
+                        <h3 className="text-xl font-semibold text-white">Narrativa da IA</h3>
+                        <p className="text-sm text-gray-500">Perfil tecnico, risco, timing de oportunidade e leitura executiva.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4 text-[15px] leading-[1.9] text-gray-300">
+                      {(reportResult.aiNarrative ?? "Narrativa indisponivel. As metricas foram preservadas e o relatorio segue salvo na central de analises.")
+                        .split(/\n{2,}/)
+                        .filter(Boolean)
+                        .map((paragraph, index) => (
+                          <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>
+                        ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-5">
+                    <div className="rounded-[20px] border border-[rgba(168,85,247,0.24)] bg-[rgba(168,85,247,0.10)] p-6">
+                      <p className="text-[11px] uppercase tracking-[0.24em] text-[#D8B4FE]">Recomendacao Executiva</p>
+                      <p className="mt-4 text-[15px] leading-[1.9] text-white">{reportResult.recommendation}</p>
+                    </div>
+
+                    <div className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-6">
+                      <p className="text-[11px] uppercase tracking-[0.24em] text-gray-500">Leituras-chave</p>
+                      <div className="mt-4 space-y-3 text-sm text-gray-300">
+                        <div>Arquetipo: <span className="text-white">{reportResult.metrics.archetype}</span></div>
+                        <div>Potencial: <span className="text-white">{reportResult.metrics.potential}</span></div>
+                        <div>Mercado: <span className="text-white">{formatMarketValue(reportResult.metrics.marketValue)}</span></div>
+                        <div>Pico projetado: <span className="text-white">{reportResult.metrics.growthProjection.expectedPeak}</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/history")}
+                    className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-[rgba(0,255,156,0.26)] bg-[rgba(0,255,156,0.10)] px-5 py-3 font-semibold text-[#B6FFD8] transition-colors hover:bg-[rgba(0,255,156,0.16)]"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Salvar na central de analises
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadPlayerReportPdf(reportResult, { analyst: user?.name })}
+                    className="inline-flex items-center justify-center gap-2 rounded-[16px] bg-[#00C2FF] px-5 py-3 font-semibold text-[#07142A] shadow-[0_10px_30px_rgba(0,194,255,0.22)] transition-colors hover:bg-[#32CEFF]"
+                  >
+                    <Download className="h-4 w-4" />
+                    Exportar PDF
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
         </main>
       </div>
     </div>

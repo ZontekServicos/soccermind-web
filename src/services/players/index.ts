@@ -50,6 +50,40 @@ export interface PlayersResponseMeta {
   filterOptions?: PlayerFilterOptions;
 }
 
+export interface PlayerReportMetrics {
+  overall: number;
+  potential: number;
+  tier: string;
+  archetype: string;
+  archetypeConfidence?: number | null;
+  riskScore: number;
+  riskLevel: string;
+  riskSummary: string;
+  financialRisk: number;
+  liquidityScore: number;
+  capitalEfficiency: number;
+  marketValue: number | null;
+  growthProjection: {
+    growthIndex: number;
+    expectedOverallNextSeason: number;
+    expectedPeak: number;
+    developmentCurve?: {
+      season1: number;
+      season2: number;
+      season3: number;
+    };
+  };
+}
+
+export interface PlayerReportResult {
+  analysisId: string;
+  player: PlayerProfileModel;
+  metrics: PlayerReportMetrics;
+  aiNarrative: string | null;
+  recommendation: string;
+  createdAt: string;
+}
+
 function isRecord(value: unknown): value is UnknownRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -400,6 +434,89 @@ export async function getPlayer(id: string): Promise<ApiEnvelope<PlayerProfileMo
         marketValue: fallbackPlayer.marketValue,
         attributes: fallbackPlayer.stats,
       }),
+      error: null,
+      meta: { source: "mock-fallback", apiError: error instanceof Error ? error.message : "API request failed" },
+    };
+  }
+}
+
+function buildMockPlayerReport(player: PlayerProfileModel): PlayerReportResult {
+  return {
+    analysisId: `mock-analysis-${player.id}`,
+    player,
+    metrics: {
+      overall: player.overall ?? 72,
+      potential: player.potential ?? (player.overall ?? 72) + 4,
+      tier: (player.overall ?? 0) >= 85 ? "ELITE" : (player.overall ?? 0) >= 80 ? "PREMIUM" : (player.overall ?? 0) >= 72 ? "STANDARD" : "PROSPECT",
+      archetype: "Balanced Player",
+      archetypeConfidence: 0.72,
+      riskScore: 4.2,
+      riskLevel: "MEDIUM",
+      riskSummary: `${player.name} apresenta risco estrutural moderado no recorte atual, com pressao maior de adaptacao competitiva do que de curva etaria.`,
+      financialRisk: 4.8,
+      liquidityScore: 6.9,
+      capitalEfficiency: 7.4,
+      marketValue: player.marketValue ?? null,
+      growthProjection: {
+        growthIndex: 63,
+        expectedOverallNextSeason: Math.min(99, (player.overall ?? 72) + 2),
+        expectedPeak: Math.min(99, player.potential ?? (player.overall ?? 72) + 4),
+        developmentCurve: {
+          season1: Math.min(99, (player.overall ?? 72) + 2),
+          season2: Math.min(99, (player.overall ?? 72) + 3),
+          season3: Math.min(99, player.potential ?? (player.overall ?? 72) + 4),
+        },
+      },
+    },
+    aiNarrative:
+      `${player.name} combina base tecnica funcional com capacidade de impacto competitivo sustentavel no curto prazo.\n\nA leitura de risco permanece controlada, mas a operacao ainda exige disciplina de preco e validacao do contexto tatico antes da tomada de decisao.\n\nA janela de oportunidade e favoravel quando o clube procura retorno esportivo imediato com margem adicional de valorizacao.\n\nA recomendacao executiva e manter o atleta em prioridade alta dentro da shortlist, com revisao final condicionada ao pacote financeiro.`,
+    recommendation:
+      "Priorizar o atleta dentro da shortlist, com fechamento condicionado a disciplina de preco e aderencia tatico-financeira.",
+    createdAt: new Date().toISOString(),
+  };
+}
+
+export async function generatePlayerReport(
+  id: string,
+  options: { analyst?: string } = {},
+): Promise<ApiEnvelope<PlayerReportResult>> {
+  const playerResponse = await getPlayer(id);
+  const fallbackPlayer = playerResponse.data;
+
+  if (getDataSource("players") === "mock") {
+    return {
+      success: true,
+      data: buildMockPlayerReport(fallbackPlayer),
+      error: null,
+      meta: { source: "mock" },
+    };
+  }
+
+  try {
+    const response = await apiFetch<unknown>(`/player/${id}/report`, {
+      method: "POST",
+      body: JSON.stringify(options.analyst ? { analyst: options.analyst } : {}),
+    });
+    const payload = isRecord(response.data) ? response.data : {};
+
+    return {
+      ...response,
+      data: {
+        analysisId: typeof payload.analysisId === "string" ? payload.analysisId : `analysis-${id}`,
+        player: mapApiPlayerToProfile(isRecord(payload.player) ? payload.player : fallbackPlayer),
+        metrics: (isRecord(payload.metrics) ? payload.metrics : {}) as PlayerReportMetrics,
+        aiNarrative: typeof payload.aiNarrative === "string" ? payload.aiNarrative : null,
+        recommendation:
+          typeof payload.recommendation === "string"
+            ? payload.recommendation
+            : "Recomendacao executiva indisponivel no momento.",
+        createdAt: typeof payload.createdAt === "string" ? payload.createdAt : new Date().toISOString(),
+      },
+    };
+  } catch (error) {
+    return {
+      success: true,
+      data: buildMockPlayerReport(fallbackPlayer),
       error: null,
       meta: { source: "mock-fallback", apiError: error instanceof Error ? error.message : "API request failed" },
     };
