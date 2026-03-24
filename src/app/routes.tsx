@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from "react-router";
+import { createBrowserRouter, Navigate, Outlet, useLocation } from "react-router";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -28,11 +28,14 @@ import ServiceDesk from "./pages/ServiceDesk";
 
 // Root layout that provides contexts
 function RootLayout() {
+  const location = useLocation();
+  const shouldHideApiSettings = location.pathname.startsWith("/players/");
+
   return (
     <LanguageProvider>
       <AuthProvider>
         <Outlet />
-        <ApiSettings />
+        {!shouldHideApiSettings && <ApiSettings />}
       </AuthProvider>
     </LanguageProvider>
   );

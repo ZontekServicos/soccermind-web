@@ -514,12 +514,7 @@ export async function generatePlayerReport(
       },
     };
   } catch (error) {
-    return {
-      success: true,
-      data: buildMockPlayerReport(fallbackPlayer),
-      error: null,
-      meta: { source: "mock-fallback", apiError: error instanceof Error ? error.message : "API request failed" },
-    };
+    throw (error instanceof Error ? error : new Error("API request failed"));
   }
 }
 
