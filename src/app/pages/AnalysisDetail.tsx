@@ -18,6 +18,7 @@ import { Button } from "../components/ui/button";
 import { getAnalysisById, deleteAnalysisHubEntry, type AnalysisDetailViewModel } from "../services/analysis";
 import { buildExecutiveReportData } from "../../adapters/reports";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
+import { downloadPlayerReportPdf } from "../utils/playerReportPdf";
 
 function formatMarketValue(value: number | null) {
   if (value === null) {
@@ -43,6 +44,19 @@ function getRiskBadgeStyles(value: string) {
       return "border-[rgba(255,77,79,0.28)] bg-[rgba(255,77,79,0.14)] text-[#FFB4B5]";
     default:
       return "border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.12)] text-[#F8D98B]";
+  }
+}
+
+function getTierStyles(tier: string) {
+  switch (tier) {
+    case "ELITE":
+      return "border-[rgba(168,85,247,0.34)] bg-[rgba(168,85,247,0.16)] text-[#E9D5FF]";
+    case "PREMIUM":
+      return "border-[rgba(0,194,255,0.28)] bg-[rgba(0,194,255,0.14)] text-[#9BE7FF]";
+    case "STANDARD":
+      return "border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.12)] text-[#B6FFD8]";
+    default:
+      return "border-[rgba(244,201,93,0.28)] bg-[rgba(244,201,93,0.14)] text-[#FBE7A1]";
   }
 }
 
@@ -155,6 +169,106 @@ export default function AnalysisDetail() {
     });
   }, [analysis]);
 
+  const singleReportPdfModel = useMemo(() => {
+    const singleReport = analysis?.reportContent?.playerReportData;
+
+    if (!analysis || !singleReport) {
+      return null;
+    }
+
+    const baseStats = {
+      crossing: null,
+      finishing: null,
+      headingAccuracy: null,
+      shortPassing: null,
+      volleys: null,
+      curve: null,
+      fkAccuracy: null,
+      longPassing: null,
+      ballControl: null,
+      acceleration: null,
+      sprintSpeed: null,
+      agility: null,
+      reactions: null,
+      balance: null,
+      shotPower: null,
+      jumping: null,
+      stamina: null,
+      strength: null,
+      longShots: null,
+      aggression: null,
+      interceptions: null,
+      attackPosition: null,
+      vision: null,
+      penalties: null,
+      composure: null,
+      defensiveAwareness: null,
+      standingTackle: null,
+      slidingTackle: null,
+      gkDiving: null,
+      gkHandling: null,
+      gkKicking: null,
+      gkPositioning: null,
+      gkReflexes: null,
+    };
+
+    const profileStats = {
+      pace: singleReport.player.pac,
+      shooting: singleReport.player.sho,
+      passing: singleReport.player.pas,
+      dribbling: singleReport.player.dri,
+      defending: singleReport.player.def,
+      physical: singleReport.player.phy,
+      ...baseStats,
+    };
+
+    return {
+      analysisId: analysis.id,
+      player: {
+        id: singleReport.player.id,
+        name: singleReport.player.name,
+        position: singleReport.player.position ?? "",
+        positions: singleReport.player.position ? [singleReport.player.position] : [],
+        team: singleReport.player.club ?? "",
+        league: singleReport.player.league ?? "",
+        nationality: singleReport.player.nationality ?? "",
+        age: singleReport.player.age ?? 0,
+        overall: singleReport.metrics.overall,
+        potential: singleReport.metrics.potential,
+        marketValue: singleReport.metrics.marketValue,
+        marketValueLabel: formatMarketValue(singleReport.metrics.marketValue),
+        image: null,
+        attributes: profileStats,
+        playStyles: [],
+        pac: singleReport.player.pac,
+        sho: singleReport.player.sho,
+        pas: singleReport.player.pas,
+        dri: singleReport.player.dri,
+        def: singleReport.player.def,
+        phy: singleReport.player.phy,
+        stats: profileStats,
+      },
+      metrics: {
+        overall: singleReport.metrics.overall,
+        potential: singleReport.metrics.potential,
+        tier: singleReport.metrics.tier,
+        archetype: singleReport.metrics.archetype,
+        archetypeConfidence: null,
+        riskScore: singleReport.metrics.riskScore,
+        riskLevel: singleReport.metrics.riskLevel,
+        riskSummary: singleReport.metrics.riskSummary,
+        financialRisk: singleReport.metrics.financialRisk,
+        liquidityScore: singleReport.metrics.liquidityScore,
+        capitalEfficiency: singleReport.metrics.capitalEfficiency,
+        marketValue: singleReport.metrics.marketValue,
+        growthProjection: singleReport.metrics.growthProjection,
+      },
+      aiNarrative: singleReport.aiNarrative,
+      recommendation: singleReport.metrics.recommendation,
+      createdAt: analysis.date,
+    };
+  }, [analysis]);
+
   const handleDelete = async () => {
     if (!analysis || deleting) {
       return;
@@ -220,7 +334,8 @@ export default function AnalysisDetail() {
   const isIndividual = analysis.playerBId === null || analysis.playerBId === undefined;
   const isSingleReport = analysis.type === "report" && isIndividual;
   const singleReport = analysis.reportContent?.playerReportData ?? null;
-  const canExportPdf = analysis.reportContent?.canExportPdf === true && Boolean(reportModel);
+  const canExportComparisonPdf = analysis.reportContent?.canExportPdf === true && Boolean(reportModel);
+  const canExportSinglePdf = analysis.reportContent?.canExportPdf === true && Boolean(singleReportPdfModel);
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -265,11 +380,16 @@ export default function AnalysisDetail() {
                 <div className="flex flex-wrap gap-3">
                   <Button
                     onClick={() => {
+                      if (isSingleReport && singleReportPdfModel) {
+                        downloadPlayerReportPdf(singleReportPdfModel, { analyst: analysis.user });
+                        return;
+                      }
+
                       if (reportModel) {
                         downloadExecutiveReportPdf(reportModel);
                       }
                     }}
-                    disabled={!canExportPdf}
+                    disabled={isSingleReport ? !canExportSinglePdf : !canExportComparisonPdf}
                     className="h-11 rounded-[14px] bg-[#00C2FF]/90 px-5 font-semibold text-[#07142A] shadow-[0_6px_18px_rgba(0,194,255,0.24)] hover:bg-[#00C2FF]"
                   >
                     <Download className="mr-2 h-4 w-4" />
@@ -324,13 +444,13 @@ export default function AnalysisDetail() {
                         {[singleReport.player.position, singleReport.player.club, singleReport.player.league].filter(Boolean).join(" • ") || "Contexto do atleta indisponivel"}
                       </p>
                     </div>
-                    <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-white">
+                    <span className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${getTierStyles(singleReport.metrics.tier)}`}>
                       {singleReport.metrics.tier}
                     </span>
                   </div>
                 </section>
 
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <MetaCard label="Overall" value={`${singleReport.metrics.overall}`} icon={Target} accent="#00C2FF" />
                   <MetaCard label="Potencial" value={`${singleReport.metrics.potential}`} icon={Target} accent="#00FF9C" />
                   <MetaCard label="Valor de Mercado" value={formatMarketValue(singleReport.metrics.marketValue)} icon={Calendar} accent="#7A5CFF" />
@@ -347,6 +467,39 @@ export default function AnalysisDetail() {
                   <MetaCard label="Capital Efficiency" value={singleReport.metrics.capitalEfficiency.toFixed(1)} icon={FileText} accent="#A855F7" />
                 </div>
 
+                <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+                  <div className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Contexto do atleta</p>
+                    <div className="mt-4 grid gap-3 text-sm text-gray-300 sm:grid-cols-2">
+                      <div>Clube: <span className="text-white">{singleReport.player.club ?? "N/A"}</span></div>
+                      <div>Liga: <span className="text-white">{singleReport.player.league ?? "N/A"}</span></div>
+                      <div>Nacionalidade: <span className="text-white">{singleReport.player.nationality ?? "N/A"}</span></div>
+                      <div>Idade: <span className="text-white">{singleReport.player.age ?? "N/A"}</span></div>
+                      <div>Arquetipo: <span className="text-white">{singleReport.metrics.archetype}</span></div>
+                      <div>Pico projetado: <span className="text-white">{singleReport.metrics.growthProjection.expectedPeak}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Atributos principais</p>
+                    <div className="mt-4 grid grid-cols-3 gap-3">
+                      {[
+                        ["PAC", singleReport.player.pac],
+                        ["SHO", singleReport.player.sho],
+                        ["PAS", singleReport.player.pas],
+                        ["DRI", singleReport.player.dri],
+                        ["DEF", singleReport.player.def],
+                        ["PHY", singleReport.player.phy],
+                      ].map(([label, value]) => (
+                        <div key={String(label)} className="rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-3 py-4 text-center">
+                          <p className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{label}</p>
+                          <p className="mt-2 text-xl font-semibold text-white">{value ?? "-"}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <section className="rounded-[22px] border border-[rgba(0,194,255,0.16)] bg-[rgba(255,255,255,0.03)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.24)]">
                   <div className="mb-5 flex items-center gap-4">
                     <div className="h-12 w-1 rounded-full bg-[#00C2FF]" />
@@ -356,9 +509,12 @@ export default function AnalysisDetail() {
                     </div>
                   </div>
                   <div className="space-y-4 text-[15px] leading-[1.9] text-gray-300">
-                    {singleReport.aiNarrative.split(/\n{2,}/).filter(Boolean).map((paragraph, index) => (
-                      <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>
-                    ))}
+                    {(singleReport.aiNarrative || analysis.description || "Narrativa de scouting indisponivel.")
+                      .split(/\n{2,}/)
+                      .filter(Boolean)
+                      .map((paragraph, index) => (
+                        <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>
+                      ))}
                   </div>
                 </section>
 
@@ -368,6 +524,23 @@ export default function AnalysisDetail() {
                   </div>
                 </DetailSection>
               </>
+            ) : null}
+
+            {isSingleReport && !singleReport ? (
+              <DetailSection
+                title="Conteudo do relatorio individual"
+                subtitle="O item foi identificado como relatorio individual, mas os detalhes completos nao puderam ser reconstruidos."
+              >
+                <div className="flex items-start gap-3 rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-4 text-sm text-gray-300">
+                  <ShieldAlert className="mt-0.5 h-5 w-5 text-[#F8D98B]" />
+                  <div>
+                    <p>{analysis.description || "Sem descricao complementar."}</p>
+                    {analysis.reportContent?.contentMessage ? (
+                      <p className="mt-2 text-[#F8D98B]">{analysis.reportContent.contentMessage}</p>
+                    ) : null}
+                  </div>
+                </div>
+              </DetailSection>
             ) : null}
 
             {!isSingleReport && reportModel ? (

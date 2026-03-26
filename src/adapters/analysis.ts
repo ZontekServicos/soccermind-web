@@ -46,7 +46,14 @@ export interface AnalysisDetailViewModel extends AnalysisViewModel {
         position: string | null;
         club: string | null;
         league: string | null;
+        nationality: string | null;
         age: number | null;
+        pac: number | null;
+        sho: number | null;
+        pas: number | null;
+        dri: number | null;
+        def: number | null;
+        phy: number | null;
       };
       metrics: {
         overall: number;
@@ -54,10 +61,23 @@ export interface AnalysisDetailViewModel extends AnalysisViewModel {
         marketValue: number | null;
         riskScore: number;
         riskLevel: string;
+        riskSummary: string;
+        financialRisk: number;
         liquidityScore: number;
         capitalEfficiency: number;
         tier: string;
+        archetype: string;
         recommendation: string;
+        growthProjection: {
+          growthIndex: number;
+          expectedOverallNextSeason: number;
+          expectedPeak: number;
+          developmentCurve?: {
+            season1: number;
+            season2: number;
+            season3: number;
+          };
+        };
       };
       aiNarrative: string;
     } | null;
@@ -182,9 +202,37 @@ export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewMo
                     playerReportRecord.player && isRecord(playerReportRecord.player)
                       ? toText(playerReportRecord.player.league, "") || null
                       : null,
+                  nationality:
+                    playerReportRecord.player && isRecord(playerReportRecord.player)
+                      ? toText(playerReportRecord.player.nationality, "") || null
+                      : null,
                   age:
                     playerReportRecord.player && isRecord(playerReportRecord.player) && typeof playerReportRecord.player.age === "number"
                       ? playerReportRecord.player.age
+                      : null,
+                  pac:
+                    playerReportRecord.player && isRecord(playerReportRecord.player) && typeof playerReportRecord.player.pac === "number"
+                      ? playerReportRecord.player.pac
+                      : null,
+                  sho:
+                    playerReportRecord.player && isRecord(playerReportRecord.player) && typeof playerReportRecord.player.sho === "number"
+                      ? playerReportRecord.player.sho
+                      : null,
+                  pas:
+                    playerReportRecord.player && isRecord(playerReportRecord.player) && typeof playerReportRecord.player.pas === "number"
+                      ? playerReportRecord.player.pas
+                      : null,
+                  dri:
+                    playerReportRecord.player && isRecord(playerReportRecord.player) && typeof playerReportRecord.player.dri === "number"
+                      ? playerReportRecord.player.dri
+                      : null,
+                  def:
+                    playerReportRecord.player && isRecord(playerReportRecord.player) && typeof playerReportRecord.player.def === "number"
+                      ? playerReportRecord.player.def
+                      : null,
+                  phy:
+                    playerReportRecord.player && isRecord(playerReportRecord.player) && typeof playerReportRecord.player.phy === "number"
+                      ? playerReportRecord.player.phy
                       : null,
                 },
                 metrics: {
@@ -208,6 +256,14 @@ export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewMo
                     playerReportRecord.metrics && isRecord(playerReportRecord.metrics)
                       ? toText(playerReportRecord.metrics.riskLevel, "MEDIUM")
                       : "MEDIUM",
+                  riskSummary:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics)
+                      ? toText(playerReportRecord.metrics.riskSummary, "")
+                      : "",
+                  financialRisk:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.financialRisk === "number"
+                      ? playerReportRecord.metrics.financialRisk
+                      : 0,
                   liquidityScore:
                     playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.liquidityScore === "number"
                       ? playerReportRecord.metrics.liquidityScore
@@ -220,10 +276,46 @@ export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewMo
                     playerReportRecord.metrics && isRecord(playerReportRecord.metrics)
                       ? toText(playerReportRecord.metrics.tier, "PROSPECT")
                       : "PROSPECT",
+                  archetype:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics)
+                      ? toText(playerReportRecord.metrics.archetype, "Nao classificado")
+                      : "Nao classificado",
                   recommendation:
                     playerReportRecord.metrics && isRecord(playerReportRecord.metrics)
                       ? toText(playerReportRecord.metrics.recommendation, "")
                       : "",
+                  growthProjection:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && isRecord(playerReportRecord.metrics.growthProjection)
+                      ? {
+                          growthIndex:
+                            typeof playerReportRecord.metrics.growthProjection.growthIndex === "number"
+                              ? playerReportRecord.metrics.growthProjection.growthIndex
+                              : 0,
+                          expectedOverallNextSeason:
+                            typeof playerReportRecord.metrics.growthProjection.expectedOverallNextSeason === "number"
+                              ? playerReportRecord.metrics.growthProjection.expectedOverallNextSeason
+                              : 0,
+                          expectedPeak:
+                            typeof playerReportRecord.metrics.growthProjection.expectedPeak === "number"
+                              ? playerReportRecord.metrics.growthProjection.expectedPeak
+                              : 0,
+                          developmentCurve:
+                            isRecord(playerReportRecord.metrics.growthProjection.developmentCurve) &&
+                            typeof playerReportRecord.metrics.growthProjection.developmentCurve.season1 === "number" &&
+                            typeof playerReportRecord.metrics.growthProjection.developmentCurve.season2 === "number" &&
+                            typeof playerReportRecord.metrics.growthProjection.developmentCurve.season3 === "number"
+                              ? {
+                                  season1: playerReportRecord.metrics.growthProjection.developmentCurve.season1,
+                                  season2: playerReportRecord.metrics.growthProjection.developmentCurve.season2,
+                                  season3: playerReportRecord.metrics.growthProjection.developmentCurve.season3,
+                                }
+                              : undefined,
+                        }
+                      : {
+                          growthIndex: 0,
+                          expectedOverallNextSeason: 0,
+                          expectedPeak: 0,
+                        },
                 },
                 aiNarrative: toText(playerReportRecord.aiNarrative, base.description),
               }
