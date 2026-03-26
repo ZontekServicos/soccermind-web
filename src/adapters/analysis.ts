@@ -14,6 +14,8 @@ export interface AnalysisViewModel {
   title: string;
   description: string;
   date: string;
+  playerAId: string | null;
+  playerBId: string | null;
   type: "comparison" | "report";
   typeLabel: string;
   players: string[];
@@ -37,6 +39,28 @@ export interface AnalysisDetailViewModel extends AnalysisViewModel {
     contentStatus: "ready" | "partial";
     contentMessage: string;
     comparisonData: CompareViewModel | null;
+    playerReportData: {
+      player: {
+        id: string;
+        name: string;
+        position: string | null;
+        club: string | null;
+        league: string | null;
+        age: number | null;
+      };
+      metrics: {
+        overall: number;
+        potential: number;
+        marketValue: number | null;
+        riskScore: number;
+        riskLevel: string;
+        liquidityScore: number;
+        capitalEfficiency: number;
+        tier: string;
+        recommendation: string;
+      };
+      aiNarrative: string;
+    } | null;
   } | null;
 }
 
@@ -99,6 +123,8 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
     title: toText(record.title, "Analise"),
     description: toText(record.description, ""),
     date: toText(record.createdAt, new Date().toISOString()),
+    playerAId: record.playerAId == null ? null : toText(record.playerAId, ""),
+    playerBId: record.playerBId == null ? null : toText(record.playerBId, ""),
     type: mapType(record.type),
     typeLabel: toText(record.typeLabel, record.type === "COMPARISON" ? "Comparacao" : "Relatorio"),
     players: players.map((player) => player.name),
@@ -128,6 +154,7 @@ export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewMo
   const comparisonData = reportContentRecord?.comparisonData
     ? mapCompareResponse(reportContentRecord.comparisonData)
     : null;
+  const playerReportRecord = isRecord(reportContentRecord?.playerReportData) ? reportContentRecord.playerReportData : null;
 
   return {
     ...base,
@@ -138,6 +165,69 @@ export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewMo
           contentStatus: reportContentRecord.contentStatus === "partial" ? "partial" : "ready",
           contentMessage: toText(reportContentRecord.contentMessage, ""),
           comparisonData,
+          playerReportData: playerReportRecord
+            ? {
+                player: {
+                  id: toText(playerReportRecord.player && isRecord(playerReportRecord.player) ? playerReportRecord.player.id : null, base.playerAId ?? "player"),
+                  name: toText(playerReportRecord.player && isRecord(playerReportRecord.player) ? playerReportRecord.player.name : null, "Jogador"),
+                  position:
+                    playerReportRecord.player && isRecord(playerReportRecord.player)
+                      ? toText(playerReportRecord.player.position, "") || null
+                      : null,
+                  club:
+                    playerReportRecord.player && isRecord(playerReportRecord.player)
+                      ? toText(playerReportRecord.player.club, "") || null
+                      : null,
+                  league:
+                    playerReportRecord.player && isRecord(playerReportRecord.player)
+                      ? toText(playerReportRecord.player.league, "") || null
+                      : null,
+                  age:
+                    playerReportRecord.player && isRecord(playerReportRecord.player) && typeof playerReportRecord.player.age === "number"
+                      ? playerReportRecord.player.age
+                      : null,
+                },
+                metrics: {
+                  overall:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.overall === "number"
+                      ? playerReportRecord.metrics.overall
+                      : 0,
+                  potential:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.potential === "number"
+                      ? playerReportRecord.metrics.potential
+                      : 0,
+                  marketValue:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.marketValue === "number"
+                      ? playerReportRecord.metrics.marketValue
+                      : null,
+                  riskScore:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.riskScore === "number"
+                      ? playerReportRecord.metrics.riskScore
+                      : 0,
+                  riskLevel:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics)
+                      ? toText(playerReportRecord.metrics.riskLevel, "MEDIUM")
+                      : "MEDIUM",
+                  liquidityScore:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.liquidityScore === "number"
+                      ? playerReportRecord.metrics.liquidityScore
+                      : 0,
+                  capitalEfficiency:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.capitalEfficiency === "number"
+                      ? playerReportRecord.metrics.capitalEfficiency
+                      : 0,
+                  tier:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics)
+                      ? toText(playerReportRecord.metrics.tier, "PROSPECT")
+                      : "PROSPECT",
+                  recommendation:
+                    playerReportRecord.metrics && isRecord(playerReportRecord.metrics)
+                      ? toText(playerReportRecord.metrics.recommendation, "")
+                      : "",
+                },
+                aiNarrative: toText(playerReportRecord.aiNarrative, base.description),
+              }
+            : null,
         }
       : null,
   };

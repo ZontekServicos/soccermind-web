@@ -19,6 +19,33 @@ import { getAnalysisById, deleteAnalysisHubEntry, type AnalysisDetailViewModel }
 import { buildExecutiveReportData } from "../../adapters/reports";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
 
+function formatMarketValue(value: number | null) {
+  if (value === null) {
+    return "N/A";
+  }
+
+  if (value >= 1_000_000) {
+    return `EUR ${(value / 1_000_000).toFixed(1)}M`;
+  }
+
+  if (value >= 1_000) {
+    return `EUR ${(value / 1_000).toFixed(0)}K`;
+  }
+
+  return `EUR ${value.toFixed(0)}`;
+}
+
+function getRiskBadgeStyles(value: string) {
+  switch (value) {
+    case "LOW":
+      return "border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.12)] text-[#B6FFD8]";
+    case "HIGH":
+      return "border-[rgba(255,77,79,0.28)] bg-[rgba(255,77,79,0.14)] text-[#FFB4B5]";
+    default:
+      return "border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.12)] text-[#F8D98B]";
+  }
+}
+
 function MetaCard({
   label,
   value,
@@ -189,7 +216,10 @@ export default function AnalysisDetail() {
   }
 
   const playersLabel = analysis.players.join(" vs ");
-  const isReport = analysis.type === "report";
+  const isComparison = analysis.type === "comparison";
+  const isIndividual = analysis.playerBId === null || analysis.playerBId === undefined;
+  const isSingleReport = analysis.type === "report" && isIndividual;
+  const singleReport = analysis.reportContent?.playerReportData ?? null;
   const canExportPdf = analysis.reportContent?.canExportPdf === true && Boolean(reportModel);
 
   return (
@@ -271,19 +301,76 @@ export default function AnalysisDetail() {
               <MetaCard label="Status" value={analysis.statusLabel} icon={Target} accent="#00FF9C" />
             </div>
 
-            {analysis.reportContent?.contentStatus === "partial" ? (
+            {analysis.reportContent?.contentStatus === "partial" && !isSingleReport ? (
               <div className="rounded-[18px] border border-[rgba(251,191,36,0.28)] bg-[rgba(251,191,36,0.08)] px-5 py-4 text-sm text-[#F8D98B]">
                 {analysis.reportContent.contentMessage || "O relatorio foi carregado parcialmente."}
               </div>
             ) : null}
 
-            {!isReport && (
+            {!isComparison && !isSingleReport && (
               <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-300">
                 Esta tela foi preparada principalmente para relatorios do tipo REPORT. Esta analise foi carregada com seus metadados, mas nao possui leitura executiva detalhada.
               </div>
             )}
 
-            {reportModel ? (
+            {isSingleReport && singleReport ? (
+              <>
+                <section className="rounded-[24px] border border-[rgba(0,194,255,0.16)] bg-[linear-gradient(135deg,rgba(10,27,53,0.96),rgba(12,34,63,0.88))] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Relatorio Individual</p>
+                      <h2 className="mt-3 text-3xl font-semibold text-white">{singleReport.player.name}</h2>
+                      <p className="mt-3 text-sm text-gray-400">
+                        {[singleReport.player.position, singleReport.player.club, singleReport.player.league].filter(Boolean).join(" • ") || "Contexto do atleta indisponivel"}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-white">
+                      {singleReport.metrics.tier}
+                    </span>
+                  </div>
+                </section>
+
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <MetaCard label="Overall" value={`${singleReport.metrics.overall}`} icon={Target} accent="#00C2FF" />
+                  <MetaCard label="Potencial" value={`${singleReport.metrics.potential}`} icon={Target} accent="#00FF9C" />
+                  <MetaCard label="Valor de Mercado" value={formatMarketValue(singleReport.metrics.marketValue)} icon={Calendar} accent="#7A5CFF" />
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Risco</p>
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <p className="text-2xl font-semibold text-white">{singleReport.metrics.riskScore.toFixed(1)}</p>
+                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase ${getRiskBadgeStyles(singleReport.metrics.riskLevel)}`}>
+                        {singleReport.metrics.riskLevel}
+                      </span>
+                    </div>
+                  </div>
+                  <MetaCard label="Liquidez" value={singleReport.metrics.liquidityScore.toFixed(1)} icon={User} accent="#00FF9C" />
+                  <MetaCard label="Capital Efficiency" value={singleReport.metrics.capitalEfficiency.toFixed(1)} icon={FileText} accent="#A855F7" />
+                </div>
+
+                <section className="rounded-[22px] border border-[rgba(0,194,255,0.16)] bg-[rgba(255,255,255,0.03)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.24)]">
+                  <div className="mb-5 flex items-center gap-4">
+                    <div className="h-12 w-1 rounded-full bg-[#00C2FF]" />
+                    <div>
+                      <h3 className="text-xl font-semibold text-white">Narrativa de Scouting</h3>
+                      <p className="mt-1 text-sm text-gray-500">Leitura executiva gerada pela IA para o atleta atual.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4 text-[15px] leading-[1.9] text-gray-300">
+                    {singleReport.aiNarrative.split(/\n{2,}/).filter(Boolean).map((paragraph, index) => (
+                      <p key={`${index}-${paragraph.slice(0, 24)}`}>{paragraph}</p>
+                    ))}
+                  </div>
+                </section>
+
+                <DetailSection title="Recomendacao Executiva" subtitle="Sintese objetiva para decisao de acompanhamento ou investimento.">
+                  <div className="rounded-[18px] border border-[rgba(168,85,247,0.24)] bg-[rgba(168,85,247,0.10)] p-5 text-[15px] leading-[1.9] text-white">
+                    {singleReport.metrics.recommendation}
+                  </div>
+                </DetailSection>
+              </>
+            ) : null}
+
+            {!isSingleReport && reportModel ? (
               <>
                 <DetailSection
                   title={reportModel.recommendationLabel}
@@ -343,7 +430,7 @@ export default function AnalysisDetail() {
                   </div>
                 </DetailSection>
               </>
-            ) : (
+            ) : !isSingleReport ? (
               <DetailSection
                 title="Conteudo do relatorio"
                 subtitle="Nao foi possivel reconstruir a leitura executiva completa deste item com os dados atualmente disponiveis."
@@ -358,7 +445,7 @@ export default function AnalysisDetail() {
                   </div>
                 </div>
               </DetailSection>
-            )}
+            ) : null}
           </div>
         </main>
       </div>
