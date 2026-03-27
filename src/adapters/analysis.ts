@@ -1,4 +1,5 @@
 import { mapCompareResponse, type CompareViewModel } from "./compare";
+import { getPlayerDisplayName, normalizeReportLiquidityScore } from "../app/utils/playerDisplay";
 type UnknownRecord = Record<string, unknown>;
 
 export interface AnalysisPlayerViewModel {
@@ -116,7 +117,7 @@ function mapPlayers(value: unknown): AnalysisPlayerViewModel[] {
     .filter(isRecord)
     .map((player, index) => ({
       id: toText(player.id, `player-${index}`),
-      name: toText(player.name, "Jogador"),
+      name: getPlayerDisplayName(toText(player.name, "Jogador")),
       club: toText(player.club, ""),
       positions: Array.isArray(player.positions) ? player.positions.filter((item): item is string => typeof item === "string") : [],
       order: typeof player.order === "number" ? player.order : index,
@@ -149,7 +150,7 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
     typeLabel: toText(record.typeLabel, record.type === "COMPARISON" ? "Comparacao" : "Relatorio"),
     players: players.map((player) => player.name),
     playerDetails: players,
-    user: toText(record.analyst, "Sistema SoccerMind"),
+    user: toText(record.analyst, "Analista SoccerMind"),
     club: players.map((player) => player.club).find(Boolean) ?? "SoccerMind",
     status: mapStatus(record.status),
     statusLabel: toText(record.statusLabel, "Em andamento"),
@@ -189,7 +190,9 @@ export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewMo
             ? {
                 player: {
                   id: toText(playerReportRecord.player && isRecord(playerReportRecord.player) ? playerReportRecord.player.id : null, base.playerAId ?? "player"),
-                  name: toText(playerReportRecord.player && isRecord(playerReportRecord.player) ? playerReportRecord.player.name : null, "Jogador"),
+                  name: getPlayerDisplayName(
+                    toText(playerReportRecord.player && isRecord(playerReportRecord.player) ? playerReportRecord.player.name : null, "Jogador"),
+                  ),
                   position:
                     playerReportRecord.player && isRecord(playerReportRecord.player)
                       ? toText(playerReportRecord.player.position, "") || null
@@ -266,7 +269,7 @@ export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewMo
                       : 0,
                   liquidityScore:
                     playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.liquidityScore === "number"
-                      ? playerReportRecord.metrics.liquidityScore
+                      ? normalizeReportLiquidityScore(playerReportRecord.metrics.liquidityScore)
                       : 0,
                   capitalEfficiency:
                     playerReportRecord.metrics && isRecord(playerReportRecord.metrics) && typeof playerReportRecord.metrics.capitalEfficiency === "number"

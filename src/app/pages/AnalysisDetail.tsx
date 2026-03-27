@@ -19,6 +19,7 @@ import { getAnalysisById, deleteAnalysisHubEntry, type AnalysisDetailViewModel }
 import { buildExecutiveReportData } from "../../adapters/reports";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
 import { downloadPlayerReportPdf } from "../utils/playerReportPdf";
+import { getPlayerDisplayName, normalizeReportLiquidityScore } from "../utils/playerDisplay";
 
 function formatMarketValue(value: number | null) {
   if (value === null) {
@@ -50,14 +51,45 @@ function getRiskBadgeStyles(value: string) {
 function getTierStyles(tier: string) {
   switch (tier) {
     case "ELITE":
-      return "border-[rgba(168,85,247,0.34)] bg-[rgba(168,85,247,0.16)] text-[#E9D5FF]";
+      return "border-transparent bg-[#00C2FF] text-[#07142A]";
     case "PREMIUM":
-      return "border-[rgba(0,194,255,0.28)] bg-[rgba(0,194,255,0.14)] text-[#9BE7FF]";
+      return "border-transparent bg-[#A855F7] text-white";
     case "STANDARD":
-      return "border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.12)] text-[#B6FFD8]";
+      return "border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.1)] text-white";
     default:
-      return "border-[rgba(244,201,93,0.28)] bg-[rgba(244,201,93,0.14)] text-[#FBE7A1]";
+      return "border-[rgba(255,193,7,0.28)] bg-[rgba(255,193,7,0.2)] text-[#FACC15]";
   }
+}
+
+function formatMetaLine(values: Array<string | null | undefined>) {
+  return values.filter(Boolean).join(" · ");
+}
+
+function MetricCard({
+  label,
+  value,
+  valueClassName,
+  subtitle,
+  badge,
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+  subtitle?: string;
+  badge?: ReactNode;
+}) {
+  return (
+    <div className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.045),rgba(255,255,255,0.02))] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.22)]">
+      <p className="text-[10px] uppercase tracking-[0.24em] text-[rgba(255,255,255,0.5)]">{label}</p>
+      <div className="mt-4 flex items-start justify-between gap-4">
+        <div>
+          <p className={`text-4xl font-semibold leading-none text-white ${valueClassName ?? ""}`}>{value}</p>
+          {subtitle ? <p className="mt-3 text-xs uppercase tracking-[0.2em] text-[rgba(255,255,255,0.44)]">{subtitle}</p> : null}
+        </div>
+        {badge}
+      </div>
+    </div>
+  );
 }
 
 function MetaCard({
@@ -336,6 +368,24 @@ export default function AnalysisDetail() {
   const singleReport = analysis.reportContent?.playerReportData ?? null;
   const canExportComparisonPdf = analysis.reportContent?.canExportPdf === true && Boolean(reportModel);
   const canExportSinglePdf = analysis.reportContent?.canExportPdf === true && Boolean(singleReportPdfModel);
+  const singleReportPlayerName = singleReport ? getPlayerDisplayName(singleReport.player.name) : null;
+  const singleReportMetaLine = singleReport
+    ? formatMetaLine([singleReport.player.position, singleReport.player.club, singleReport.player.league])
+    : "";
+  const headerTitle = isSingleReport && singleReportPlayerName ? singleReportPlayerName : analysis.title;
+  const headerDescription =
+    isSingleReport && singleReport
+      ? singleReportMetaLine || "Contexto do atleta indisponivel"
+      : analysis.description || "Leitura completa do relatorio salvo na central de analises.";
+  const playersBadgeLabel = isSingleReport && singleReportPlayerName ? singleReportPlayerName : playersLabel || "Jogadores nao informados";
+
+  useEffect(() => {
+    document.title = `${headerTitle} | SoccerMind`;
+
+    return () => {
+      document.title = "SoccerMind";
+    };
+  }, [headerTitle]);
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -360,16 +410,26 @@ export default function AnalysisDetail() {
                     <FileText className="h-3.5 w-3.5" />
                     Analysis Detail
                   </div>
-                  <h1 className="mt-4 text-4xl font-semibold text-white">{analysis.title}</h1>
-                  <p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-400">
-                    {analysis.description || "Leitura completa do relatorio salvo na central de analises."}
-                  </p>
+                  <div className="mt-4 flex flex-col gap-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <h1 className="text-4xl font-bold tracking-[-0.03em] text-white lg:text-[2.3rem]">{headerTitle}</h1>
+                      {isSingleReport && singleReport ? (
+                        <span className={`inline-flex items-center self-start rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${getTierStyles(singleReport.metrics.tier)}`}>
+                          {singleReport.metrics.tier}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="max-w-3xl text-sm leading-relaxed text-[rgba(255,255,255,0.6)]">
+                      {headerDescription}
+                    </p>
+                    <div className="h-px w-full bg-[linear-gradient(90deg,rgba(0,194,255,0.7),rgba(0,194,255,0.08),transparent)]" />
+                  </div>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-400">
                     <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
                       {analysis.typeLabel}
                     </span>
                     <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
-                      {playersLabel || "Jogadores nao informados"}
+                      {playersBadgeLabel}
                     </span>
                     <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
                       {analysis.statusLabel}
@@ -439,8 +499,8 @@ export default function AnalysisDetail() {
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Relatorio Individual</p>
-                      <h2 className="mt-3 text-3xl font-semibold text-white">{singleReport.player.name}</h2>
-                      <p className="mt-3 text-sm text-gray-400">
+                      <h2 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-white">{singleReportPlayerName}</h2>
+                      <p className="mt-3 text-sm text-[rgba(255,255,255,0.6)]">
                         {[singleReport.player.position, singleReport.player.club, singleReport.player.league].filter(Boolean).join(" • ") || "Contexto do atleta indisponivel"}
                       </p>
                     </div>
@@ -451,20 +511,32 @@ export default function AnalysisDetail() {
                 </section>
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <MetaCard label="Overall" value={`${singleReport.metrics.overall}`} icon={Target} accent="#00C2FF" />
-                  <MetaCard label="Potencial" value={`${singleReport.metrics.potential}`} icon={Target} accent="#00FF9C" />
-                  <MetaCard label="Valor de Mercado" value={formatMarketValue(singleReport.metrics.marketValue)} icon={Calendar} accent="#7A5CFF" />
-                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Risco</p>
-                    <div className="mt-3 flex items-center justify-between gap-3">
-                      <p className="text-2xl font-semibold text-white">{singleReport.metrics.riskScore.toFixed(1)}</p>
+                  <MetricCard label="Overall" value={`${singleReport.metrics.overall}`} valueClassName="text-[#00C2FF]" />
+                  <MetricCard label="Potencial" value={`${singleReport.metrics.potential}`} valueClassName="text-[#A855F7]" />
+                  <MetricCard
+                    label="Valor de mercado"
+                    value={formatMarketValue(singleReport.metrics.marketValue)}
+                    valueClassName="text-[#00FF9C] text-[2rem]"
+                  />
+                  <MetricCard
+                    label="Risco"
+                    value={singleReport.metrics.riskScore.toFixed(1)}
+                    badge={
                       <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase ${getRiskBadgeStyles(singleReport.metrics.riskLevel)}`}>
                         {singleReport.metrics.riskLevel}
                       </span>
-                    </div>
-                  </div>
-                  <MetaCard label="Liquidez" value={singleReport.metrics.liquidityScore.toFixed(1)} icon={User} accent="#00FF9C" />
-                  <MetaCard label="Capital Efficiency" value={singleReport.metrics.capitalEfficiency.toFixed(1)} icon={FileText} accent="#A855F7" />
+                    }
+                  />
+                  <MetricCard
+                    label="Liquidez"
+                    value={normalizeReportLiquidityScore(singleReport.metrics.liquidityScore).toFixed(1)}
+                    subtitle="score 0-10"
+                  />
+                  <MetricCard
+                    label="Capital Efficiency"
+                    value={singleReport.metrics.capitalEfficiency.toFixed(1)}
+                    subtitle="eficiencia de capital"
+                  />
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
@@ -500,7 +572,7 @@ export default function AnalysisDetail() {
                   </div>
                 </div>
 
-                <section className="rounded-[22px] border border-[rgba(0,194,255,0.16)] bg-[rgba(255,255,255,0.03)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.24)]">
+                <section className="rounded-[22px] border border-[rgba(0,194,255,0.16)] bg-[rgba(0,194,255,0.04)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.24)]">
                   <div className="mb-5 flex items-center gap-4">
                     <div className="h-12 w-1 rounded-full bg-[#00C2FF]" />
                     <div>
@@ -508,7 +580,7 @@ export default function AnalysisDetail() {
                       <p className="mt-1 text-sm text-gray-500">Leitura executiva gerada pela IA para o atleta atual.</p>
                     </div>
                   </div>
-                  <div className="space-y-4 text-[15px] leading-[1.9] text-gray-300">
+                  <div className="space-y-6 border-l border-[#00C2FF] pl-5 text-[1.05rem] leading-[1.85] text-gray-300">
                     {(singleReport.aiNarrative || analysis.description || "Narrativa de scouting indisponivel.")
                       .split(/\n{2,}/)
                       .filter(Boolean)
@@ -519,8 +591,12 @@ export default function AnalysisDetail() {
                 </section>
 
                 <DetailSection title="Recomendacao Executiva" subtitle="Sintese objetiva para decisao de acompanhamento ou investimento.">
-                  <div className="rounded-[18px] border border-[rgba(168,85,247,0.24)] bg-[rgba(168,85,247,0.10)] p-5 text-[15px] leading-[1.9] text-white">
-                    {singleReport.metrics.recommendation}
+                  <div className="rounded-[18px] border border-[rgba(168,85,247,0.3)] bg-[rgba(168,85,247,0.08)] p-5 text-white">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#A855F7]">Recomendacao Executiva</p>
+                    <div className="mt-4 flex items-start gap-3">
+                      <Target className="mt-0.5 h-5 w-5 text-[#A855F7]" />
+                      <p className="text-[15px] font-bold leading-[1.85] text-white">{singleReport.metrics.recommendation}</p>
+                    </div>
                   </div>
                 </DetailSection>
               </>

@@ -236,7 +236,7 @@ export async function getPlayer(id: string) {
 }
 
 export async function generatePlayerReport(playerId: string, analyst?: string) {
-  return client.post<ApiPlayerReportResponse>(`/player/${playerId}/report`, analyst ? { analyst } : {});
+  return client.post<ApiPlayerReportResponse>(`/player/${playerId}/report`, analyst ? { analystName: analyst, analyst } : {});
 }
 
 export async function getPlayerProjection(id: string) {

@@ -495,7 +495,7 @@ export async function generatePlayerReport(
   try {
     const response = await apiFetch<unknown>(`/player/${id}/report`, {
       method: "POST",
-      body: JSON.stringify(options.analyst ? { analyst: options.analyst } : {}),
+      body: JSON.stringify(options.analyst ? { analystName: options.analyst, analyst: options.analyst } : {}),
     });
     const payload = isRecord(response.data) ? response.data : {};
 
