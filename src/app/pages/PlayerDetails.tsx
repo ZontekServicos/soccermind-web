@@ -5,6 +5,7 @@ import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tool
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
 import { useAuth } from "../contexts/AuthContext";
+import { API_CONFIG } from "../config/api-config";
 import type { PlayerCardModel, PlayerProfileModel } from "../mappers/player.mapper";
 import { downloadPlayerReportPdf } from "../utils/playerReportPdf";
 import {
@@ -199,6 +200,8 @@ export default function PlayerDetails() {
       return;
     }
 
+    console.log("Player ID sendo enviado:", id);
+    console.log("URL chamada:", `${API_CONFIG.BASE_URL}/api/player/${id}/report`);
     console.log("[PlayerDetails] generatePlayerReport playerId", id);
     setReportLoading(true);
     setReportError(null);
