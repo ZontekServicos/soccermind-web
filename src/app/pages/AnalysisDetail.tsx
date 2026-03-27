@@ -119,6 +119,38 @@ function formatRiskSummary(value: unknown) {
   return formatUnknownText(value, "");
 }
 
+function shortenText(value: string, maxLength = 180) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength).trimEnd()}...`;
+}
+
+function compactBullets(values: Array<string | null | undefined>, maxItems = 4) {
+  return values
+    .map((value) => (typeof value === "string" ? shortenText(value, 160) : ""))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function CompactBulletList({ items }: { items: string[] }) {
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div
+          key={item}
+          className="flex items-start gap-3 rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm leading-relaxed text-gray-300"
+        >
+          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#00C2FF]" />
+          <span>{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function formatGrowthProjectionText(value: unknown) {
   if (isRenderableRecord(value)) {
     if (typeof value.expectedPeak === "number" && Number.isFinite(value.expectedPeak)) {
@@ -731,59 +763,57 @@ export default function AnalysisDetail() {
                   title={reportModel.recommendationLabel}
                   subtitle="Recomendacao executiva reconstruida a partir do backend da analise salva."
                 >
-                  <p className="text-[15px] leading-[1.9] text-gray-300">{reportModel.recommendationSummary}</p>
+                  <p className="text-sm leading-7 text-gray-300">{shortenText(reportModel.recommendationSummary, 220)}</p>
                 </DetailSection>
 
                 <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                  <DetailSection title="Executive Summary">
-                    <p className="text-[15px] leading-[1.9] text-gray-300">{reportModel.executiveSummary}</p>
+                  <DetailSection title="Decision">
+                    <CompactBulletList
+                      items={compactBullets(
+                        [
+                          ...reportModel.takeaways,
+                          reportModel.executiveSummary,
+                        ],
+                        4,
+                      )}
+                    />
                   </DetailSection>
 
-                  <DetailSection title="Risk Overview">
-                    <p className="text-[15px] leading-[1.9] text-gray-300">{reportModel.riskOverview}</p>
+                  <DetailSection title="Key Insights">
+                    <CompactBulletList
+                      items={compactBullets(
+                        reportModel.insights.map((insight) => `${insight.title}: ${insight.content}`),
+                        4,
+                      )}
+                    />
                   </DetailSection>
                 </div>
 
-                <DetailSection title="Financial and Strategic Context">
-                  <div className="grid gap-4 md:grid-cols-3">
-                    {reportModel.insights.map((insight) => (
-                      <div
-                        key={insight.title}
-                        className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4"
-                      >
-                        <p className="text-sm font-semibold text-white">{insight.title}</p>
-                        <p className="mt-2 text-sm leading-relaxed text-gray-400">{insight.content}</p>
-                      </div>
-                    ))}
-                  </div>
-                </DetailSection>
+                <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+                  <DetailSection title="Risk">
+                    <CompactBulletList
+                      items={compactBullets(
+                        [
+                          reportModel.riskOverview,
+                          ...reportModel.aiNarrative,
+                        ],
+                        4,
+                      )}
+                    />
+                  </DetailSection>
 
-                <DetailSection title="Comparative Analysis">
-                  <p className="text-[15px] leading-[1.9] text-gray-300">{reportModel.comparativeAnalysis}</p>
-                </DetailSection>
-
-                <DetailSection title="Narrative">
-                  <div className="space-y-4">
-                    {reportModel.aiNarrative.map((paragraph, index) => (
-                      <p key={`${index}-${paragraph.slice(0, 24)}`} className="text-[15px] leading-[1.9] text-gray-300">
-                        {paragraph}
-                      </p>
-                    ))}
-                  </div>
-                </DetailSection>
-
-                <DetailSection title="Takeaways">
-                  <div className="space-y-3">
-                    {reportModel.takeaways.map((takeaway) => (
-                      <div
-                        key={takeaway}
-                        className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-sm text-gray-300"
-                      >
-                        {takeaway}
-                      </div>
-                    ))}
-                  </div>
-                </DetailSection>
+                  <DetailSection title="Financial Summary">
+                    <CompactBulletList
+                      items={compactBullets(
+                        [
+                          ...reportModel.insights.map((insight) => insight.content),
+                          reportModel.comparativeAnalysis,
+                        ],
+                        4,
+                      )}
+                    />
+                  </DetailSection>
+                </div>
               </>
             ) : !isSingleReport ? (
               <DetailSection

@@ -456,17 +456,7 @@ export default function Reports() {
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Decision Snapshot</p>
                       <h2 className="mt-3 text-3xl font-semibold text-white">{reportModel.recommendationLabel}</h2>
-                      <p className="mt-4 max-w-3xl text-[15px] leading-[1.9] text-gray-300">{reportModel.recommendationSummary}</p>
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        {reportModel.takeaways.slice(0, 2).map((takeaway) => (
-                          <span
-                            key={takeaway}
-                            className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-xs text-gray-300"
-                          >
-                            {takeaway}
-                          </span>
-                        ))}
-                      </div>
+                      <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300">{shortenText(reportModel.recommendationSummary, 220)}</p>
                     </div>
                     <div className="grid gap-4 rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-5">
                       <EditorialStat
@@ -485,96 +475,105 @@ export default function Reports() {
                   </div>
                 </section>
 
-                <SectionCard icon={FileText} iconColor="#00C2FF" iconBg="rgba(0,194,255,0.15)" title="Executive Summary">
-                  <div className="max-w-[980px]">
-                    <p className="text-[15px] leading-[1.9] text-gray-300">{reportModel.executiveSummary}</p>
-
-                    <div className="mt-8 grid gap-5 lg:grid-cols-3">
-                      {reportModel.insights.map((insight) => (
-                        <InsightCard key={insight.title} insight={insight} />
-                      ))}
+                <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+                  <CompactSection title="Decision" subtitle="Executive Summary">
+                    <div className="space-y-4">
+                      <div className="rounded-[16px] border border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] p-4">
+                        <p className="text-[11px] uppercase tracking-[0.22em] text-[#9CFFD1]">Recommended</p>
+                        <p className="mt-2 text-lg font-semibold text-white">
+                          {reportModel.recommendedPlayer?.name ?? "Decisao condicional"}
+                        </p>
+                        <p className="mt-2 text-sm leading-7 text-gray-200">
+                          {shortenText(reportModel.recommendationSummary, 200)}
+                        </p>
+                      </div>
+                      <BulletList
+                        items={splitIntoBullets(
+                          [
+                            ...reportModel.takeaways,
+                            shortenText(reportModel.executiveSummary, 150),
+                          ],
+                          4,
+                        )}
+                      />
                     </div>
-                  </div>
-                </SectionCard>
+                  </CompactSection>
 
-                <SectionCard icon={TrendingUp} iconColor="#7A5CFF" iconBg="rgba(122,92,255,0.15)" title="Comparative Analysis">
-                  <div className="space-y-6">
-                    <p className="max-w-[980px] text-[15px] leading-[1.9] text-gray-300">{reportModel.comparativeAnalysis}</p>
+                  <CompactSection title="Key Insights" subtitle="Decision Drivers">
+                    <BulletList
+                      items={splitIntoBullets(
+                        reportModel.insights.map((insight) => `${insight.title}: ${insight.content}`),
+                        4,
+                      )}
+                    />
+                  </CompactSection>
+                </div>
 
+                <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+                  <CompactSection title="Risk" subtitle="Risk Snapshot">
+                    <BulletList
+                      items={splitIntoBullets(
+                        [
+                          `${displayPlayerA.name}: risco ${displayPlayerA.risk.level} (${displayPlayerA.risk.score.toFixed(1)}), estrutural ${displayPlayerA.structuralRisk.score.toFixed(1)}.`,
+                          `${displayPlayerB.name}: risco ${displayPlayerB.risk.level} (${displayPlayerB.risk.score.toFixed(1)}), estrutural ${displayPlayerB.structuralRisk.score.toFixed(1)}.`,
+                          shortenText(reportModel.riskOverview, 150),
+                        ],
+                        3,
+                      )}
+                    />
+                  </CompactSection>
+
+                  <CompactSection title="Financial Summary" subtitle="Capital and Liquidity">
+                    <BulletList
+                      items={splitIntoBullets(
+                        [
+                          `${displayPlayerA.name}: capital efficiency ${displayPlayerA.capitalEfficiency.toFixed(1)}, liquidez ${displayPlayerA.liquidity.score.toFixed(1)}, risco financeiro ${displayPlayerA.financialRisk.index.toFixed(1)}.`,
+                          `${displayPlayerB.name}: capital efficiency ${displayPlayerB.capitalEfficiency.toFixed(1)}, liquidez ${displayPlayerB.liquidity.score.toFixed(1)}, risco financeiro ${displayPlayerB.financialRisk.index.toFixed(1)}.`,
+                          `${displayPlayerA.name}: ${displayPlayerA.marketValueLabel}.`,
+                          `${displayPlayerB.name}: ${displayPlayerB.marketValueLabel}.`,
+                        ],
+                        4,
+                      )}
+                    />
+                  </CompactSection>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+                  <CompactSection title="Player Summary" subtitle="Quick Read">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <PlayerRiskBlock
+                        player={displayPlayerA}
+                        color="#00C2FF"
+                        recommendation={reportModel.winner === "A"}
+                      />
+                      <PlayerRiskBlock
+                        player={displayPlayerB}
+                        color="#7A5CFF"
+                        recommendation={reportModel.winner === "B"}
+                      />
+                    </div>
+                  </CompactSection>
+
+                  <CompactSection title="Metrics" subtitle="Side by Side">
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[720px]" role="table">
-                        <thead className="sticky top-0 z-10 bg-[rgba(255,255,255,0.04)] backdrop-blur-sm">
+                      <table className="w-full min-w-[640px]" role="table">
+                        <thead className="bg-[rgba(255,255,255,0.04)]">
                           <tr>
-                            <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">Metrica</th>
-                            <th className="px-5 py-4 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">{displayPlayerA.name}</th>
-                            <th className="px-5 py-4 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">{displayPlayerB.name}</th>
-                            <th className="px-5 py-4 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">Vencedor</th>
+                            <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">Metrica</th>
+                            <th className="px-4 py-3 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">{displayPlayerA.name}</th>
+                            <th className="px-4 py-3 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">{displayPlayerB.name}</th>
+                            <th className="px-4 py-3 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">Vencedor</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[rgba(255,255,255,0.04)]">
-                          {reportModel.metrics.map((metric) => (
+                          {reportModel.metrics.slice(0, 5).map((metric) => (
                             <ComparisonRow key={metric.label} metric={metric} />
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                </SectionCard>
-
-                <SectionCard icon={ShieldAlert} iconColor="#FF5A74" iconBg="rgba(255,90,116,0.15)" title="Risk Overview">
-                  <div className="grid gap-8 lg:grid-cols-2">
-                    <PlayerRiskBlock
-                      player={displayPlayerA}
-                      color="#00C2FF"
-                      recommendation={reportModel.winner === "A"}
-                    />
-                    <PlayerRiskBlock
-                      player={displayPlayerB}
-                      color="#7A5CFF"
-                      recommendation={reportModel.winner === "B"}
-                    />
-                  </div>
-                  <p className="mt-8 max-w-[980px] text-[15px] leading-[1.9] text-gray-300">{reportModel.riskOverview}</p>
-                </SectionCard>
-
-                <section className="rounded-[20px] border border-[rgba(0,194,255,0.2)] bg-gradient-to-br from-[rgba(0,194,255,0.05)] to-[rgba(122,92,255,0.05)] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)]" role="region" aria-label="AI Narrative">
-                  <div className="mb-8 flex items-center gap-4 border-b border-[rgba(255,255,255,0.06)] pb-6">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-[12px] bg-gradient-to-br from-[#00C2FF] to-[#7A5CFF] shadow-[0_4px_16px_rgba(0,194,255,0.25)]">
-                      <Brain className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-semibold tracking-wide text-white">AI Narrative</h2>
-                      <p className="mt-1 text-sm text-gray-400">Parecer contextualizado com leitura de mercado, risco e encaixe competitivo.</p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-5">
-                    {reportModel.aiNarrative.map((paragraph, index) => (
-                      <p key={`${index}-${paragraph.slice(0, 24)}`} className="max-w-[960px] text-[15px] leading-[1.9] text-gray-300">
-                        {paragraph}
-                      </p>
-                    ))}
-                  </div>
-
-                  <div className="mt-8 rounded-[16px] border border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.08)] p-5">
-                    <p className="text-sm leading-relaxed text-gray-200">
-                      <strong className="font-semibold text-[#00FF9C]">Recomendacao Final:</strong> {reportModel.recommendationSummary}
-                    </p>
-                  </div>
-                </section>
-
-                <SectionCard icon={CheckCircle} iconColor="#00FF9C" iconBg="rgba(0,255,156,0.15)" title="Decision Checklist">
-                  <div className="grid gap-4 lg:grid-cols-3">
-                    {reportModel.takeaways.map((takeaway) => (
-                      <div key={takeaway} className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
-                        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-[10px] bg-[rgba(0,255,156,0.12)] text-[#00FF9C]">
-                          <CheckCircle className="h-4 w-4" />
-                        </div>
-                        <p className="text-sm leading-relaxed text-gray-300">{takeaway}</p>
-                      </div>
-                    ))}
-                  </div>
-                </SectionCard>
+                  </CompactSection>
+                </div>
               </>
             )}
           </div>
@@ -627,6 +626,22 @@ function StatusBanner({ children, tone }: { children: ReactNode; tone: "error" |
   return <div className={`rounded-[16px] border px-5 py-4 text-sm ${styles}`}>{children}</div>;
 }
 
+function shortenText(value: string, maxLength = 180) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength).trimEnd()}...`;
+}
+
+function splitIntoBullets(values: Array<string | null | undefined>, maxItems = 4) {
+  return values
+    .map((value) => (typeof value === "string" ? shortenText(value, 160) : ""))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
 function ReportLoadingSkeleton() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
@@ -647,6 +662,42 @@ function ReportLoadingSkeleton() {
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+function CompactSection({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.24)]">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-white">{title}</h2>
+        {subtitle ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-500">{subtitle}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function BulletList({ items }: { items: string[] }) {
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div
+          key={item}
+          className="flex items-start gap-3 rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm leading-relaxed text-gray-300"
+        >
+          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#00C2FF]" />
+          <span>{item}</span>
+        </div>
+      ))}
     </div>
   );
 }
