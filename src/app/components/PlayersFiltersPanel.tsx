@@ -377,6 +377,11 @@ function FilterSection({
   );
 }
 
+const FilterGroup = FilterSection;
+const FilterDropdown = SearchableSelect;
+const FilterToggle = PositionSelector;
+const FilterSlider = NumberRangeField;
+
 export function PlayersFiltersPanel({
   filters,
   options,
@@ -447,8 +452,8 @@ export function PlayersFiltersPanel({
       <div className={cn("overflow-hidden transition-all duration-300", isExpanded ? "max-h-[2400px] opacity-100" : "max-h-0 opacity-0")}>
         <div className="space-y-6 px-6 py-6">
           <div className="grid gap-5 xl:grid-cols-[1.08fr_0.92fr]">
-            <FilterSection
-              title="Identificacao"
+            <FilterGroup
+              title="Context"
               description="Abra a busca por nome e combine a malha de posicoes para refinar rapidamente o shortlist."
             >
               <FieldShell label="Nome do jogador" helperText="Atualizacao automatica">
@@ -464,40 +469,40 @@ export function PlayersFiltersPanel({
                 </div>
               </FieldShell>
 
-              <PositionSelector
+              <FilterToggle
                 selectedPositions={filters.positions}
                 options={options.positions}
                 onTogglePosition={onTogglePosition}
               />
-            </FilterSection>
+            </FilterGroup>
 
-            <FilterSection
-              title="Contexto esportivo"
+            <FilterGroup
+              title="Market"
               description="Cruze pais, clube, liga e origem de dados para deixar o radar mais aderente ao recorte de decisao."
             >
               <div className="grid gap-4 md:grid-cols-2">
-                <SearchableSelect
+                <FilterDropdown
                   label="Nacionalidade"
                   value={filters.nationality}
                   options={options.nationalities}
                   placeholder="Todas as nacionalidades"
                   onChange={(value) => onFieldChange("nationality", value)}
                 />
-                <SearchableSelect
+                <FilterDropdown
                   label="Clube"
                   value={filters.team}
                   options={options.teams}
                   placeholder="Todos os clubes"
                   onChange={(value) => onFieldChange("team", value)}
                 />
-                <SearchableSelect
+                <FilterDropdown
                   label="Liga"
                   value={filters.league}
                   options={options.leagues}
                   placeholder="Todas as ligas"
                   onChange={(value) => onFieldChange("league", value)}
                 />
-                <SearchableSelect
+                <FilterDropdown
                   label="Source"
                   value={filters.source}
                   options={options.sources}
@@ -506,15 +511,15 @@ export function PlayersFiltersPanel({
                   onChange={(value) => onFieldChange("source", value)}
                 />
               </div>
-            </FilterSection>
+            </FilterGroup>
           </div>
 
           <div className="grid gap-5 lg:grid-cols-3">
-            <FilterSection
-              title="Janela de idade"
+            <FilterGroup
+              title="Performance"
               description="Separe talentos para impacto imediato, valorizacao futura ou equilibrio de ciclo."
             >
-              <NumberRangeField
+              <FilterSlider
                 label="Idade"
                 minValue={filters.minAge}
                 maxValue={filters.maxAge}
@@ -523,14 +528,14 @@ export function PlayersFiltersPanel({
                 onMinChange={(value) => onFieldChange("minAge", value)}
                 onMaxChange={(value) => onFieldChange("maxAge", value)}
               />
-            </FilterSection>
+            </FilterGroup>
 
-            <FilterSection
-              title="Nivel e upside"
+            <FilterGroup
+              title="Performance"
               description="Equilibre performance atual e potencial para diferenciar prontidao competitiva de teto de crescimento."
             >
               <div className="space-y-4">
-                <NumberRangeField
+                <FilterSlider
                   label="Overall"
                   minValue={filters.minOverall}
                   maxValue={filters.maxOverall}
@@ -539,7 +544,7 @@ export function PlayersFiltersPanel({
                   onMinChange={(value) => onFieldChange("minOverall", value)}
                   onMaxChange={(value) => onFieldChange("maxOverall", value)}
                 />
-                <NumberRangeField
+                <FilterSlider
                   label="Potential"
                   minValue={filters.minPotential}
                   maxValue={filters.maxPotential}
@@ -549,13 +554,13 @@ export function PlayersFiltersPanel({
                   onMaxChange={(value) => onFieldChange("maxPotential", value)}
                 />
               </div>
-            </FilterSection>
+            </FilterGroup>
 
-            <FilterSection
-              title="Faixa financeira"
+            <FilterGroup
+              title="Market"
               description="Ajuste piso e teto de investimento para alinhar o shortlist a cenarios reais de mercado."
             >
-              <NumberRangeField
+              <FilterSlider
                 label="Valor de mercado"
                 minValue={filters.minValue}
                 maxValue={filters.maxValue}
@@ -565,7 +570,7 @@ export function PlayersFiltersPanel({
                 onMinChange={(value) => onFieldChange("minValue", value)}
                 onMaxChange={(value) => onFieldChange("maxValue", value)}
               />
-            </FilterSection>
+            </FilterGroup>
           </div>
         </div>
       </div>

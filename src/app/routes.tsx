@@ -14,11 +14,14 @@ import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Compare from "./pages/Compare";
 import Reports from "./pages/Reports";
+import ReportsHub from "./pages/ReportsHub";
+import ScoutReportDetail from "./pages/ScoutReportDetail";
 import History from "./pages/History";
 import AnalysisDetail from "./pages/AnalysisDetail";
 import Governance from "./pages/Governance";
 import PlayersRanking from "./pages/PlayersRanking";
 import PlayerDetails from "./pages/PlayerDetails";
+import SmartMatch from "./pages/SmartMatch";
 import Profile from "./pages/Profile";
 import Squad from "./pages/Squad";
 import ActionsDemo from "./pages/ActionsDemo";
@@ -113,6 +116,14 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "/smart-match/:playerId",
+        element: (
+          <ProtectedRoute>
+            <SmartMatch />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "/compare",
         element: (
           <ProtectedRoute>
@@ -124,7 +135,23 @@ export const router = createBrowserRouter([
         path: "/reports",
         element: (
           <ProtectedRoute>
+            <ReportsHub />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/reports/generate",
+        element: (
+          <ProtectedRoute>
             <Reports />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/reports/:id",
+        element: (
+          <ProtectedRoute>
+            <ScoutReportDetail />
           </ProtectedRoute>
         ),
       },

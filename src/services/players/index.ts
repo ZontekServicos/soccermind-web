@@ -77,11 +77,29 @@ export interface PlayerReportMetrics {
 
 export interface PlayerReportResult {
   analysisId: string;
+  scoutReportId?: string;
   player: PlayerProfileModel;
   metrics: PlayerReportMetrics;
   aiNarrative: string | null;
   recommendation: string;
   createdAt: string;
+}
+
+export interface SmartMatchClub {
+  club: string;
+  league: string | null;
+  fitScore: number;
+  reason: string;
+  breakdown: {
+    overall: number;
+    risk: number;
+    financial: number;
+  };
+}
+
+export interface SmartMatchResult {
+  playerId: string;
+  clubs: SmartMatchClub[];
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -503,6 +521,7 @@ export async function generatePlayerReport(
       ...response,
       data: {
         analysisId: typeof payload.analysisId === "string" ? payload.analysisId : `analysis-${id}`,
+        scoutReportId: typeof payload.scoutReportId === "string" ? payload.scoutReportId : undefined,
         player: mapApiPlayerToProfile(isRecord(payload.player) ? payload.player : fallbackPlayer),
         metrics: (isRecord(payload.metrics) ? payload.metrics : {}) as PlayerReportMetrics,
         aiNarrative: typeof payload.aiNarrative === "string" ? payload.aiNarrative : null,
@@ -534,6 +553,56 @@ export async function getPlayerProjection(id: string) {
   }
 
   return apiFetch<unknown>(`/player/${id}/projection`);
+}
+
+export async function getSmartMatch(id: string): Promise<ApiEnvelope<SmartMatchResult>> {
+  if (getDataSource("players") === "mock") {
+    return {
+      success: true,
+      data: {
+        playerId: id,
+        clubs: [
+          {
+            club: "Sevilla FC",
+            league: "LaLiga",
+            fitScore: 91,
+            reason: "Encaixe forte entre nivel competitivo, risco controlado e capacidade do elenco para absorver o atleta sem inflacao excessiva de custo.",
+            breakdown: {
+              overall: 92,
+              risk: 88,
+              financial: 91,
+            },
+          },
+          {
+            club: "Atalanta",
+            league: "Serie A",
+            fitScore: 87,
+            reason: "Contexto tatico e financeiro cria boa simetria para acelerar impacto esportivo mantendo opcionalidade de revenda.",
+            breakdown: {
+              overall: 86,
+              risk: 89,
+              financial: 86,
+            },
+          },
+          {
+            club: "Real Sociedad",
+            league: "LaLiga",
+            fitScore: 83,
+            reason: "Operacao equilibrada para clubes que aceitam uma curva moderada de maturacao com boa disciplina de preco.",
+            breakdown: {
+              overall: 82,
+              risk: 84,
+              financial: 83,
+            },
+          },
+        ],
+      },
+      error: null,
+      meta: { source: "mock" },
+    };
+  }
+
+  return apiFetch<SmartMatchResult>(`/smart-match/${id}`);
 }
 
 export async function getSimilarPlayers(id: string): Promise<ApiEnvelope<PlayerCardModel[]>> {

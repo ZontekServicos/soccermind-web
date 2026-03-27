@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   Brain,
   CheckCircle,
   Download,
+  ExternalLink,
   FileText,
   LoaderCircle,
-  Save,
   ShieldAlert,
   Sparkles,
   TrendingUp,
-  X,
 } from "lucide-react";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
@@ -30,14 +29,15 @@ import {
 } from "../utils/playerFilters";
 import { formatExecutiveMetric, type ExecutiveReportMetric } from "../utils/executiveReport";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
-import { createReportAnalysis } from "../services/analysis";
+import { buildExecutiveReportData } from "../../adapters/reports";
 import {
-  getExecutiveReportData,
   getReportShortlist,
   type CompareViewModel,
   type ExecutiveReportModel,
   type PlayerFilterOptions,
 } from "../services/reports";
+import { generateScoutReport, type StoredScoutReport } from "../../services/scoutReports";
+import { toast } from "sonner";
 
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
   positions: [],
@@ -61,6 +61,7 @@ function dedupePlayers(players: PlayerExtended[]) {
 
 export default function Reports() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
   const [filters, setFilters] = useState<PlayersFiltersState>(initialFilters);
@@ -76,12 +77,12 @@ export default function Reports() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
-  const [saveFeedbackTone, setSaveFeedbackTone] = useState<"success" | "error">("success");
+  const [saveFeedbackTone, setSaveFeedbackTone] = useState<"success" | "error" | "info">("info");
   const [comparisonData, setComparisonData] = useState<CompareViewModel | null>(null);
   const [reportModel, setReportModel] = useState<ExecutiveReportModel | null>(null);
   const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
+  const [savedReport, setSavedReport] = useState<StoredScoutReport | null>(null);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -166,24 +167,44 @@ export default function Reports() {
     async function loadExecutiveComparison() {
       if (!playerA.name || !playerB.name || playerA.name === "Sem dados" || playerB.name === "Sem dados") {
         setComparisonData(null);
+        setReportModel(null);
+        setSavedReport(null);
         return;
       }
 
       setReportLoading(true);
 
       try {
-        const response = await getExecutiveReportData(playerA, playerB, {
+        const response = await generateScoutReport({
+          playerIds: [playerA.id, playerB.id],
           analyst: user?.name,
-          status: "Concluído",
         });
 
         if (!active) {
           return;
         }
 
-        setComparisonData(response.data?.comparisonData ?? null);
-        setReportModel(response.data?.reportModel ?? null);
+        const nextReport = response.data ?? null;
+        const nextComparisonData = nextReport?.content.comparisonData ?? null;
+
+        setSavedReport(nextReport);
+        setComparisonData(nextComparisonData);
+        setReportModel(
+          nextComparisonData
+            ? buildExecutiveReportData(nextComparisonData, nextComparisonData.playerA, nextComparisonData.playerB, {
+                analyst: nextReport?.analyst,
+                generatedAt: new Date(nextReport?.content.generatedAt ?? nextReport?.createdAt ?? Date.now()),
+                status: nextReport?.status,
+              })
+            : null,
+        );
         setReportError(null);
+        setSaveFeedbackTone("info");
+        setSaveFeedback(
+          nextReport
+            ? `ScoutReport persistido automaticamente: ${nextReport.title}. A visualizacao atual reflete o artefato salvo.`
+            : null,
+        );
       } catch (error) {
         if (!active) {
           return;
@@ -191,6 +212,7 @@ export default function Reports() {
 
         setComparisonData(null);
         setReportModel(null);
+        setSavedReport(null);
         setReportError(error instanceof Error ? error.message : "Erro ao gerar o relatorio executivo");
       } finally {
         if (active) {
@@ -221,13 +243,6 @@ export default function Reports() {
 
   const displayPlayerA = comparisonData?.playerA ?? playerA;
   const displayPlayerB = comparisonData?.playerB ?? playerB;
-  const hasValidPlayers =
-    Boolean(displayPlayerA.id) &&
-    Boolean(displayPlayerB.id) &&
-    displayPlayerA.id !== EMPTY_PLAYER.id &&
-    displayPlayerB.id !== EMPTY_PLAYER.id &&
-    displayPlayerA.id !== displayPlayerB.id;
-
   const handleFieldChange = (field: FilterFieldKey, value: string) => {
     setFilters((current) => ({ ...current, [field]: value }));
   };
@@ -263,31 +278,15 @@ export default function Reports() {
     }
   };
 
-  const handleSaveReport = async () => {
-    if (!reportModel || !hasValidPlayers) {
+  const handleOpenSavedReport = () => {
+    if (!savedReport?.id) {
       setSaveFeedbackTone("error");
-      setSaveFeedback("Selecione dois jogadores validos para salvar o relatorio executivo.");
+      setSaveFeedback("O ScoutReport ainda nao foi persistido para esta comparacao.");
+      toast.error("O ScoutReport ainda nao foi persistido.");
       return;
     }
 
-    setSaving(true);
-    setSaveFeedback(null);
-
-    try {
-      const response = await createReportAnalysis({
-        playerIds: [displayPlayerA.id, displayPlayerB.id],
-        title: `${reportModel.title} - ${reportModel.subtitle}`,
-        analyst: user?.name,
-      });
-
-      setSaveFeedbackTone("success");
-      setSaveFeedback(`Relatorio salvo com sucesso: ${response.data.title}. Ele ja esta disponivel na central de Analises.`);
-    } catch (error) {
-      setSaveFeedbackTone("error");
-      setSaveFeedback(error instanceof Error ? error.message : "Nao foi possivel salvar o relatorio.");
-    } finally {
-      setSaving(false);
-    }
+    navigate(`/reports/${savedReport.id}`);
   };
 
   return (
@@ -317,6 +316,9 @@ export default function Reports() {
                     <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
                       {reportModel ? `Gerado em ${reportModel.generatedAtLabel}` : "Aguardando comparacao"}
                     </span>
+                    <span className="rounded-full border border-[rgba(0,194,255,0.18)] bg-[rgba(0,194,255,0.08)] px-3 py-1.5 text-[#9BE7FF]">
+                      <Link to="/reports">Central ScoutReport</Link>
+                    </span>
                   </div>
                 </div>
 
@@ -325,16 +327,16 @@ export default function Reports() {
                   <MetricHeroCard label="Filtros ativos" value={`${activeFiltersCount}`} caption="Refinando o radar atual" accent="violet" />
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-5 py-4 backdrop-blur-sm">
                     <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Acoes</p>
-                    <p className="mt-2 text-lg font-semibold text-white">Salvar ou exportar</p>
-                    <p className="mt-1 text-xs text-gray-500">Persista o parecer na central ou gere o PDF executivo.</p>
+                    <p className="mt-2 text-lg font-semibold text-white">Persistido por padrao</p>
+                    <p className="mt-1 text-xs text-gray-500">A geracao executiva agora salva um ScoutReport imediatamente e devolve o registro salvo.</p>
                     <div className="mt-4 grid gap-3">
                       <Button
                         className="h-11 rounded-[14px] border border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.14)] px-4 font-semibold text-[#B6FFD8] shadow-[0_6px_18px_rgba(0,255,156,0.14)] hover:bg-[rgba(0,255,156,0.2)]"
-                        onClick={handleSaveReport}
-                        disabled={!reportModel || reportLoading || saving || !hasValidPlayers}
+                        onClick={handleOpenSavedReport}
+                        disabled={!savedReport || reportLoading}
                       >
-                        {saving ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                        Salvar relatorio
+                        {reportLoading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
+                        Abrir ScoutReport
                       </Button>
                       <Button
                         className="h-11 rounded-[14px] bg-[#00C2FF]/90 px-4 font-semibold text-[#07142A] shadow-[0_6px_18px_rgba(0,194,255,0.25)] hover:bg-[#00C2FF]"
@@ -355,7 +357,9 @@ export default function Reports() {
                 className={`rounded-[16px] border px-5 py-4 text-sm ${
                   saveFeedbackTone === "success"
                     ? "border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] text-[#9CFFD1]"
-                    : "border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] text-[#FFB4B5]"
+                    : saveFeedbackTone === "error"
+                      ? "border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] text-[#FFB4B5]"
+                      : "border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.08)] text-[#9BE7FF]"
                 }`}
               >
                 {saveFeedback}
@@ -413,7 +417,7 @@ export default function Reports() {
             {playersError && <StatusBanner tone="error">{playersError}</StatusBanner>}
             {reportError && <StatusBanner tone="error">{reportError}</StatusBanner>}
             {playersLoading && <StatusBanner tone="loading">Carregando shortlist para o relatorio...</StatusBanner>}
-            {reportLoading && <StatusBanner tone="loading">Gerando leitura executiva atual...</StatusBanner>}
+            {reportLoading && <ReportLoadingSkeleton />}
 
             {!playersLoading && selectablePlayers.length === 0 && (
               <div className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-6 py-14 text-center text-sm text-gray-500">
@@ -423,7 +427,7 @@ export default function Reports() {
 
             {reportModel && (
               <>
-                <section className="relative overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(135deg,rgba(7,20,42,0.96),rgba(13,29,57,0.92))] px-7 py-7 shadow-[0_18px_56px_rgba(0,0,0,0.34)]">
+                <section className="relative overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(135deg,rgba(7,20,42,0.96),rgba(13,29,57,0.92))] px-7 py-7 shadow-[0_18px_56px_rgba(0,0,0,0.34)] transition-all duration-300 hover:border-[rgba(0,194,255,0.18)] hover:shadow-[0_24px_70px_rgba(0,0,0,0.38)]">
                   <div className="absolute inset-y-0 right-0 w-64 bg-[radial-gradient(circle_at_top_right,rgba(0,194,255,0.16),transparent_72%)]" />
                   <div className="relative grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
                     <div>
@@ -442,9 +446,18 @@ export default function Reports() {
                       </div>
                     </div>
                     <div className="grid gap-4 rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-5">
-                      <EditorialStat label="Status" value="Pronto para decisao" accent="#00FF9C" />
+                      <EditorialStat
+                        label="Status"
+                        value={reportLoading ? "Gerando" : savedReport?.status === "COMPLETED" ? "Persistido" : "Em andamento"}
+                        accent={reportLoading ? "#FFB800" : "#00FF9C"}
+                      />
                       <EditorialStat label="Recorte" value={reportModel.subtitle} accent="#00C2FF" />
                       <EditorialStat label="Gerado em" value={reportModel.generatedAtLabel} accent="#7A5CFF" />
+                      <EditorialStat
+                        label="Tempo de geracao"
+                        value={savedReport?.content.meta?.generatedInMs ? `${savedReport.content.meta.generatedInMs} ms` : "n/d"}
+                        accent="#00FF9C"
+                      />
                     </div>
                   </div>
                 </section>
@@ -589,6 +602,30 @@ function StatusBanner({ children, tone }: { children: ReactNode; tone: "error" |
       : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-400";
 
   return <div className={`rounded-[16px] border px-5 py-4 text-sm ${styles}`}>{children}</div>;
+}
+
+function ReportLoadingSkeleton() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
+      <div className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6">
+        <div className="h-3 w-32 rounded-full bg-white/10" />
+        <div className="mt-4 h-8 w-3/4 rounded-full bg-white/10" />
+        <div className="mt-4 space-y-3">
+          <div className="h-3 w-full rounded-full bg-white/10" />
+          <div className="h-3 w-5/6 rounded-full bg-white/10" />
+          <div className="h-3 w-2/3 rounded-full bg-white/10" />
+        </div>
+      </div>
+      <div className="grid gap-3">
+        {[0, 1, 2].map((item) => (
+          <div
+            key={item}
+            className="h-20 rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]"
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function PlayerSelector({

@@ -111,7 +111,7 @@ export function AppSidebar() {
                 <NavItem
                   key={item.href}
                   item={item}
-                  isActive={location.pathname === item.href}
+                  isActive={location.pathname === item.href || location.pathname.startsWith(`${item.href}/`)}
                   isCollapsed={isCollapsed}
                 />
               ))}

@@ -604,7 +604,7 @@ export default function PlayerDetails() {
                     <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Relatorio Individual</p>
                     <h2 className="mt-3 text-3xl font-semibold text-white">{reportResult.player.name}</h2>
                     <p className="mt-3 max-w-4xl text-sm leading-relaxed text-gray-400">
-                      Analise persistida automaticamente na central de analises. Use os cards abaixo para leitura rapida e exporte o PDF premium quando quiser compartilhar a versao executiva.
+                      ScoutReport persistido automaticamente na central decisoria. Use os cards abaixo para leitura rapida e exporte o PDF premium quando quiser compartilhar a versao executiva.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
@@ -674,11 +674,11 @@ export default function PlayerDetails() {
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                   <button
                     type="button"
-                    onClick={() => navigate("/history")}
+                    onClick={() => navigate(reportResult.scoutReportId ? `/reports/${reportResult.scoutReportId}` : "/reports")}
                     className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-[rgba(0,255,156,0.26)] bg-[rgba(0,255,156,0.10)] px-5 py-3 font-semibold text-[#B6FFD8] transition-colors hover:bg-[rgba(0,255,156,0.16)]"
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    Salvar na central de analises
+                    Abrir ScoutReport salvo
                   </button>
                   <button
                     type="button"
