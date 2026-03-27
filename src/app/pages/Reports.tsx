@@ -1,15 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
-  Brain,
-  CheckCircle,
   Download,
   ExternalLink,
   FileText,
   LoaderCircle,
-  ShieldAlert,
   Sparkles,
-  TrendingUp,
 } from "lucide-react";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
@@ -27,7 +23,6 @@ import {
   type PlayersFiltersState,
   parseFiltersFromSearchParams,
 } from "../utils/playerFilters";
-import { formatExecutiveMetric, type ExecutiveReportMetric } from "../utils/executiveReport";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
 import {
   type CompareViewModel,
@@ -448,134 +443,29 @@ export default function Reports() {
               </div>
             )}
 
-            {reportModel && (
-              <>
-                <section className="relative overflow-hidden rounded-[24px] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(135deg,rgba(7,20,42,0.96),rgba(13,29,57,0.92))] px-7 py-7 shadow-[0_18px_56px_rgba(0,0,0,0.34)] transition-all duration-300 hover:border-[rgba(0,194,255,0.18)] hover:shadow-[0_24px_70px_rgba(0,0,0,0.38)]">
-                  <div className="absolute inset-y-0 right-0 w-64 bg-[radial-gradient(circle_at_top_right,rgba(0,194,255,0.16),transparent_72%)]" />
-                  <div className="relative grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Decision Snapshot</p>
-                      <h2 className="mt-3 text-3xl font-semibold text-white">{reportModel.recommendationLabel}</h2>
-                      <p className="mt-4 max-w-3xl text-sm leading-7 text-gray-300">{shortenText(reportModel.recommendationSummary, 220)}</p>
-                    </div>
-                    <div className="grid gap-4 rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-5">
-                      <EditorialStat
-                        label="Status"
-                        value={reportLoading ? "Gerando" : savedAnalysis?.statusLabel ?? "Em andamento"}
-                        accent={reportLoading ? "#FFB800" : "#00FF9C"}
-                      />
-                      <EditorialStat label="Recorte" value={reportModel.subtitle} accent="#00C2FF" />
-                      <EditorialStat label="Gerado em" value={reportModel.generatedAtLabel} accent="#7A5CFF" />
-                      <EditorialStat
-                        label="Tempo de geracao"
-                        value="n/d"
-                        accent="#00FF9C"
-                      />
-                    </div>
+            {reportModel ? (
+              <section className="rounded-[24px] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(135deg,rgba(7,20,42,0.96),rgba(13,29,57,0.92))] px-7 py-7 shadow-[0_18px_56px_rgba(0,0,0,0.34)]">
+                <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Analysis Saved</p>
+                    <h2 className="mt-3 text-2xl font-semibold text-white">{savedAnalysis?.title ?? reportModel.subtitle}</h2>
+                    <p className="mt-3 max-w-3xl text-sm leading-7 text-gray-300">
+                      O relatorio completo nao aparece mais nesta tela. Use os botoes acima para abrir a analise salva ou exportar o PDF.
+                    </p>
                   </div>
-                </section>
 
-                <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                  <CompactSection title="Decision" subtitle="Executive Summary">
-                    <div className="space-y-4">
-                      <div className="rounded-[16px] border border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] p-4">
-                        <p className="text-[11px] uppercase tracking-[0.22em] text-[#9CFFD1]">Recommended</p>
-                        <p className="mt-2 text-lg font-semibold text-white">
-                          {reportModel.recommendedPlayer?.name ?? "Decisao condicional"}
-                        </p>
-                        <p className="mt-2 text-sm leading-7 text-gray-200">
-                          {shortenText(reportModel.recommendationSummary, 200)}
-                        </p>
-                      </div>
-                      <BulletList
-                        items={splitIntoBullets(
-                          [
-                            ...reportModel.takeaways,
-                            shortenText(reportModel.executiveSummary, 150),
-                          ],
-                          4,
-                        )}
-                      />
-                    </div>
-                  </CompactSection>
-
-                  <CompactSection title="Key Insights" subtitle="Decision Drivers">
-                    <BulletList
-                      items={splitIntoBullets(
-                        reportModel.insights.map((insight) => `${insight.title}: ${insight.content}`),
-                        4,
-                      )}
+                  <div className="grid gap-4 rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-5">
+                    <EditorialStat
+                      label="Status"
+                      value={reportLoading ? "Gerando" : savedAnalysis?.statusLabel ?? "Em andamento"}
+                      accent={reportLoading ? "#FFB800" : "#00FF9C"}
                     />
-                  </CompactSection>
+                    <EditorialStat label="Recorte" value={reportModel.subtitle} accent="#00C2FF" />
+                    <EditorialStat label="Gerado em" value={reportModel.generatedAtLabel} accent="#7A5CFF" />
+                  </div>
                 </div>
-
-                <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                  <CompactSection title="Risk" subtitle="Risk Snapshot">
-                    <BulletList
-                      items={splitIntoBullets(
-                        [
-                          `${displayPlayerA.name}: risco ${displayPlayerA.risk.level} (${displayPlayerA.risk.score.toFixed(1)}), estrutural ${displayPlayerA.structuralRisk.score.toFixed(1)}.`,
-                          `${displayPlayerB.name}: risco ${displayPlayerB.risk.level} (${displayPlayerB.risk.score.toFixed(1)}), estrutural ${displayPlayerB.structuralRisk.score.toFixed(1)}.`,
-                          shortenText(reportModel.riskOverview, 150),
-                        ],
-                        3,
-                      )}
-                    />
-                  </CompactSection>
-
-                  <CompactSection title="Financial Summary" subtitle="Capital and Liquidity">
-                    <BulletList
-                      items={splitIntoBullets(
-                        [
-                          `${displayPlayerA.name}: capital efficiency ${displayPlayerA.capitalEfficiency.toFixed(1)}, liquidez ${displayPlayerA.liquidity.score.toFixed(1)}, risco financeiro ${displayPlayerA.financialRisk.index.toFixed(1)}.`,
-                          `${displayPlayerB.name}: capital efficiency ${displayPlayerB.capitalEfficiency.toFixed(1)}, liquidez ${displayPlayerB.liquidity.score.toFixed(1)}, risco financeiro ${displayPlayerB.financialRisk.index.toFixed(1)}.`,
-                          `${displayPlayerA.name}: ${displayPlayerA.marketValueLabel}.`,
-                          `${displayPlayerB.name}: ${displayPlayerB.marketValueLabel}.`,
-                        ],
-                        4,
-                      )}
-                    />
-                  </CompactSection>
-                </div>
-
-                <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                  <CompactSection title="Player Summary" subtitle="Quick Read">
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <PlayerRiskBlock
-                        player={displayPlayerA}
-                        color="#00C2FF"
-                        recommendation={reportModel.winner === "A"}
-                      />
-                      <PlayerRiskBlock
-                        player={displayPlayerB}
-                        color="#7A5CFF"
-                        recommendation={reportModel.winner === "B"}
-                      />
-                    </div>
-                  </CompactSection>
-
-                  <CompactSection title="Metrics" subtitle="Side by Side">
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-[640px]" role="table">
-                        <thead className="bg-[rgba(255,255,255,0.04)]">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">Metrica</th>
-                            <th className="px-4 py-3 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">{displayPlayerA.name}</th>
-                            <th className="px-4 py-3 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">{displayPlayerB.name}</th>
-                            <th className="px-4 py-3 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500" scope="col">Vencedor</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[rgba(255,255,255,0.04)]">
-                          {reportModel.metrics.slice(0, 5).map((metric) => (
-                            <ComparisonRow key={metric.label} metric={metric} />
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CompactSection>
-                </div>
-              </>
-            )}
+              </section>
+            ) : null}
           </div>
         </main>
       </div>
@@ -626,22 +516,6 @@ function StatusBanner({ children, tone }: { children: ReactNode; tone: "error" |
   return <div className={`rounded-[16px] border px-5 py-4 text-sm ${styles}`}>{children}</div>;
 }
 
-function shortenText(value: string, maxLength = 180) {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxLength) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, maxLength).trimEnd()}...`;
-}
-
-function splitIntoBullets(values: Array<string | null | undefined>, maxItems = 4) {
-  return values
-    .map((value) => (typeof value === "string" ? shortenText(value, 160) : ""))
-    .filter(Boolean)
-    .slice(0, maxItems);
-}
-
 function ReportLoadingSkeleton() {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
@@ -662,42 +536,6 @@ function ReportLoadingSkeleton() {
           />
         ))}
       </div>
-    </div>
-  );
-}
-
-function CompactSection({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.24)]">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold text-white">{title}</h2>
-        {subtitle ? <p className="mt-1 text-xs uppercase tracking-[0.18em] text-gray-500">{subtitle}</p> : null}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function BulletList({ items }: { items: string[] }) {
-  return (
-    <div className="space-y-3">
-      {items.map((item) => (
-        <div
-          key={item}
-          className="flex items-start gap-3 rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-4 py-3 text-sm leading-relaxed text-gray-300"
-        >
-          <span className="mt-1 h-1.5 w-1.5 rounded-full bg-[#00C2FF]" />
-          <span>{item}</span>
-        </div>
-      ))}
     </div>
   );
 }
@@ -750,144 +588,6 @@ function PlayerSelector({
           ))}
         </SelectContent>
       </Select>
-    </div>
-  );
-}
-
-function SectionCard({
-  icon: Icon,
-  iconColor,
-  iconBg,
-  title,
-  children,
-}: {
-  icon: ElementType;
-  iconColor: string;
-  iconBg: string;
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)]" role="region" aria-label={title}>
-      <div className="mb-8 flex items-center gap-4 border-b border-[rgba(255,255,255,0.06)] pb-6">
-        <div className="flex h-12 w-12 items-center justify-center rounded-[12px]" style={{ background: iconBg }}>
-          <Icon className="h-6 w-6" style={{ color: iconColor }} />
-        </div>
-        <h2 className="text-2xl font-semibold tracking-wide text-white">{title}</h2>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function InsightCard({
-  insight,
-}: {
-  insight: {
-    title: string;
-    content: string;
-    tone: "cyan" | "violet" | "emerald";
-  };
-}) {
-  const colors: Record<string, string> = {
-    cyan: "#00C2FF",
-    violet: "#7A5CFF",
-    emerald: "#00FF9C",
-  };
-
-  const color = colors[insight.tone] ?? colors.cyan;
-
-  return (
-    <div className="rounded-[16px] border bg-[rgba(255,255,255,0.03)] p-5 transition-colors hover:bg-[rgba(255,255,255,0.04)]" style={{ borderColor: `${color}20` }}>
-      <h4 className="mb-3 flex items-center gap-2 font-semibold" style={{ color }}>
-        <div className="h-4 w-1 rounded-full" style={{ background: color }} />
-        {insight.title}
-      </h4>
-      <p className="text-sm leading-relaxed text-gray-400">{insight.content}</p>
-    </div>
-  );
-}
-
-function ComparisonRow({ metric }: { metric: ExecutiveReportMetric }) {
-  const winner = metric.winner;
-
-  return (
-    <tr className="transition-colors hover:bg-[rgba(255,255,255,0.02)]" role="row">
-      <td className="px-5 py-4 text-sm text-gray-300" role="cell">{metric.label}</td>
-      <td className="px-5 py-4 text-center tabular-nums" role="cell">
-        <span className={`text-base font-bold ${winner === "A" ? "text-[#00C2FF]" : "text-gray-400"}`}>
-          {formatExecutiveMetric(metric, metric.a)}
-        </span>
-      </td>
-      <td className="px-5 py-4 text-center tabular-nums" role="cell">
-        <span className={`text-base font-bold ${winner === "B" ? "text-[#7A5CFF]" : "text-gray-400"}`}>
-          {formatExecutiveMetric(metric, metric.b)}
-        </span>
-      </td>
-      <td className="px-5 py-4 text-center" role="cell">
-        {winner === "DRAW" ? (
-          <span className="text-xs text-gray-500">Empate</span>
-        ) : (
-          <CheckCircle className={`inline h-5 w-5 ${winner === "A" ? "text-[#00C2FF]" : "text-[#7A5CFF]"}`} />
-        )}
-      </td>
-    </tr>
-  );
-}
-
-function PlayerRiskBlock({
-  player,
-  color,
-  recommendation,
-}: {
-  player: PlayerExtended;
-  color: string;
-  recommendation: boolean;
-}) {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="flex items-center gap-2 text-lg font-semibold">
-          <div className="h-5 w-1 rounded-full" style={{ background: color }} />
-          <span style={{ color }}>{player.name}</span>
-        </h3>
-        {recommendation && (
-          <span className="rounded-full border border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.08)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#00FF9C]">
-            Preferred
-          </span>
-        )}
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <RiskCard title="Composite Risk" value={`${player.risk.score.toFixed(1)}`} subtitle={player.risk.level} description={player.risk.explanation} />
-        <RiskCard title="Structural Risk" value={`${player.structuralRisk.score.toFixed(1)}`} subtitle={player.structuralRisk.level} description={player.structuralRisk.breakdown} />
-        <RiskCard title="Financial Risk" value={`${player.financialRisk.index.toFixed(1)}`} subtitle={player.financialRisk.capitalExposure} description={player.financialRisk.investmentProfile} />
-        <RiskCard title="Liquidity Window" value={`${player.liquidity.score.toFixed(1)}`} subtitle={player.liquidity.resaleWindow} description={player.liquidity.marketProfile} />
-        <RiskCard title="Capital Efficiency" value={`${player.capitalEfficiency.toFixed(1)}`} subtitle={player.risk.level} description={`${player.name} combina leitura de custo, risco e desempenho dentro do recorte atual.`} />
-      </div>
-    </div>
-  );
-}
-
-function RiskCard({
-  title,
-  value,
-  subtitle,
-  description,
-}: {
-  title: string;
-  value: string;
-  subtitle: string;
-  description: string;
-}) {
-  return (
-    <div className="rounded-[14px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] p-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <span className="text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">{title}</span>
-        <span className="rounded-[8px] bg-[rgba(255,255,255,0.06)] px-2.5 py-1 text-xs font-semibold text-white">{subtitle}</span>
-      </div>
-      <p className="text-2xl font-bold text-white">{value}</p>
-      <p className="mt-2 text-xs leading-relaxed text-gray-500">{description}</p>
     </div>
   );
 }
