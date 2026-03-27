@@ -77,7 +77,6 @@ export interface PlayerReportMetrics {
 
 export interface PlayerReportResult {
   analysisId: string;
-  scoutReportId?: string;
   player: PlayerProfileModel;
   metrics: PlayerReportMetrics;
   aiNarrative: string | null;
@@ -521,7 +520,6 @@ export async function generatePlayerReport(
       ...response,
       data: {
         analysisId: typeof payload.analysisId === "string" ? payload.analysisId : `analysis-${id}`,
-        scoutReportId: typeof payload.scoutReportId === "string" ? payload.scoutReportId : undefined,
         player: mapApiPlayerToProfile(isRecord(payload.player) ? payload.player : fallbackPlayer),
         metrics: (isRecord(payload.metrics) ? payload.metrics : {}) as PlayerReportMetrics,
         aiNarrative: typeof payload.aiNarrative === "string" ? payload.aiNarrative : null,

@@ -135,7 +135,7 @@ export const router = createBrowserRouter([
         path: "/reports",
         element: (
           <ProtectedRoute>
-            <ReportsHub />
+            <Reports />
           </ProtectedRoute>
         ),
       },
@@ -144,6 +144,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <Reports />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/reports/hub",
+        element: (
+          <ProtectedRoute>
+            <ReportsHub />
           </ProtectedRoute>
         ),
       },

@@ -233,7 +233,7 @@ export default function ReportsHub() {
                   asChild
                   className="h-12 rounded-[16px] bg-[#00C2FF]/90 px-5 font-semibold text-[#07142A] shadow-[0_10px_28px_rgba(0,194,255,0.24)] transition-transform hover:scale-[1.01] hover:bg-[#00C2FF]"
                 >
-                  <Link to="/reports/generate">
+                  <Link to="/reports">
                     <Plus className="mr-2 h-4 w-4" />
                     Gerar novo relatorio
                   </Link>
