@@ -1,13 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Calendar, Eye, FileText, Plus, ShieldAlert, Trash2 } from "lucide-react";
+import { Calendar, Eye, FileText, Plus, Trash2 } from "lucide-react";
 import { Link } from "react-router";
 import { AppHeader } from "../components/AppHeader";
 import { AppSidebar } from "../components/AppSidebar";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import { toast } from "sonner";
-import { deleteScoutReport, getScoutReports, type StoredScoutReport } from "../../services/scoutReports";
+import {
+  deleteAnalysisHubEntry,
+  getAnalyses,
+  subscribeToAnalysisHubUpdates,
+  type AnalysisViewModel,
+} from "../../services/analysis";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString("pt-BR");
@@ -34,11 +39,11 @@ function ReportsSkeleton() {
   );
 }
 
-function getRiskTone(value: string | undefined) {
+function getStatusTone(value: AnalysisViewModel["status"]) {
   switch (value) {
-    case "LOW":
+    case "completed":
       return "border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.12)] text-[#B6FFD8]";
-    case "HIGH":
+    case "archived":
       return "border-[rgba(255,77,79,0.28)] bg-[rgba(255,77,79,0.14)] text-[#FFB4B5]";
     default:
       return "border-[rgba(255,184,0,0.28)] bg-[rgba(255,184,0,0.12)] text-[#F8D98B]";
@@ -50,12 +55,11 @@ function ReportCard({
   deleting,
   onDelete,
 }: {
-  report: StoredScoutReport;
+  report: AnalysisViewModel;
   deleting: boolean;
-  onDelete: (id: string) => void;
+  onDelete: (entry: AnalysisViewModel) => void;
 }) {
-  const decisionSummary = report.content.decisionSummary;
-  const riskTone = getRiskTone(decisionSummary?.riskLevel);
+  const statusTone = getStatusTone(report.status);
 
   return (
     <motion.article
@@ -69,63 +73,40 @@ function ReportCard({
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">
             <FileText className="h-3.5 w-3.5" />
-            {report.type}
+            {report.typeLabel}
           </div>
           <h2 className="mt-4 text-2xl font-semibold text-white">{report.title}</h2>
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400">
-            {report.description || "Relatorio salvo na central inteligente do SoccerMind."}
+            {report.description || "Relatorio salvo na central Analysis."}
           </p>
         </div>
         <div className="rounded-[16px] border border-white/10 bg-white/5 px-4 py-3 text-right">
           <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Analista</p>
-          <p className="mt-2 text-sm font-semibold text-white">{report.analyst}</p>
+          <p className="mt-2 text-sm font-semibold text-white">{report.user}</p>
         </div>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3 text-xs text-gray-400">
         <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
           <Calendar className="h-3.5 w-3.5 text-[#9BE7FF]" />
-          {formatDate(report.createdAt)}
+          {formatDate(report.date)}
         </span>
-        {decisionSummary ? (
-          <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(0,194,255,0.18)] bg-[rgba(0,194,255,0.08)] px-3 py-1.5 text-[#9BE7FF]">
-            {decisionSummary.confidence}% confidence
-          </span>
-        ) : null}
+        <span className={`rounded-full border px-3 py-1.5 font-semibold uppercase ${statusTone}`}>
+          {report.statusLabel}
+        </span>
         <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
           {report.players.length} atleta{report.players.length === 1 ? "" : "s"}
         </span>
       </div>
 
       <div className="mt-5 rounded-[18px] border border-[rgba(0,194,255,0.16)] bg-[rgba(0,194,255,0.08)] p-4">
-        <p className="text-[10px] uppercase tracking-[0.24em] text-[#9BE7FF]">Decision Summary</p>
+        <p className="text-[10px] uppercase tracking-[0.24em] text-[#9BE7FF]">Decision Snapshot</p>
         <p className="mt-3 text-sm font-semibold leading-[1.8] text-white">
-          {decisionSummary?.decision || "Resumo decisorio ainda nao disponivel para este ScoutReport."}
+          {report.players.join(" vs ") || "Leitura executiva preservada na central Analysis."}
         </p>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          {decisionSummary ? (
-            <>
-              <div className="min-w-[148px] flex-1">
-                <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-gray-400">
-                  <span>Confidence</span>
-                  <span>{decisionSummary.confidence}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <div
-                    className="h-full rounded-full bg-[#00C2FF] transition-all duration-500"
-                    style={{ width: `${decisionSummary.confidence}%` }}
-                  />
-                </div>
-              </div>
-              <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase ${riskTone}`}>
-                <ShieldAlert className="mr-1 inline h-3.5 w-3.5" />
-                {decisionSummary.riskLevel}
-              </span>
-            </>
-          ) : (
-            <span className="text-xs text-gray-400">Confianca e risco nao informados.</span>
-          )}
-        </div>
+        <p className="mt-3 text-xs leading-relaxed text-gray-300">
+          {report.deleteHint}
+        </p>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
@@ -133,15 +114,15 @@ function ReportCard({
           asChild
           className="h-11 rounded-[14px] bg-[#00C2FF]/90 px-5 font-semibold text-[#07142A] transition-transform hover:scale-[1.01] hover:bg-[#00C2FF]"
         >
-          <Link to={`/reports/${report.id}`}>
+          <Link to={`/analysis/${report.id}`}>
             <Eye className="mr-2 h-4 w-4" />
             Ver relatorio
           </Link>
         </Button>
         <Button
           variant="outline"
-          onClick={() => onDelete(report.id)}
-          disabled={deleting}
+          onClick={() => onDelete(report)}
+          disabled={deleting || !report.canDelete}
           className="h-11 rounded-[14px] border-[rgba(255,77,79,0.28)] bg-[rgba(255,77,79,0.08)] px-5 text-[#FFB4B5] transition-colors hover:bg-[rgba(255,77,79,0.14)]"
         >
           <Trash2 className="mr-2 h-4 w-4" />
@@ -153,10 +134,15 @@ function ReportCard({
 }
 
 export default function ReportsHub() {
-  const [reports, setReports] = useState<StoredScoutReport[]>([]);
+  const [reports, setReports] = useState<AnalysisViewModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const visibleReports = useMemo(
+    () => reports.filter((report) => report.type === "report"),
+    [reports],
+  );
 
   useEffect(() => {
     let active = true;
@@ -165,7 +151,7 @@ export default function ReportsHub() {
       setLoading(true);
 
       try {
-        const response = await getScoutReports();
+        const response = await getAnalyses();
         if (!active) {
           return;
         }
@@ -178,7 +164,7 @@ export default function ReportsHub() {
         }
 
         setReports([]);
-        setError(loadError instanceof Error ? loadError.message : "Nao foi possivel carregar os relatórios.");
+        setError(loadError instanceof Error ? loadError.message : "Nao foi possivel carregar os relatorios.");
       } finally {
         if (active) {
           setLoading(false);
@@ -187,18 +173,22 @@ export default function ReportsHub() {
     }
 
     void loadReports();
+    const unsubscribe = subscribeToAnalysisHubUpdates(() => {
+      void loadReports();
+    });
 
     return () => {
       active = false;
+      unsubscribe();
     };
   }, []);
 
-  const handleDelete = async (id: string) => {
-    setDeletingId(id);
+  const handleDelete = async (entry: AnalysisViewModel) => {
+    setDeletingId(entry.id);
 
     try {
-      await deleteScoutReport(id);
-      setReports((current) => current.filter((report) => report.id !== id));
+      await deleteAnalysisHubEntry(entry);
+      setReports((current) => current.filter((report) => report.id !== entry.id));
       toast.success("Relatorio removido da central.");
     } catch (deleteError) {
       toast.error(deleteError instanceof Error ? deleteError.message : "Nao foi possivel excluir o relatorio.");
@@ -221,11 +211,11 @@ export default function ReportsHub() {
                 <div className="max-w-4xl">
                   <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">
                     <FileText className="h-3.5 w-3.5" />
-                    ScoutReport Hub
+                    Analysis Hub
                   </div>
-                  <h1 className="mt-4 text-4xl font-semibold text-white">Central inteligente de relatórios</h1>
+                  <h1 className="mt-4 text-4xl font-semibold text-white">Central de relatorios</h1>
                   <p className="mt-3 max-w-3xl text-sm leading-relaxed text-gray-400">
-                    Tudo o que foi salvo pelo time agora orbita em torno de ScoutReport: decisão, contexto, explainability e histórico executivo.
+                    Todos os relatorios executivos ativos agora sao listados diretamente da central Analysis, sem depender de ScoutReport no fluxo principal.
                   </p>
                 </div>
 
@@ -249,16 +239,16 @@ export default function ReportsHub() {
 
             {loading ? <ReportsSkeleton /> : null}
 
-            {!loading && reports.length === 0 ? (
+            {!loading && visibleReports.length === 0 ? (
               <div className="rounded-[24px] border border-white/8 bg-white/5 px-8 py-16 text-center text-sm text-gray-400 backdrop-blur-sm">
-                Nenhum ScoutReport salvo ainda. Gere um novo parecer executivo para popular a central.
+                Nenhum relatorio salvo ainda. Gere um novo parecer executivo para popular a central Analysis.
               </div>
             ) : null}
 
-            {!loading && reports.length > 0 ? (
+            {!loading && visibleReports.length > 0 ? (
               <AnimatePresence>
                 <div className="grid gap-5 xl:grid-cols-2">
-                  {reports.map((report) => (
+                  {visibleReports.map((report) => (
                     <ReportCard
                       key={report.id}
                       report={report}

@@ -4,7 +4,6 @@ import {
   type AnalysisDetailViewModel,
   type AnalysisViewModel,
 } from "../../adapters/analysis";
-import { deleteScoutReport as deleteScoutReportRequest } from "../../app/service/api";
 import { apiFetch, type ApiEnvelope } from "../../app/services/api";
 import { getDataSource } from "../../config/dataSource";
 
@@ -73,11 +72,11 @@ const MOCK_ANALYSES: AnalysisViewModel[] = [
     status: "completed",
     statusLabel: "Concluido",
     canDelete: true,
-    isLegacy: true,
-    sourceOrigin: "scout_report",
-    sourceLabel: "Legado ScoutReport",
-    deleteManagedBy: "scout_report",
-    deleteHint: "Entrada legada removivel via ScoutReport.",
+    isLegacy: false,
+    sourceOrigin: "analysis",
+    sourceLabel: "Central Analysis",
+    deleteManagedBy: "analysis",
+    deleteHint: "Entrada persistida em Analysis; exclusao disponivel.",
   },
 ];
 
@@ -175,10 +174,7 @@ export async function getAnalysisById(id: string) {
 }
 
 export async function deleteAnalysisHubEntry(entry: Pick<AnalysisViewModel, "id" | "deleteManagedBy">) {
-  const response =
-    entry.deleteManagedBy === "scout_report"
-      ? await deleteScoutReportRequest(entry.id)
-      : await deleteAnalysisEntry(entry.id);
+  const response = await deleteAnalysisEntry(entry.id);
 
   notifyAnalysisHubUpdated({ action: "deleted", id: entry.id });
 
