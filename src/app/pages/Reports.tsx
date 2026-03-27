@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ElementType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ElementType, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   Brain,
@@ -29,14 +29,14 @@ import {
 } from "../utils/playerFilters";
 import { formatExecutiveMetric, type ExecutiveReportMetric } from "../utils/executiveReport";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
-import { buildExecutiveReportData } from "../../adapters/reports";
 import {
-  getReportShortlist,
   type CompareViewModel,
+  getExecutiveReportData,
+  getReportShortlist,
   type ExecutiveReportModel,
   type PlayerFilterOptions,
 } from "../services/reports";
-import { generateScoutReport, type StoredScoutReport } from "../../services/scoutReports";
+import { createReportAnalysis, type AnalysisViewModel } from "../services/analysis";
 import { toast } from "sonner";
 
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
@@ -82,7 +82,8 @@ export default function Reports() {
   const [comparisonData, setComparisonData] = useState<CompareViewModel | null>(null);
   const [reportModel, setReportModel] = useState<ExecutiveReportModel | null>(null);
   const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
-  const [savedReport, setSavedReport] = useState<StoredScoutReport | null>(null);
+  const [savedAnalysis, setSavedAnalysis] = useState<AnalysisViewModel | null>(null);
+  const lastPersistedSelectionRef = useRef<string>("");
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -168,43 +169,65 @@ export default function Reports() {
       if (!playerA.name || !playerB.name || playerA.name === "Sem dados" || playerB.name === "Sem dados") {
         setComparisonData(null);
         setReportModel(null);
-        setSavedReport(null);
+        setSavedAnalysis(null);
         return;
       }
 
       setReportLoading(true);
 
       try {
-        const response = await generateScoutReport({
-          playerIds: [playerA.id, playerB.id],
+        const response = await getExecutiveReportData(playerA, playerB, {
           analyst: user?.name,
+          generatedAt: new Date(),
+          status: "Concluido",
         });
 
         if (!active) {
           return;
         }
 
-        const nextReport = response.data ?? null;
-        const nextComparisonData = nextReport?.content.comparisonData ?? null;
+        const payload = response.data ?? null;
+        const nextComparisonData = payload?.comparisonData ?? null;
 
-        setSavedReport(nextReport);
         setComparisonData(nextComparisonData);
-        setReportModel(
-          nextComparisonData
-            ? buildExecutiveReportData(nextComparisonData, nextComparisonData.playerA, nextComparisonData.playerB, {
-                analyst: nextReport?.analyst,
-                generatedAt: new Date(nextReport?.content.generatedAt ?? nextReport?.createdAt ?? Date.now()),
-                status: nextReport?.status,
-              })
-            : null,
-        );
+        setReportModel(payload?.reportModel ?? null);
         setReportError(null);
-        setSaveFeedbackTone("info");
-        setSaveFeedback(
-          nextReport
-            ? `ScoutReport persistido automaticamente: ${nextReport.title}. A visualizacao atual reflete o artefato salvo.`
-            : null,
-        );
+
+        const selectionKey = [playerA.id, playerB.id].sort().join(":");
+
+        if (payload?.reportModel && selectionKey !== lastPersistedSelectionRef.current) {
+          try {
+            const persisted = await createReportAnalysis({
+              playerIds: [playerA.id, playerB.id],
+              title: `Relatorio Executivo - ${payload.reportModel.subtitle}`,
+              description: payload.reportModel.recommendationSummary,
+              analyst: user?.name,
+            });
+
+            if (!active) {
+              return;
+            }
+
+            lastPersistedSelectionRef.current = selectionKey;
+            setSavedAnalysis(persisted.data);
+            setSaveFeedbackTone("success");
+            setSaveFeedback(
+              `Relatorio persistido na central Analysis: ${persisted.data.title}. A visualizacao atual segue o fluxo oficial do projeto.`,
+            );
+          } catch (persistError) {
+            if (!active) {
+              return;
+            }
+
+            setSavedAnalysis(null);
+            setSaveFeedbackTone("error");
+            setSaveFeedback(
+              persistError instanceof Error
+                ? `O relatorio foi gerado, mas nao foi possivel persisti-lo em Analysis: ${persistError.message}`
+                : "O relatorio foi gerado, mas nao foi possivel persisti-lo em Analysis.",
+            );
+          }
+        }
       } catch (error) {
         if (!active) {
           return;
@@ -212,7 +235,7 @@ export default function Reports() {
 
         setComparisonData(null);
         setReportModel(null);
-        setSavedReport(null);
+        setSavedAnalysis(null);
         setReportError(error instanceof Error ? error.message : "Erro ao gerar o relatorio executivo");
       } finally {
         if (active) {
@@ -279,14 +302,14 @@ export default function Reports() {
   };
 
   const handleOpenSavedReport = () => {
-    if (!savedReport?.id) {
+    if (!savedAnalysis?.id) {
       setSaveFeedbackTone("error");
-      setSaveFeedback("O ScoutReport ainda nao foi persistido para esta comparacao.");
-      toast.error("O ScoutReport ainda nao foi persistido.");
+      setSaveFeedback("A analise ainda nao foi persistida para esta comparacao.");
+      toast.error("A analise ainda nao foi persistida.");
       return;
     }
 
-    navigate(`/reports/${savedReport.id}`);
+    navigate(`/analysis/${savedAnalysis.id}`);
   };
 
   return (
@@ -317,7 +340,7 @@ export default function Reports() {
                       {reportModel ? `Gerado em ${reportModel.generatedAtLabel}` : "Aguardando comparacao"}
                     </span>
                     <span className="rounded-full border border-[rgba(0,194,255,0.18)] bg-[rgba(0,194,255,0.08)] px-3 py-1.5 text-[#9BE7FF]">
-                      <Link to="/reports">Central ScoutReport</Link>
+                      <Link to="/history">Central Analysis</Link>
                     </span>
                   </div>
                 </div>
@@ -328,15 +351,15 @@ export default function Reports() {
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-5 py-4 backdrop-blur-sm">
                     <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Acoes</p>
                     <p className="mt-2 text-lg font-semibold text-white">Persistido por padrao</p>
-                    <p className="mt-1 text-xs text-gray-500">A geracao executiva agora salva um ScoutReport imediatamente e devolve o registro salvo.</p>
+                    <p className="mt-1 text-xs text-gray-500">A geracao executiva persiste o relatorio na central Analysis e mantem o fluxo oficial do produto.</p>
                     <div className="mt-4 grid gap-3">
                       <Button
                         className="h-11 rounded-[14px] border border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.14)] px-4 font-semibold text-[#B6FFD8] shadow-[0_6px_18px_rgba(0,255,156,0.14)] hover:bg-[rgba(0,255,156,0.2)]"
                         onClick={handleOpenSavedReport}
-                        disabled={!savedReport || reportLoading}
+                        disabled={!savedAnalysis || reportLoading}
                       >
                         {reportLoading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
-                        Abrir ScoutReport
+                        Abrir Analysis
                       </Button>
                       <Button
                         className="h-11 rounded-[14px] bg-[#00C2FF]/90 px-4 font-semibold text-[#07142A] shadow-[0_6px_18px_rgba(0,194,255,0.25)] hover:bg-[#00C2FF]"
@@ -448,14 +471,14 @@ export default function Reports() {
                     <div className="grid gap-4 rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-5">
                       <EditorialStat
                         label="Status"
-                        value={reportLoading ? "Gerando" : savedReport?.status === "COMPLETED" ? "Persistido" : "Em andamento"}
+                        value={reportLoading ? "Gerando" : savedAnalysis?.statusLabel ?? "Em andamento"}
                         accent={reportLoading ? "#FFB800" : "#00FF9C"}
                       />
                       <EditorialStat label="Recorte" value={reportModel.subtitle} accent="#00C2FF" />
                       <EditorialStat label="Gerado em" value={reportModel.generatedAtLabel} accent="#7A5CFF" />
                       <EditorialStat
                         label="Tempo de geracao"
-                        value={savedReport?.content.meta?.generatedInMs ? `${savedReport.content.meta.generatedInMs} ms` : "n/d"}
+                        value="n/d"
                         accent="#00FF9C"
                       />
                     </div>
