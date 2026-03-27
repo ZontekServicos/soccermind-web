@@ -65,6 +65,80 @@ function formatMetaLine(values: Array<string | null | undefined>) {
   return values.filter(Boolean).join(" · ");
 }
 
+function isRenderableRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function formatUnknownText(value: unknown, fallback = "N/A") {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || fallback;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Sim" : "Nao";
+  }
+
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => formatUnknownText(item, ""))
+      .filter((item) => item.trim().length > 0);
+
+    return items.length > 0 ? items.join(", ") : fallback;
+  }
+
+  if (isRenderableRecord(value)) {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+}
+
+function formatUnknownNumber(value: unknown, fallback = 0) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : fallback;
+}
+
+function formatRiskSummary(value: unknown) {
+  if (isRenderableRecord(value)) {
+    return formatUnknownText(value.text, "");
+  }
+
+  return formatUnknownText(value, "");
+}
+
+function formatGrowthProjectionText(value: unknown) {
+  if (isRenderableRecord(value)) {
+    if (typeof value.expectedPeak === "number" && Number.isFinite(value.expectedPeak)) {
+      return String(value.expectedPeak);
+    }
+
+    const timelineLabels = [
+      typeof value.shortTerm !== "undefined" ? `Curto: ${formatUnknownText(value.shortTerm, "N/A")}` : null,
+      typeof value.mediumTerm !== "undefined" ? `Medio: ${formatUnknownText(value.mediumTerm, "N/A")}` : null,
+      typeof value.longTerm !== "undefined" ? `Longo: ${formatUnknownText(value.longTerm, "N/A")}` : null,
+    ].filter((item): item is string => Boolean(item));
+
+    if (timelineLabels.length > 0) {
+      return timelineLabels.join(" | ");
+    }
+  }
+
+  return formatUnknownText(value, "N/A");
+}
+
 function MetricCard({
   label,
   value,
@@ -378,14 +452,43 @@ export default function AnalysisDetail() {
       ? singleReportMetaLine || "Contexto do atleta indisponivel"
       : analysis.description || "Leitura completa do relatorio salvo na central de analises.";
   const playersBadgeLabel = isSingleReport && singleReportPlayerName ? singleReportPlayerName : playersLabel || "Jogadores nao informados";
+  const safeHeaderTitle = formatUnknownText(headerTitle, "Analise");
+  const safeHeaderDescription = formatUnknownText(headerDescription, "Leitura completa do relatorio salvo na central de analises.");
+  const safePlayersBadgeLabel = formatUnknownText(playersBadgeLabel, "Jogadores nao informados");
+  const safeTypeLabel = formatUnknownText(analysis.typeLabel, "Relatorio");
+  const safeStatusLabel = formatUnknownText(analysis.statusLabel, "Em andamento");
+  const safeAnalystName = formatUnknownText(analysis.user, "Analista SoccerMind");
+  const safeSingleReportTier = formatUnknownText(singleReport?.metrics?.tier, "PROSPECT");
+  const safeSingleReportArchetype = formatUnknownText(singleReport?.metrics?.archetype, "Nao classificado");
+  const safeSingleReportRiskLevel = formatUnknownText(singleReport?.metrics?.riskLevel, "MEDIUM");
+  const safeSingleReportRecommendation = formatUnknownText(singleReport?.metrics?.recommendation, "Recomendacao indisponivel.");
+  const safeSingleReportRiskSummary = formatRiskSummary(singleReport?.metrics?.riskSummary);
+  const safeSingleReportGrowthProjection = formatGrowthProjectionText(singleReport?.metrics?.growthProjection);
+  const safeSingleReportNarrative = formatUnknownText(
+    singleReport?.aiNarrative ?? analysis.description ?? "Narrativa de scouting indisponivel.",
+    "Narrativa de scouting indisponivel.",
+  );
 
   useEffect(() => {
-    document.title = `${headerTitle} | SoccerMind`;
+    document.title = `${safeHeaderTitle} | SoccerMind`;
 
     return () => {
       document.title = "SoccerMind";
     };
-  }, [headerTitle]);
+  }, [safeHeaderTitle]);
+
+  useEffect(() => {
+    if (!analysis) {
+      return;
+    }
+
+    try {
+      console.log("Analysis payload completo:", JSON.stringify(analysis, null, 2));
+    } catch (serializationError) {
+      console.log("Analysis payload completo:", analysis);
+      console.error("Falha ao serializar analysis para diagnostico:", serializationError);
+    }
+  }, [analysis]);
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -412,27 +515,27 @@ export default function AnalysisDetail() {
                   </div>
                   <div className="mt-4 flex flex-col gap-4">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <h1 className="text-4xl font-bold tracking-[-0.03em] text-white lg:text-[2.3rem]">{headerTitle}</h1>
+                      <h1 className="text-4xl font-bold tracking-[-0.03em] text-white lg:text-[2.3rem]">{safeHeaderTitle}</h1>
                       {isSingleReport && singleReport ? (
-                        <span className={`inline-flex items-center self-start rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${getTierStyles(singleReport.metrics.tier)}`}>
-                          {singleReport.metrics.tier}
+                        <span className={`inline-flex items-center self-start rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${getTierStyles(safeSingleReportTier)}`}>
+                          {safeSingleReportTier}
                         </span>
                       ) : null}
                     </div>
                     <p className="max-w-3xl text-sm leading-relaxed text-[rgba(255,255,255,0.6)]">
-                      {headerDescription}
+                      {safeHeaderDescription}
                     </p>
                     <div className="h-px w-full bg-[linear-gradient(90deg,rgba(0,194,255,0.7),rgba(0,194,255,0.08),transparent)]" />
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-400">
                     <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
-                      {analysis.typeLabel}
+                      {safeTypeLabel}
                     </span>
                     <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
-                      {playersBadgeLabel}
+                      {safePlayersBadgeLabel}
                     </span>
                     <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
-                      {analysis.statusLabel}
+                      {safeStatusLabel}
                     </span>
                   </div>
                 </div>
@@ -471,14 +574,14 @@ export default function AnalysisDetail() {
             </section>
 
             <div className="grid gap-4 md:grid-cols-3">
-              <MetaCard label="Analista" value={analysis.user} icon={User} accent="#00C2FF" />
+              <MetaCard label="Analista" value={safeAnalystName} icon={User} accent="#00C2FF" />
               <MetaCard
                 label="Data"
                 value={new Date(analysis.date).toLocaleString("pt-BR")}
                 icon={Calendar}
                 accent="#7A5CFF"
               />
-              <MetaCard label="Status" value={analysis.statusLabel} icon={Target} accent="#00FF9C" />
+              <MetaCard label="Status" value={safeStatusLabel} icon={Target} accent="#00FF9C" />
             </div>
 
             {analysis.reportContent?.contentStatus === "partial" && !isSingleReport ? (
@@ -499,13 +602,13 @@ export default function AnalysisDetail() {
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                       <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Relatorio Individual</p>
-                      <h2 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-white">{singleReportPlayerName}</h2>
+                      <h2 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-white">{formatUnknownText(singleReportPlayerName, "Jogador")}</h2>
                       <p className="mt-3 text-sm text-[rgba(255,255,255,0.6)]">
                         {[singleReport.player.position, singleReport.player.club, singleReport.player.league].filter(Boolean).join(" • ") || "Contexto do atleta indisponivel"}
                       </p>
                     </div>
-                    <span className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${getTierStyles(singleReport.metrics.tier)}`}>
-                      {singleReport.metrics.tier}
+                    <span className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${getTierStyles(safeSingleReportTier)}`}>
+                      {safeSingleReportTier}
                     </span>
                   </div>
                 </section>
@@ -520,10 +623,10 @@ export default function AnalysisDetail() {
                   />
                   <MetricCard
                     label="Risco"
-                    value={singleReport.metrics.riskScore.toFixed(1)}
+                    value={formatUnknownNumber(singleReport.metrics.riskScore).toFixed(1)}
                     badge={
-                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase ${getRiskBadgeStyles(singleReport.metrics.riskLevel)}`}>
-                        {singleReport.metrics.riskLevel}
+                      <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase ${getRiskBadgeStyles(safeSingleReportRiskLevel)}`}>
+                        {safeSingleReportRiskLevel}
                       </span>
                     }
                   />
@@ -547,8 +650,8 @@ export default function AnalysisDetail() {
                       <div>Liga: <span className="text-white">{singleReport.player.league ?? "N/A"}</span></div>
                       <div>Nacionalidade: <span className="text-white">{singleReport.player.nationality ?? "N/A"}</span></div>
                       <div>Idade: <span className="text-white">{singleReport.player.age ?? "N/A"}</span></div>
-                      <div>Arquetipo: <span className="text-white">{singleReport.metrics.archetype}</span></div>
-                      <div>Pico projetado: <span className="text-white">{singleReport.metrics.growthProjection.expectedPeak}</span></div>
+                      <div>Arquetipo: <span className="text-white">{safeSingleReportArchetype}</span></div>
+                      <div>Pico projetado: <span className="text-white">{safeSingleReportGrowthProjection}</span></div>
                     </div>
                   </div>
 
@@ -581,7 +684,7 @@ export default function AnalysisDetail() {
                     </div>
                   </div>
                   <div className="space-y-6 border-l border-[#00C2FF] pl-5 text-[1.05rem] leading-[1.85] text-gray-300">
-                    {(singleReport.aiNarrative || analysis.description || "Narrativa de scouting indisponivel.")
+                    {safeSingleReportNarrative
                       .split(/\n{2,}/)
                       .filter(Boolean)
                       .map((paragraph, index) => (
@@ -595,8 +698,11 @@ export default function AnalysisDetail() {
                     <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#A855F7]">Recomendacao Executiva</p>
                     <div className="mt-4 flex items-start gap-3">
                       <Target className="mt-0.5 h-5 w-5 text-[#A855F7]" />
-                      <p className="text-[15px] font-bold leading-[1.85] text-white">{singleReport.metrics.recommendation}</p>
+                      <p className="text-[15px] font-bold leading-[1.85] text-white">{safeSingleReportRecommendation}</p>
                     </div>
+                    {safeSingleReportRiskSummary ? (
+                      <p className="mt-4 text-sm leading-[1.8] text-[rgba(255,255,255,0.75)]">{safeSingleReportRiskSummary}</p>
+                    ) : null}
                   </div>
                 </DetailSection>
               </>
