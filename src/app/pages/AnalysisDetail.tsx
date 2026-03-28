@@ -279,6 +279,54 @@ function DetailSection({
   );
 }
 
+function ExecutiveDecisionCard({
+  label,
+  recommendation,
+  reason,
+  indicators,
+}: {
+  label: string;
+  recommendation: string;
+  reason: string;
+  indicators: Array<{ label: string; value: string; tone?: "cyan" | "green" | "amber" | "violet" }>;
+}) {
+  const toneClass = {
+    cyan: "border-[rgba(0,194,255,0.18)] bg-[rgba(0,194,255,0.08)] text-[#9BE7FF]",
+    green: "border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] text-[#B6FFD8]",
+    amber: "border-[rgba(251,191,36,0.18)] bg-[rgba(251,191,36,0.08)] text-[#F8D98B]",
+    violet: "border-[rgba(168,85,247,0.22)] bg-[rgba(168,85,247,0.08)] text-[#D8B4FE]",
+  };
+
+  return (
+    <section className="rounded-[24px] border border-[rgba(168,85,247,0.22)] bg-[linear-gradient(135deg,rgba(29,18,52,0.96),rgba(10,27,53,0.94))] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-[11px] uppercase tracking-[0.28em] text-[#D8B4FE]">{label}</p>
+          <div className="mt-4 flex items-start gap-3">
+            <div className="mt-1 h-10 w-1 rounded-full bg-[#A855F7]" />
+            <div>
+              <h2 className="text-2xl font-semibold text-white">{recommendation}</h2>
+              <p className="mt-3 text-sm leading-7 text-[rgba(255,255,255,0.68)]">{reason}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[460px]">
+          {indicators.map((indicator) => (
+            <div
+              key={`${indicator.label}-${indicator.value}`}
+              className={`rounded-[18px] border px-4 py-4 ${toneClass[indicator.tone ?? "cyan"]}`}
+            >
+              <p className="text-[10px] uppercase tracking-[0.22em] text-[rgba(255,255,255,0.56)]">{indicator.label}</p>
+              <p className="mt-2 text-lg font-semibold text-white">{indicator.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function AnalysisDetail() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -491,6 +539,45 @@ export default function AnalysisDetail() {
   const comparisonInsights = Array.isArray(reportModel?.insights) ? reportModel.insights : [];
   const comparisonTakeaways = Array.isArray(reportModel?.takeaways) ? reportModel.takeaways : [];
   const comparisonNarrative = Array.isArray(reportModel?.aiNarrative) ? reportModel.aiNarrative : [];
+  const executiveReason = isSingleReport
+    ? shortenText(safeSingleReportRiskSummary || safeHeaderDescription, 132)
+    : shortenText(reportModel?.executiveSummary ?? analysis?.description ?? "Leitura executiva indisponivel.", 132);
+  const executiveRecommendationLabel = isSingleReport ? "SoccerMind Decision" : "Recomendacao Executiva";
+  const executiveRecommendationValue = isSingleReport
+    ? safeSingleReportRecommendation
+    : formatUnknownText(reportModel?.recommendationLabel, "Decisao condicionada");
+  const executiveIndicators = isSingleReport
+    ? [
+        {
+          label: "Risco",
+          value: safeSingleReportRiskLevel,
+          tone: safeSingleReportRiskLevel === "LOW" ? "green" : safeSingleReportRiskLevel === "HIGH" ? "amber" : "cyan",
+        },
+        { label: "Liquidez", value: safeSingleLiquidity.toFixed(1), tone: "green" },
+        { label: "Capital", value: safeSingleCapitalEfficiency.toFixed(1), tone: "violet" },
+      ]
+    : [
+        {
+          label: "Risco",
+          value: reportModel?.recommendedPlayer?.riskLevel ?? "MEDIUM",
+          tone:
+            reportModel?.recommendedPlayer?.riskLevel === "LOW"
+              ? "green"
+              : reportModel?.recommendedPlayer?.riskLevel === "HIGH"
+                ? "amber"
+                : "cyan",
+        },
+        {
+          label: "Liquidez",
+          value: reportModel?.recommendedPlayer ? reportModel.recommendedPlayer.liquidity.score.toFixed(1) : "N/A",
+          tone: "green",
+        },
+        {
+          label: "Capital",
+          value: reportModel?.recommendedPlayer ? reportModel.recommendedPlayer.capitalEfficiency.toFixed(1) : "N/A",
+          tone: "violet",
+        },
+      ];
 
   useEffect(() => {
     document.title = `${safeHeaderTitle} | SoccerMind`;
@@ -610,17 +697,6 @@ export default function AnalysisDetail() {
                     </p>
                     <div className="h-px w-full bg-[linear-gradient(90deg,rgba(0,194,255,0.7),rgba(0,194,255,0.08),transparent)]" />
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-400">
-                    <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
-                      {safeTypeLabel}
-                    </span>
-                    <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
-                      {safePlayersBadgeLabel}
-                    </span>
-                    <span className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5">
-                      {safeStatusLabel}
-                    </span>
-                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
@@ -656,6 +732,13 @@ export default function AnalysisDetail() {
               </div>
             </section>
 
+            <ExecutiveDecisionCard
+              label={executiveRecommendationLabel}
+              recommendation={executiveRecommendationValue}
+              reason={executiveReason}
+              indicators={executiveIndicators}
+            />
+
             <div className="grid gap-4 md:grid-cols-3">
               <MetaCard label="Analista" value={safeAnalystName} icon={User} accent="#00C2FF" />
               <MetaCard
@@ -675,27 +758,12 @@ export default function AnalysisDetail() {
 
             {!isComparison && !isSingleReport && (
               <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-300">
-                Esta tela foi preparada principalmente para relatorios do tipo REPORT. Esta analise foi carregada com seus metadados, mas nao possui leitura executiva detalhada.
+                Relatorio salvo com metadados disponiveis. A leitura executiva detalhada nao esta completa neste item.
               </div>
             )}
 
             {isSingleReport && singleReport ? (
               <>
-                <section className="rounded-[24px] border border-[rgba(0,194,255,0.16)] bg-[linear-gradient(135deg,rgba(10,27,53,0.96),rgba(12,34,63,0.88))] p-6 shadow-[0_18px_60px_rgba(0,0,0,0.28)]">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                      <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Relatorio Individual</p>
-                      <h2 className="mt-3 text-3xl font-bold tracking-[-0.03em] text-white">{formatUnknownText(singleReportPlayerName, "Jogador")}</h2>
-                      <p className="mt-3 text-sm text-[rgba(255,255,255,0.6)]">
-                        {[singleReport.player.position, singleReport.player.club, singleReport.player.league].filter(Boolean).join(" • ") || "Contexto do atleta indisponivel"}
-                      </p>
-                    </div>
-                    <span className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] ${getTierStyles(safeSingleReportTier)}`}>
-                      {safeSingleReportTier}
-                    </span>
-                  </div>
-                </section>
-
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <MetricCard label="Overall" value={`${safeSingleOverall}`} valueClassName="text-[#00C2FF]" />
                   <MetricCard label="Potencial" value={`${safeSinglePotential}`} valueClassName="text-[#A855F7]" />
@@ -762,8 +830,8 @@ export default function AnalysisDetail() {
                   <div className="mb-5 flex items-center gap-4">
                     <div className="h-12 w-1 rounded-full bg-[#00C2FF]" />
                     <div>
-                      <h3 className="text-xl font-semibold text-white">Narrativa de Scouting</h3>
-                      <p className="mt-1 text-sm text-gray-500">Leitura executiva gerada pela IA para o atleta atual.</p>
+                      <h3 className="text-xl font-semibold text-white">Leitura de Contexto</h3>
+                      <p className="mt-1 text-sm text-gray-500">Contexto complementar preservado na Analysis.</p>
                     </div>
                   </div>
                   <div className="space-y-6 border-l border-[#00C2FF] pl-5 text-[1.05rem] leading-[1.85] text-gray-300">
@@ -776,28 +844,15 @@ export default function AnalysisDetail() {
                   </div>
                 </section>
 
-                <DetailSection title="Recomendacao Executiva" subtitle="Sintese objetiva para decisao de acompanhamento ou investimento.">
-                  <div className="rounded-[18px] border border-[rgba(168,85,247,0.3)] bg-[rgba(168,85,247,0.08)] p-5 text-white">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#A855F7]">Recomendacao Executiva</p>
-                    <div className="mt-4 flex items-start gap-3">
-                      <Target className="mt-0.5 h-5 w-5 text-[#A855F7]" />
-                      <p className="text-[15px] font-bold leading-[1.85] text-white">{safeSingleReportRecommendation}</p>
-                    </div>
-                    {safeSingleReportRiskSummary ? (
-                      <p className="mt-4 text-sm leading-[1.8] text-[rgba(255,255,255,0.75)]">{safeSingleReportRiskSummary}</p>
-                    ) : null}
-                  </div>
-                </DetailSection>
-
                 {(rawDecisionSummary || rawExplainabilityItems.length > 0 || rawInsights.length > 0 || rawMetricLines.length > 0 || rawPlayers.length > 0) ? (
                   <DetailSection
-                    title="Blocos salvos da Analysis"
-                    subtitle="Fallback resiliente para registros parciais ou legados preservados na central Analysis."
+                    title="Sinais salvos"
+                    subtitle="Blocos preservados da Analysis para leitura complementar."
                   >
                     <div className="grid gap-4 xl:grid-cols-2">
                       {rawDecisionSummary ? (
                         <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
-                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Decision Summary</p>
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">SoccerMind Decision</p>
                           <div className="mt-4 space-y-2 text-sm text-gray-300">
                             <div>Decision: <span className="text-white">{formatUnknownText(rawDecisionSummary.decision, "N/A")}</span></div>
                             <div>Confidence: <span className="text-white">{formatUnknownNumber(rawDecisionSummary.confidence, 0)}%</span></div>
@@ -819,7 +874,7 @@ export default function AnalysisDetail() {
                     <div className="mt-4 grid gap-4 xl:grid-cols-3">
                       {rawExplainabilityItems.length > 0 ? (
                         <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
-                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Explainability</p>
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Leituras de apoio</p>
                           <div className="mt-4">
                             <CompactBulletList items={rawExplainabilityItems} />
                           </div>
@@ -828,7 +883,7 @@ export default function AnalysisDetail() {
 
                       {rawInsights.length > 0 ? (
                         <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
-                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Insights</p>
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Sinais-Chave</p>
                           <div className="mt-4">
                             <CompactBulletList items={rawInsights} />
                           </div>
@@ -837,7 +892,7 @@ export default function AnalysisDetail() {
 
                       {rawMetricLines.length > 0 ? (
                         <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
-                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Metrics</p>
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Metricas</p>
                           <div className="mt-4">
                             <CompactBulletList items={rawMetricLines} />
                           </div>
@@ -868,15 +923,8 @@ export default function AnalysisDetail() {
 
             {!isSingleReport && reportModel ? (
               <>
-                <DetailSection
-                  title={reportModel.recommendationLabel}
-                  subtitle="Recomendacao executiva reconstruida a partir do backend da analise salva."
-                >
-                  <p className="text-sm leading-7 text-gray-300">{shortenText(reportModel.recommendationSummary, 220)}</p>
-                </DetailSection>
-
                 <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                  <DetailSection title="Decision">
+                  <DetailSection title="SoccerMind Decision">
                     <CompactBulletList
                       items={compactBullets(
                         [
@@ -888,10 +936,10 @@ export default function AnalysisDetail() {
                     />
                   </DetailSection>
 
-                  <DetailSection title="Key Insights">
+                  <DetailSection title="Sinais-Chave">
                     <CompactBulletList
                       items={compactBullets(
-                        comparisonInsights.map((insight) => `${formatUnknownText(insight.title, "Insight")}: ${formatUnknownText(insight.content, "")}`),
+                        comparisonInsights.map((insight) => `${formatUnknownText(insight.title, "Insight")}: ${shortenText(formatUnknownText(insight.content, ""), 96)}`),
                         4,
                       )}
                     />
@@ -899,7 +947,7 @@ export default function AnalysisDetail() {
                 </div>
 
                 <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-                  <DetailSection title="Risk">
+                  <DetailSection title="Leitura de Risco">
                     <CompactBulletList
                       items={compactBullets(
                         [
@@ -911,7 +959,7 @@ export default function AnalysisDetail() {
                     />
                   </DetailSection>
 
-                  <DetailSection title="Financial Summary">
+                  <DetailSection title="Mercado & Contexto">
                     <CompactBulletList
                       items={compactBullets(
                         [
