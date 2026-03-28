@@ -39,6 +39,14 @@ export interface AnalysisDetailViewModel extends AnalysisViewModel {
     canExportPdf: boolean;
     contentStatus: "ready" | "partial";
     contentMessage: string;
+    rawBlocks: {
+      decisionSummary: Record<string, unknown> | null;
+      explainability: unknown;
+      insights: unknown;
+      metrics: unknown;
+      players: unknown;
+      reportContent: Record<string, unknown> | null;
+    };
     comparisonData: CompareViewModel | null;
     playerReportData: {
       player: {
@@ -185,6 +193,14 @@ export function mapAnalysisDetailResponse(source: unknown): AnalysisDetailViewMo
           canExportPdf: reportContentRecord.canExportPdf === true,
           contentStatus: reportContentRecord.contentStatus === "partial" ? "partial" : "ready",
           contentMessage: toText(reportContentRecord.contentMessage, ""),
+          rawBlocks: {
+            decisionSummary: isRecord(reportContentRecord.decisionSummary) ? reportContentRecord.decisionSummary : null,
+            explainability: reportContentRecord.explainability,
+            insights: reportContentRecord.insights,
+            metrics: reportContentRecord.metrics,
+            players: reportContentRecord.players,
+            reportContent: reportContentRecord,
+          },
           comparisonData,
           playerReportData: playerReportRecord
             ? {

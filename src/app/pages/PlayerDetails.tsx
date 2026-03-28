@@ -145,17 +145,24 @@ export default function PlayerDetails() {
         setSimilarPlayers(nextSimilarPlayers);
 
         if (nextPlayer) {
-          const nextIntelligenceProfile = await getPlayerIntelligenceProfile({
-            player: nextPlayer,
-            similarPlayers: nextSimilarPlayers,
-            projection: nextProjection,
-          });
+          try {
+            const nextIntelligenceProfile = await getPlayerIntelligenceProfile({
+              player: nextPlayer,
+              similarPlayers: nextSimilarPlayers,
+              projection: nextProjection,
+            });
 
-          if (!active) {
-            return;
+            if (!active) {
+              return;
+            }
+
+            setIntelligenceProfile(nextIntelligenceProfile);
+          } catch (intelligenceError) {
+            console.error("[PlayerDetails] premium intelligence fallback", intelligenceError);
+            if (active) {
+              setIntelligenceProfile(null);
+            }
           }
-
-          setIntelligenceProfile(nextIntelligenceProfile);
         } else {
           setIntelligenceProfile(null);
         }

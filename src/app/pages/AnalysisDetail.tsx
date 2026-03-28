@@ -171,6 +171,41 @@ function formatGrowthProjectionText(value: unknown) {
   return formatUnknownText(value, "N/A");
 }
 
+function normalizeStringList(value: unknown, maxItems = 6) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => formatUnknownText(item, ""))
+      .filter((item) => item.trim().length > 0)
+      .slice(0, maxItems);
+  }
+
+  if (isRenderableRecord(value)) {
+    return Object.entries(value)
+      .map(([key, item]) => {
+        const text = formatUnknownText(item, "");
+        return text ? `${key}: ${text}` : "";
+      })
+      .filter(Boolean)
+      .slice(0, maxItems);
+  }
+
+  const single = formatUnknownText(value, "");
+  return single ? [single] : [];
+}
+
+function normalizeDecisionSummary(value: unknown) {
+  if (!isRenderableRecord(value)) {
+    return null;
+  }
+
+  return {
+    decision: formatUnknownText(value.decision, ""),
+    confidence: formatUnknownNumber(value.confidence, 0),
+    riskLevel: formatUnknownText(value.riskLevel, "MEDIUM"),
+    winner: formatUnknownText(value.winner, ""),
+  };
+}
+
 function MetricCard({
   label,
   value,
@@ -407,6 +442,77 @@ export default function AnalysisDetail() {
     };
   }, [analysis]);
 
+  const playersLabel = Array.isArray(analysis?.players) ? analysis?.players.join(" vs ") : "";
+  const reportContent = analysis?.reportContent ?? null;
+  const rawBlocks = reportContent?.rawBlocks;
+  const rawDecisionSummary = normalizeDecisionSummary(rawBlocks?.decisionSummary);
+  const rawExplainabilityItems = normalizeStringList(rawBlocks?.explainability, 6);
+  const rawInsights = normalizeStringList(rawBlocks?.insights, 6);
+  const rawMetricLines = normalizeStringList(rawBlocks?.metrics, 6);
+  const rawPlayers = normalizeStringList(rawBlocks?.players, 4);
+  const isComparison = analysis?.type === "comparison";
+  const isIndividual = analysis ? analysis.playerBId === null || analysis.playerBId === undefined : false;
+  const isSingleReport = analysis?.type === "report" && isIndividual;
+  const singleReport = reportContent?.playerReportData ?? null;
+  const canExportComparisonPdf = reportContent?.canExportPdf === true && Boolean(reportModel);
+  const canExportSinglePdf = reportContent?.canExportPdf === true && Boolean(singleReportPdfModel);
+  const singleReportPlayerName = singleReport ? getPlayerDisplayName(singleReport.player.name) : null;
+  const singleReportMetaLine = singleReport
+    ? formatMetaLine([singleReport.player.position, singleReport.player.club, singleReport.player.league])
+    : "";
+  const headerTitle = isSingleReport && singleReportPlayerName ? singleReportPlayerName : analysis?.title;
+  const headerDescription =
+    isSingleReport && singleReport
+      ? singleReportMetaLine || "Contexto do atleta indisponivel"
+      : analysis?.description || "Leitura completa do relatorio salvo na central de analises.";
+  const playersBadgeLabel = isSingleReport && singleReportPlayerName ? singleReportPlayerName : playersLabel || "Jogadores nao informados";
+  const safeHeaderTitle = formatUnknownText(headerTitle, "Analise");
+  const safeHeaderDescription = formatUnknownText(headerDescription, "Leitura completa do relatorio salvo na central de analises.");
+  const safePlayersBadgeLabel = formatUnknownText(playersBadgeLabel, "Jogadores nao informados");
+  const safeTypeLabel = formatUnknownText(analysis?.typeLabel, "Relatorio");
+  const safeStatusLabel = formatUnknownText(analysis?.statusLabel, "Em andamento");
+  const safeAnalystName = formatUnknownText(analysis?.user, "Analista SoccerMind");
+  const safeSingleReportTier = formatUnknownText(singleReport?.metrics?.tier, "PROSPECT");
+  const safeSingleReportArchetype = formatUnknownText(singleReport?.metrics?.archetype, "Nao classificado");
+  const safeSingleReportRiskLevel = formatUnknownText(singleReport?.metrics?.riskLevel, rawDecisionSummary?.riskLevel || "MEDIUM");
+  const safeSingleReportRecommendation = formatUnknownText(singleReport?.metrics?.recommendation, rawDecisionSummary?.decision || "Recomendacao indisponivel.");
+  const safeSingleReportRiskSummary = formatRiskSummary(singleReport?.metrics?.riskSummary);
+  const safeSingleReportGrowthProjection = formatGrowthProjectionText(singleReport?.metrics?.growthProjection);
+  const safeSingleReportNarrative = formatUnknownText(
+    singleReport?.aiNarrative ?? analysis?.description ?? "Narrativa de scouting indisponivel.",
+    "Narrativa de scouting indisponivel.",
+  );
+  const safeSingleOverall = formatUnknownNumber(singleReport?.metrics?.overall, 0);
+  const safeSinglePotential = formatUnknownNumber(singleReport?.metrics?.potential, 0);
+  const safeSingleMarketValue = typeof singleReport?.metrics?.marketValue === "number" ? singleReport.metrics.marketValue : null;
+  const safeSingleRiskScore = formatUnknownNumber(singleReport?.metrics?.riskScore, rawDecisionSummary?.confidence ? 10 - rawDecisionSummary.confidence / 10 : 0);
+  const safeSingleLiquidity = normalizeReportLiquidityScore(singleReport?.metrics?.liquidityScore ?? 0);
+  const safeSingleCapitalEfficiency = formatUnknownNumber(singleReport?.metrics?.capitalEfficiency, 0);
+  const comparisonInsights = Array.isArray(reportModel?.insights) ? reportModel.insights : [];
+  const comparisonTakeaways = Array.isArray(reportModel?.takeaways) ? reportModel.takeaways : [];
+  const comparisonNarrative = Array.isArray(reportModel?.aiNarrative) ? reportModel.aiNarrative : [];
+
+  useEffect(() => {
+    document.title = `${safeHeaderTitle} | SoccerMind`;
+
+    return () => {
+      document.title = "SoccerMind";
+    };
+  }, [safeHeaderTitle]);
+
+  useEffect(() => {
+    if (!analysis) {
+      return;
+    }
+
+    try {
+      console.log("Analysis payload completo:", JSON.stringify(analysis, null, 2));
+    } catch (serializationError) {
+      console.log("Analysis payload completo:", analysis);
+      console.error("Falha ao serializar analysis para diagnostico:", serializationError);
+    }
+  }, [analysis]);
+
   const handleDelete = async () => {
     if (!analysis || deleting) {
       return;
@@ -466,61 +572,6 @@ export default function AnalysisDetail() {
       </div>
     );
   }
-
-  const playersLabel = analysis.players.join(" vs ");
-  const isComparison = analysis.type === "comparison";
-  const isIndividual = analysis.playerBId === null || analysis.playerBId === undefined;
-  const isSingleReport = analysis.type === "report" && isIndividual;
-  const singleReport = analysis.reportContent?.playerReportData ?? null;
-  const canExportComparisonPdf = analysis.reportContent?.canExportPdf === true && Boolean(reportModel);
-  const canExportSinglePdf = analysis.reportContent?.canExportPdf === true && Boolean(singleReportPdfModel);
-  const singleReportPlayerName = singleReport ? getPlayerDisplayName(singleReport.player.name) : null;
-  const singleReportMetaLine = singleReport
-    ? formatMetaLine([singleReport.player.position, singleReport.player.club, singleReport.player.league])
-    : "";
-  const headerTitle = isSingleReport && singleReportPlayerName ? singleReportPlayerName : analysis.title;
-  const headerDescription =
-    isSingleReport && singleReport
-      ? singleReportMetaLine || "Contexto do atleta indisponivel"
-      : analysis.description || "Leitura completa do relatorio salvo na central de analises.";
-  const playersBadgeLabel = isSingleReport && singleReportPlayerName ? singleReportPlayerName : playersLabel || "Jogadores nao informados";
-  const safeHeaderTitle = formatUnknownText(headerTitle, "Analise");
-  const safeHeaderDescription = formatUnknownText(headerDescription, "Leitura completa do relatorio salvo na central de analises.");
-  const safePlayersBadgeLabel = formatUnknownText(playersBadgeLabel, "Jogadores nao informados");
-  const safeTypeLabel = formatUnknownText(analysis.typeLabel, "Relatorio");
-  const safeStatusLabel = formatUnknownText(analysis.statusLabel, "Em andamento");
-  const safeAnalystName = formatUnknownText(analysis.user, "Analista SoccerMind");
-  const safeSingleReportTier = formatUnknownText(singleReport?.metrics?.tier, "PROSPECT");
-  const safeSingleReportArchetype = formatUnknownText(singleReport?.metrics?.archetype, "Nao classificado");
-  const safeSingleReportRiskLevel = formatUnknownText(singleReport?.metrics?.riskLevel, "MEDIUM");
-  const safeSingleReportRecommendation = formatUnknownText(singleReport?.metrics?.recommendation, "Recomendacao indisponivel.");
-  const safeSingleReportRiskSummary = formatRiskSummary(singleReport?.metrics?.riskSummary);
-  const safeSingleReportGrowthProjection = formatGrowthProjectionText(singleReport?.metrics?.growthProjection);
-  const safeSingleReportNarrative = formatUnknownText(
-    singleReport?.aiNarrative ?? analysis.description ?? "Narrativa de scouting indisponivel.",
-    "Narrativa de scouting indisponivel.",
-  );
-
-  useEffect(() => {
-    document.title = `${safeHeaderTitle} | SoccerMind`;
-
-    return () => {
-      document.title = "SoccerMind";
-    };
-  }, [safeHeaderTitle]);
-
-  useEffect(() => {
-    if (!analysis) {
-      return;
-    }
-
-    try {
-      console.log("Analysis payload completo:", JSON.stringify(analysis, null, 2));
-    } catch (serializationError) {
-      console.log("Analysis payload completo:", analysis);
-      console.error("Falha ao serializar analysis para diagnostico:", serializationError);
-    }
-  }, [analysis]);
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -646,16 +697,16 @@ export default function AnalysisDetail() {
                 </section>
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <MetricCard label="Overall" value={`${singleReport.metrics.overall}`} valueClassName="text-[#00C2FF]" />
-                  <MetricCard label="Potencial" value={`${singleReport.metrics.potential}`} valueClassName="text-[#A855F7]" />
+                  <MetricCard label="Overall" value={`${safeSingleOverall}`} valueClassName="text-[#00C2FF]" />
+                  <MetricCard label="Potencial" value={`${safeSinglePotential}`} valueClassName="text-[#A855F7]" />
                   <MetricCard
                     label="Valor de mercado"
-                    value={formatMarketValue(singleReport.metrics.marketValue)}
+                    value={formatMarketValue(safeSingleMarketValue)}
                     valueClassName="text-[#00FF9C] text-[2rem]"
                   />
                   <MetricCard
                     label="Risco"
-                    value={formatUnknownNumber(singleReport.metrics.riskScore).toFixed(1)}
+                    value={safeSingleRiskScore.toFixed(1)}
                     badge={
                       <span className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase ${getRiskBadgeStyles(safeSingleReportRiskLevel)}`}>
                         {safeSingleReportRiskLevel}
@@ -664,12 +715,12 @@ export default function AnalysisDetail() {
                   />
                   <MetricCard
                     label="Liquidez"
-                    value={normalizeReportLiquidityScore(singleReport.metrics.liquidityScore).toFixed(1)}
+                    value={safeSingleLiquidity.toFixed(1)}
                     subtitle="score 0-10"
                   />
                   <MetricCard
                     label="Capital Efficiency"
-                    value={singleReport.metrics.capitalEfficiency.toFixed(1)}
+                    value={safeSingleCapitalEfficiency.toFixed(1)}
                     subtitle="eficiencia de capital"
                   />
                 </div>
@@ -737,6 +788,64 @@ export default function AnalysisDetail() {
                     ) : null}
                   </div>
                 </DetailSection>
+
+                {(rawDecisionSummary || rawExplainabilityItems.length > 0 || rawInsights.length > 0 || rawMetricLines.length > 0 || rawPlayers.length > 0) ? (
+                  <DetailSection
+                    title="Blocos salvos da Analysis"
+                    subtitle="Fallback resiliente para registros parciais ou legados preservados na central Analysis."
+                  >
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      {rawDecisionSummary ? (
+                        <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Decision Summary</p>
+                          <div className="mt-4 space-y-2 text-sm text-gray-300">
+                            <div>Decision: <span className="text-white">{formatUnknownText(rawDecisionSummary.decision, "N/A")}</span></div>
+                            <div>Confidence: <span className="text-white">{formatUnknownNumber(rawDecisionSummary.confidence, 0)}%</span></div>
+                            <div>Risk: <span className="text-white">{formatUnknownText(rawDecisionSummary.riskLevel, "MEDIUM")}</span></div>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {rawPlayers.length > 0 ? (
+                        <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Players</p>
+                          <div className="mt-4">
+                            <CompactBulletList items={rawPlayers} />
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 grid gap-4 xl:grid-cols-3">
+                      {rawExplainabilityItems.length > 0 ? (
+                        <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Explainability</p>
+                          <div className="mt-4">
+                            <CompactBulletList items={rawExplainabilityItems} />
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {rawInsights.length > 0 ? (
+                        <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Insights</p>
+                          <div className="mt-4">
+                            <CompactBulletList items={rawInsights} />
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {rawMetricLines.length > 0 ? (
+                        <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
+                          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Metrics</p>
+                          <div className="mt-4">
+                            <CompactBulletList items={rawMetricLines} />
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </DetailSection>
+                ) : null}
               </>
             ) : null}
 
@@ -771,7 +880,7 @@ export default function AnalysisDetail() {
                     <CompactBulletList
                       items={compactBullets(
                         [
-                          ...reportModel.takeaways,
+                          ...comparisonTakeaways,
                           reportModel.executiveSummary,
                         ],
                         4,
@@ -782,7 +891,7 @@ export default function AnalysisDetail() {
                   <DetailSection title="Key Insights">
                     <CompactBulletList
                       items={compactBullets(
-                        reportModel.insights.map((insight) => `${insight.title}: ${insight.content}`),
+                        comparisonInsights.map((insight) => `${formatUnknownText(insight.title, "Insight")}: ${formatUnknownText(insight.content, "")}`),
                         4,
                       )}
                     />
@@ -795,7 +904,7 @@ export default function AnalysisDetail() {
                       items={compactBullets(
                         [
                           reportModel.riskOverview,
-                          ...reportModel.aiNarrative,
+                          ...comparisonNarrative,
                         ],
                         4,
                       )}
@@ -806,7 +915,7 @@ export default function AnalysisDetail() {
                     <CompactBulletList
                       items={compactBullets(
                         [
-                          ...reportModel.insights.map((insight) => insight.content),
+                          ...comparisonInsights.map((insight) => formatUnknownText(insight.content, "")),
                           reportModel.comparativeAnalysis,
                         ],
                         4,
