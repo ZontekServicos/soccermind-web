@@ -4,9 +4,15 @@ import { ArrowLeft, TrendingUp, Shield, Star, FileText, Download, CheckCircle2, 
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer, Tooltip } from "recharts";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
+import { ContextSimilaritySection } from "../components/player-intelligence/ContextSimilaritySection";
+import { ExecutiveSnapshotSection } from "../components/player-intelligence/ExecutiveSnapshotSection";
+import { FieldIntelligenceSection } from "../components/player-intelligence/FieldIntelligenceSection";
+import { MarketRiskSection } from "../components/player-intelligence/MarketRiskSection";
+import { SoccerMindDnaSection } from "../components/player-intelligence/SoccerMindDnaSection";
 import { useAuth } from "../contexts/AuthContext";
 import { API_CONFIG } from "../config/api-config";
 import type { PlayerCardModel, PlayerProfileModel } from "../mappers/player.mapper";
+import { getPlayerIntelligenceProfile } from "../services/playerIntelligence";
 import { downloadPlayerReportPdf } from "../utils/playerReportPdf";
 import {
   generatePlayerReport,
@@ -15,6 +21,7 @@ import {
   getSimilarPlayers,
   type PlayerReportResult,
 } from "../services/players";
+import type { PlayerIntelligenceProfile } from "../types/player-intelligence";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 
 function formatMarketValue(value: number | null) {
@@ -58,6 +65,7 @@ export default function PlayerDetails() {
   const [player, setPlayer] = useState<PlayerProfileModel | null>(null);
   const [similarPlayers, setSimilarPlayers] = useState<PlayerCardModel[]>([]);
   const [projection, setProjection] = useState<Record<string, unknown> | null>(null);
+  const [intelligenceProfile, setIntelligenceProfile] = useState<PlayerIntelligenceProfile | null>(null);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,9 +136,30 @@ export default function PlayerDetails() {
           return;
         }
 
-        setPlayer(playerResponse.data ?? null);
-        setProjection((projectionResponse?.data as Record<string, unknown> | undefined) ?? null);
-        setSimilarPlayers(Array.isArray(similarResponse?.data) ? similarResponse.data : []);
+        const nextPlayer = playerResponse.data ?? null;
+        const nextProjection = (projectionResponse?.data as Record<string, unknown> | undefined) ?? null;
+        const nextSimilarPlayers = Array.isArray(similarResponse?.data) ? similarResponse.data : [];
+
+        setPlayer(nextPlayer);
+        setProjection(nextProjection);
+        setSimilarPlayers(nextSimilarPlayers);
+
+        if (nextPlayer) {
+          const nextIntelligenceProfile = await getPlayerIntelligenceProfile({
+            player: nextPlayer,
+            similarPlayers: nextSimilarPlayers,
+            projection: nextProjection,
+          });
+
+          if (!active) {
+            return;
+          }
+
+          setIntelligenceProfile(nextIntelligenceProfile);
+        } else {
+          setIntelligenceProfile(null);
+        }
+
         setError(null);
       } catch (fetchError) {
         if (!active) {
@@ -140,6 +169,7 @@ export default function PlayerDetails() {
         setPlayer(null);
         setSimilarPlayers([]);
         setProjection(null);
+        setIntelligenceProfile(null);
         setError(fetchError instanceof Error ? fetchError.message : "Erro ao carregar jogador");
       } finally {
         if (active) {
@@ -336,8 +366,8 @@ export default function PlayerDetails() {
           </button>
 
           <div className="bg-gradient-to-r from-[#0A1B35] to-[#1a2942] border border-[rgba(0,194,255,0.3)] rounded-lg p-8 mb-6">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-6">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
                 <div className="w-24 h-24 bg-gradient-to-br from-[#00C2FF] to-[#7A5CFF] rounded-full flex items-center justify-center text-3xl shadow-[0_0_30px_rgba(0,194,255,0.4)]">
                   {player.name.split(" ").map((name) => name[0]).join("").slice(0, 2)}
                 </div>
@@ -361,7 +391,7 @@ export default function PlayerDetails() {
                 </div>
               </div>
 
-              <div className="flex gap-4">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="bg-[#07142A] border border-[rgba(0,194,255,0.3)] rounded-lg px-6 py-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Overall</p>
                   <p className="text-3xl text-[#00C2FF]">{formatStatValue(player.overall)}</p>
@@ -401,7 +431,7 @@ export default function PlayerDetails() {
             {player.playStyles.length > 0 && (
               <div className="mt-6 pt-6 border-t border-[rgba(0,194,255,0.2)]">
                 <p className="text-xs text-gray-400 mb-3">ESTILOS DE JOGO</p>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   {player.playStyles.map((style, index) => (
                     <span
                       key={`${style}-${index}`}
@@ -415,7 +445,26 @@ export default function PlayerDetails() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-6">
+          {intelligenceProfile && (
+            <div className="space-y-6">
+              <div className="grid gap-6 2xl:grid-cols-[1.08fr_0.92fr]">
+                <ExecutiveSnapshotSection
+                  snapshot={intelligenceProfile.executiveSnapshot}
+                  dataSourceLabel={`Source ${intelligenceProfile.dataStatus.source}`}
+                />
+                <SoccerMindDnaSection dna={intelligenceProfile.soccerMindDna} />
+              </div>
+
+              <FieldIntelligenceSection intelligence={intelligenceProfile.fieldIntelligence} />
+
+              <div className="grid gap-6 2xl:grid-cols-[0.9fr_1.1fr]">
+                <MarketRiskSection marketRisk={intelligenceProfile.marketRisk} />
+                <ContextSimilaritySection context={intelligenceProfile.contextSimilarity} />
+              </div>
+            </div>
+          )}
+
+          <div className="mt-6 grid gap-6 xl:grid-cols-2">
             <div className="bg-[#0A1B35] border border-[rgba(0,194,255,0.3)] rounded-lg p-6">
               <h2 className="text-xl mb-6 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-[#00C2FF]" />
@@ -489,7 +538,7 @@ export default function PlayerDetails() {
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-6 mt-6">
+          <div className="grid gap-6 mt-6 md:grid-cols-2 xl:grid-cols-3">
             <div className="bg-[#0A1B35] border border-[rgba(0,194,255,0.3)] rounded-lg p-6">
               <h3 className="text-sm text-[#00C2FF] mb-4 uppercase tracking-wider">Movement</h3>
               <div className="space-y-3">
@@ -525,7 +574,7 @@ export default function PlayerDetails() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-6 mt-6">
+          <div className="grid gap-6 mt-6 xl:grid-cols-2">
             <div className="bg-[#0A1B35] border border-[rgba(0,194,255,0.3)] rounded-lg p-6">
               <h3 className="text-sm text-[#00FF9C] mb-4 uppercase tracking-wider">Defending</h3>
               <div className="space-y-3">
@@ -569,10 +618,10 @@ export default function PlayerDetails() {
             </div>
           )}
 
-          <div className="flex gap-4 mt-8">
+          <div className="mt-8 grid gap-4 xl:grid-cols-3">
             <Link
               to={`/compare?player1=${player.id}`}
-              className="flex-1 bg-[#00C2FF] hover:bg-[#00A8E0] text-[#07142A] py-3 rounded-lg text-center transition-colors"
+              className="bg-[#00C2FF] hover:bg-[#00A8E0] text-[#07142A] py-3 rounded-lg text-center transition-colors"
             >
               Comparar com outro jogador
             </Link>
@@ -580,12 +629,12 @@ export default function PlayerDetails() {
               type="button"
               onClick={handleGenerateReport}
               disabled={reportLoading}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#a855f7,#00C2FF)] py-3 text-white shadow-[0_10px_30px_rgba(0,194,255,0.18)] transition-transform hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#a855f7,#00C2FF)] py-3 text-white shadow-[0_10px_30px_rgba(0,194,255,0.18)] transition-transform hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
             >
               {reportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
               {reportLoading ? "Gerando analise..." : "Gerar Relatorio Individual"}
             </button>
-            <button className="flex-1 bg-[#0A1B35] hover:bg-[#1a2942] border border-[rgba(0,194,255,0.3)] py-3 rounded-lg transition-colors">
+            <button className="bg-[#0A1B35] hover:bg-[#1a2942] border border-[rgba(0,194,255,0.3)] py-3 rounded-lg transition-colors">
               Adicionar ao Relatorio
             </button>
           </div>
