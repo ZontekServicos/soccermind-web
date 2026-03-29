@@ -1,5 +1,5 @@
 import { mapApiPlayerToExtended, type ApiPlayerLike } from "./player.mapper";
-import type { PlayerIntelligenceProfile } from "../types/player-intelligence";
+import { normalizePlayerIntelligenceProfile, type PlayerIntelligenceProfile } from "../types/player-intelligence";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -258,14 +258,16 @@ export function mapCompareResponse(response: unknown) {
   const blockWinners = pickRecord(source, ["blockWinners"]);
   const executiveRecommendation = pickRecord(source, ["executiveRecommendation"]);
 
-  const intelligenceProfileA =
-    (pickRecord(intelligenceProfiles ?? {}, ["playerA"]) ?? pickRecord(normalizedPlayerA, ["intelligenceProfile"])) as
-      | PlayerIntelligenceProfile
-      | null;
-  const intelligenceProfileB =
-    (pickRecord(intelligenceProfiles ?? {}, ["playerB"]) ?? pickRecord(normalizedPlayerB, ["intelligenceProfile"])) as
-      | PlayerIntelligenceProfile
-      | null;
+  const intelligenceProfileA = normalizePlayerIntelligenceProfile(
+    pickRecord(intelligenceProfiles ?? {}, ["playerA"]) ??
+      pickRecord(source, ["playerAProfile"]) ??
+      pickRecord(normalizedPlayerA, ["intelligenceProfile"]),
+  ) as PlayerIntelligenceProfile | null;
+  const intelligenceProfileB = normalizePlayerIntelligenceProfile(
+    pickRecord(intelligenceProfiles ?? {}, ["playerB"]) ??
+      pickRecord(source, ["playerBProfile"]) ??
+      pickRecord(normalizedPlayerB, ["intelligenceProfile"]),
+  ) as PlayerIntelligenceProfile | null;
 
   playerA.capitalEfficiency = toNumber(capitalA?.index, playerA.capitalEfficiency);
   playerB.capitalEfficiency = toNumber(capitalB?.index, playerB.capitalEfficiency);

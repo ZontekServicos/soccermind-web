@@ -1,22 +1,31 @@
 interface WinnerBadgeProps {
-  winner: "A" | "B" | "DRAW";
+  winner: "A" | "B" | "DRAW" | "playerA" | "playerB" | "draw";
   nameA: string;
   nameB: string;
   label?: string;
 }
 
-function resolveWinnerLabel(winner: "A" | "B" | "DRAW", nameA: string, nameB: string) {
-  if (winner === "A") return nameA;
-  if (winner === "B") return nameB;
+function normalizeWinner(winner: WinnerBadgeProps["winner"]) {
+  if (winner === "playerA") return "A";
+  if (winner === "playerB") return "B";
+  if (winner === "draw") return "DRAW";
+  return winner;
+}
+
+function resolveWinnerLabel(winner: WinnerBadgeProps["winner"], nameA: string, nameB: string) {
+  const normalized = normalizeWinner(winner);
+  if (normalized === "A") return nameA;
+  if (normalized === "B") return nameB;
   return "Balanced";
 }
 
-function resolveWinnerTone(winner: "A" | "B" | "DRAW") {
-  if (winner === "A") {
+function resolveWinnerTone(winner: WinnerBadgeProps["winner"]) {
+  const normalized = normalizeWinner(winner);
+  if (normalized === "A") {
     return "border-[rgba(0,194,255,0.24)] bg-[rgba(0,194,255,0.10)] text-[#9BE7FF]";
   }
 
-  if (winner === "B") {
+  if (normalized === "B") {
     return "border-[rgba(168,85,247,0.24)] bg-[rgba(168,85,247,0.10)] text-[#E9D5FF]";
   }
 
@@ -29,12 +38,12 @@ export function WinnerBadge({
   nameB,
   label = "Winner",
 }: WinnerBadgeProps) {
+  const normalized = normalizeWinner(winner);
   return (
     <span
       className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] ${resolveWinnerTone(winner)}`}
     >
-      {label}: {resolveWinnerLabel(winner, nameA, nameB)}
+      {label}: {resolveWinnerLabel(normalized, nameA, nameB)}
     </span>
   );
 }
-

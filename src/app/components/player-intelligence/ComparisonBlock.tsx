@@ -14,7 +14,7 @@ interface ComparisonBlockProps {
   nameA: string;
   nameB: string;
   items: ComparisonMetricItem[];
-  forcedWinner?: "A" | "B" | "DRAW";
+  forcedWinner?: "A" | "B" | "DRAW" | "playerA" | "playerB" | "draw";
 }
 
 function getWinner(valueA: number, valueB: number, inverse = false): "A" | "B" | "DRAW" {
@@ -27,6 +27,13 @@ function getWinner(valueA: number, valueB: number, inverse = false): "A" | "B" |
   }
 
   return valueA > valueB ? "A" : "B";
+}
+
+function normalizeWinner(value: ComparisonBlockProps["forcedWinner"]) {
+  if (value === "playerA") return "A";
+  if (value === "playerB") return "B";
+  if (value === "draw") return "DRAW";
+  return value ?? "DRAW";
 }
 
 function getWidth(value: number, maxValue: number) {
@@ -48,7 +55,7 @@ export function ComparisonBlock({
   const visibleItems = items.slice(0, 5);
   const totalA = visibleItems.reduce((sum, item) => sum + (item.inverse ? 100 - item.valueA : item.valueA), 0);
   const totalB = visibleItems.reduce((sum, item) => sum + (item.inverse ? 100 - item.valueB : item.valueB), 0);
-  const blockWinner = forcedWinner ?? getWinner(totalA, totalB);
+  const blockWinner = forcedWinner ? normalizeWinner(forcedWinner) : getWinner(totalA, totalB);
 
   return (
     <section className="rounded-[24px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5 shadow-[0_16px_40px_rgba(0,0,0,0.18)]">
@@ -99,4 +106,3 @@ export function ComparisonBlock({
     </section>
   );
 }
-

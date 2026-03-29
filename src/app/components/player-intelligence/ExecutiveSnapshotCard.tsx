@@ -106,9 +106,9 @@ export function ExecutiveSnapshotCard({
           inverse
         />
         <SnapshotMetric
-          label="Value"
-          score={snapshot.value?.score ?? snapshot.liquidity.score}
-          value={snapshot.value?.label ?? snapshot.liquidity.label}
+          label="Market"
+          score={snapshot.marketOpportunity.score}
+          value={snapshot.marketOpportunity.label}
           icon={<TrendingUp className="h-4 w-4" />}
         />
         <SnapshotMetric
@@ -118,7 +118,23 @@ export function ExecutiveSnapshotCard({
           icon={<Sparkles className="h-4 w-4" />}
         />
       </div>
+
+      <div className="border-t border-[rgba(255,255,255,0.06)] px-6 py-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Decision Window</p>
+            <p className="mt-3 text-base font-semibold text-white">{snapshot.decisionWindow.replace(/_/g, " ")}</p>
+          </div>
+          <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Current Level</p>
+            <p className="mt-3 text-base font-semibold text-white">{snapshot.currentLevel.score}</p>
+          </div>
+          <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
+            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Quick Take</p>
+            <p className="mt-3 text-sm text-gray-300">{snapshot.summary}</p>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
-
