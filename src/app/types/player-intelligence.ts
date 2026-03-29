@@ -16,6 +16,7 @@ export interface ExecutiveSnapshot {
   liquidity: IntelligenceMetricBand;
   tacticalFit: IntelligenceMetricBand;
   idealAcquisitionWindow: string;
+  value?: IntelligenceMetricBand;
 }
 
 export interface SoccerMindDnaTrait {
@@ -106,6 +107,99 @@ export interface PlayerIntelligenceDataStatus {
 }
 
 export interface PlayerIntelligenceProfile {
+  identity?: {
+    id: string;
+    name: string;
+    age: number | null;
+    nationality: string | null;
+    club: string | null;
+    league: string | null;
+    dominantPosition: string | null;
+    positions: string[];
+  };
+  summary?: {
+    overall: number;
+    potential: number;
+    marketValue: number | null;
+    recommendation: string;
+    confidence: number;
+    currentLevel: number;
+    expectedPeak: number;
+    growthOutlook: string;
+    resalePotential: IntelligenceMetricBand;
+    archetype: string;
+    profile: string;
+    idealRole: string;
+    idealSystem: string;
+    bestUseCase: string;
+    valueScore: number;
+    liquidityScore: number;
+    riskScore: number;
+    capitalEfficiency: number;
+  };
+  technical?: {
+    coreAttributes: {
+      pace: number;
+      shooting: number;
+      passing: number;
+      dribbling: number;
+      defending: number;
+      physical: number;
+    };
+    detailedMetrics: Record<string, number>;
+    overall: number;
+    potential: number;
+    marketValue: number | null;
+  };
+  physical?: {
+    acceleration: number;
+    sprintSpeed: number;
+    stamina: number;
+    strength: number;
+    jumping: number;
+    balance: number;
+    agility: number;
+    physicalRisk: IntelligenceMetricBand;
+  };
+  tactical?: {
+    tacticalMaturity: IntelligenceMetricBand;
+    tacticalAdaptationRisk: IntelligenceMetricBand;
+    idealRole: string;
+    idealSystem: string;
+    bestUseCase: string;
+    archetype: string;
+    profile: string;
+  };
+  market?: {
+    marketValue: number | null;
+    salaryRange: SalaryRange;
+    liquidity: IntelligenceMetricBand;
+    financialRisk: IntelligenceMetricBand;
+    capitalEfficiency: number;
+    valueScore: number;
+  };
+  risk?: {
+    composite: IntelligenceMetricBand;
+    structural: IntelligenceMetricBand;
+    financial: IntelligenceMetricBand;
+    physical: IntelligenceMetricBand;
+    tacticalAdaptation: IntelligenceMetricBand;
+    medical: IntelligenceMetricBand;
+  };
+  projection?: {
+    currentLevel: number;
+    expectedPeak: number;
+    expectedOverallNextSeason: number;
+    growthIndex: number;
+    growthOutlook: string;
+    resalePotential: IntelligenceMetricBand;
+  };
+  dna?: {
+    dominantTags: string[];
+    traits: SoccerMindDnaTrait[];
+    archetype: string;
+    profile: string;
+  };
   playerId: string;
   playerName: string;
   executiveSnapshot: ExecutiveSnapshot;

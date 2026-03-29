@@ -96,6 +96,9 @@ export interface PlayerProfileModel extends PlayerCardModel {
   def: NullableNumber;
   phy: NullableNumber;
   stats: PlayerAttributeModel;
+  intelligenceProfile?: unknown;
+  projection?: unknown;
+  similarPlayers?: PlayerCardModel[];
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -462,6 +465,12 @@ export function mapApiPlayerToProfile(
     def: attrs.defending,
     phy: attrs.physical,
     stats: attrs,
+    intelligenceProfile: isRecord(player) ? player.intelligenceProfile : undefined,
+    projection: isRecord(player) ? player.projection : undefined,
+    similarPlayers:
+      isRecord(player) && Array.isArray(player.similarPlayers)
+        ? player.similarPlayers.map((item) => mapApiPlayerToCard(item as ApiPlayerLike | UnknownRecord))
+        : undefined,
   };
 }
 

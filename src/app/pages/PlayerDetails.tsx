@@ -146,11 +146,14 @@ export default function PlayerDetails() {
 
         if (nextPlayer) {
           try {
-            const nextIntelligenceProfile = await getPlayerIntelligenceProfile({
-              player: nextPlayer,
-              similarPlayers: nextSimilarPlayers,
-              projection: nextProjection,
-            });
+            const nextIntelligenceProfile =
+              nextPlayer.intelligenceProfile && typeof nextPlayer.intelligenceProfile === "object"
+                ? (nextPlayer.intelligenceProfile as PlayerIntelligenceProfile)
+                : await getPlayerIntelligenceProfile({
+                    player: nextPlayer,
+                    similarPlayers: nextSimilarPlayers,
+                    projection: nextProjection,
+                  });
 
             if (!active) {
               return;

@@ -1,4 +1,5 @@
 import { mapApiPlayerToExtended, type ApiPlayerLike } from "./player.mapper";
+import type { PlayerIntelligenceProfile } from "../types/player-intelligence";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -253,6 +254,18 @@ export function mapCompareResponse(response: unknown) {
   const riskProfileA = pickRecord(pickRecord(source, ["riskProfile"]) ?? {}, ["playerA"]);
   const riskProfileB = pickRecord(pickRecord(source, ["riskProfile"]) ?? {}, ["playerB"]);
   const positionContextSource = pickRecord(source, ["positionContext"]);
+  const intelligenceProfiles = pickRecord(source, ["intelligenceProfiles"]);
+  const blockWinners = pickRecord(source, ["blockWinners"]);
+  const executiveRecommendation = pickRecord(source, ["executiveRecommendation"]);
+
+  const intelligenceProfileA =
+    (pickRecord(intelligenceProfiles ?? {}, ["playerA"]) ?? pickRecord(normalizedPlayerA, ["intelligenceProfile"])) as
+      | PlayerIntelligenceProfile
+      | null;
+  const intelligenceProfileB =
+    (pickRecord(intelligenceProfiles ?? {}, ["playerB"]) ?? pickRecord(normalizedPlayerB, ["intelligenceProfile"])) as
+      | PlayerIntelligenceProfile
+      | null;
 
   playerA.capitalEfficiency = toNumber(capitalA?.index, playerA.capitalEfficiency);
   playerB.capitalEfficiency = toNumber(capitalB?.index, playerB.capitalEfficiency);
@@ -364,6 +377,36 @@ export function mapCompareResponse(response: unknown) {
     playerB,
     winner,
     comparison: source.comparison ?? source,
+    intelligenceProfiles: {
+      playerA: intelligenceProfileA,
+      playerB: intelligenceProfileB,
+    },
+    blockWinners: {
+      technical: blockWinners?.technical ?? null,
+      physical: blockWinners?.physical ?? null,
+      market: blockWinners?.market ?? null,
+      risk: blockWinners?.risk ?? null,
+      upside: blockWinners?.upside ?? null,
+      tacticalDna: blockWinners?.tacticalDna ?? null,
+    },
+    executiveRecommendation: executiveRecommendation
+      ? {
+          winner: normalizeWinner(executiveRecommendation.winner),
+          summary: toText(executiveRecommendation.summary),
+          sportingImpact: normalizeWinner(executiveRecommendation.sportingImpact),
+          tacticalFit: normalizeWinner(executiveRecommendation.tacticalFit),
+          risk: normalizeWinner(executiveRecommendation.risk),
+          marketEfficiency: normalizeWinner(executiveRecommendation.marketEfficiency),
+          upside: normalizeWinner(executiveRecommendation.upside),
+          resaleLiquidity: normalizeWinner(executiveRecommendation.resaleLiquidity),
+          weightedScores: isRecord(executiveRecommendation.weightedScores)
+            ? {
+                playerA: toNumber(executiveRecommendation.weightedScores.playerA),
+                playerB: toNumber(executiveRecommendation.weightedScores.playerB),
+              }
+            : { playerA: 0, playerB: 0 },
+        }
+      : null,
     radarData,
     comparisonStats: radarData.map((item) => ({
       name: item.attribute,

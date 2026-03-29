@@ -93,6 +93,7 @@ function buildExecutiveSnapshot(player: PlayerProfileModel): ExecutiveSnapshot {
     32,
     96,
   );
+  const valueScore = clamp(liquidityScore * 0.38 + upsideScore * 0.32 + tacticalFitScore * 0.2 - riskScore * 0.12, 22, 96);
 
   let recommendation = "Monitor";
   if (overall >= 82 || (upsideGap >= 6 && age <= 24)) {
@@ -123,6 +124,11 @@ function buildExecutiveSnapshot(player: PlayerProfileModel): ExecutiveSnapshot {
       tacticalFitScore >= 78 ? "System Ready" : tacticalFitScore >= 60 ? "Context Dependent" : "Scheme Risk",
       tacticalFitScore,
       "Blend of technical security, transition value and positional suitability for structured football.",
+    ),
+    value: toBand(
+      valueScore >= 75 ? "Positive Value" : valueScore >= 55 ? "Fair Value" : "Price Sensitive",
+      valueScore,
+      "Relationship between expected output, market entry cost and future optionality.",
     ),
     idealAcquisitionWindow:
       age <= 22
@@ -401,15 +407,136 @@ function buildContextSimilarity(
 class MockPlayerIntelligenceGateway implements PlayerIntelligenceGateway {
   async getProfile(query: PlayerIntelligenceQuery): Promise<PlayerIntelligenceProfile> {
     const executiveSnapshot = buildExecutiveSnapshot(query.player);
+    const soccerMindDna = buildSoccerMindDna(query.player);
+    const fieldIntelligence = buildFieldIntelligence(query.player);
+    const marketRisk = buildMarketRisk(query.player, executiveSnapshot);
+    const contextSimilarity = buildContextSimilarity(query.player, query.similarPlayers, executiveSnapshot, query.projection);
+    const overall = getOverall(query.player);
+    const potential = getPotential(query.player);
+    const growthIndex =
+      typeof query.projection?.growthIndex === "number" ? query.projection.growthIndex : Math.max(35, potential - overall) * 8;
+    const expectedPeak =
+      typeof query.projection?.projectedPeak === "number"
+        ? query.projection.projectedPeak
+        : typeof query.projection?.potential === "number"
+          ? query.projection.potential
+          : potential;
+    const dominantPosition = query.player.position || query.player.positions[0] || "";
+    const idealSystems = contextSimilarity.idealSystems;
+    const archetype = soccerMindDna.dominantTags[0] || "Developmental Profile";
 
     return {
+      identity: {
+        id: query.player.id,
+        name: query.player.name,
+        age: query.player.age,
+        nationality: query.player.nationality,
+        club: query.player.team,
+        league: query.player.league,
+        dominantPosition,
+        positions: query.player.positions,
+      },
+      summary: {
+        overall,
+        potential,
+        marketValue: query.player.marketValue,
+        recommendation: executiveSnapshot.recommendation,
+        confidence: executiveSnapshot.confidence,
+        currentLevel: overall,
+        expectedPeak,
+        growthOutlook: growthIndex >= 70 ? "High Growth" : growthIndex >= 50 ? "Positive" : "Stable",
+        resalePotential: marketRisk.resalePotential,
+        archetype,
+        profile: `${resolvePositionFamily(dominantPosition)}-profile`,
+        idealRole: dominantPosition || "Flexible role",
+        idealSystem: idealSystems[0] || "Flexible structure",
+        bestUseCase: executiveSnapshot.recommendation === "Target Now" ? "Immediate impact acquisition" : "Strategic monitoring with upside",
+        valueScore: executiveSnapshot.value?.score ?? 0,
+        liquidityScore: executiveSnapshot.liquidity.score,
+        riskScore: executiveSnapshot.risk.score,
+        capitalEfficiency: executiveSnapshot.value?.score ?? 0,
+      },
+      technical: {
+        coreAttributes: {
+          pace: query.player.pac ?? 0,
+          shooting: query.player.sho ?? 0,
+          passing: query.player.pas ?? 0,
+          dribbling: query.player.dri ?? 0,
+          defending: query.player.def ?? 0,
+          physical: query.player.phy ?? 0,
+        },
+        detailedMetrics: Object.fromEntries(
+          Object.entries(query.player.stats).map(([key, value]) => [key, typeof value === "number" ? value : 0]),
+        ),
+        overall,
+        potential,
+        marketValue: query.player.marketValue,
+      },
+      physical: {
+        acceleration: query.player.stats.acceleration ?? 0,
+        sprintSpeed: query.player.stats.sprintSpeed ?? 0,
+        stamina: query.player.stats.stamina ?? 0,
+        strength: query.player.stats.strength ?? 0,
+        jumping: query.player.stats.jumping ?? 0,
+        balance: query.player.stats.balance ?? 0,
+        agility: query.player.stats.agility ?? 0,
+        physicalRisk: marketRisk.physicalRisk,
+      },
+      tactical: {
+        tacticalMaturity: soccerMindDna.traits.find((trait) => trait.key === "tactical-maturity")
+          ? toBand(
+              "Tactical Maturity",
+              soccerMindDna.traits.find((trait) => trait.key === "tactical-maturity")?.value ?? 0,
+              "Decision quality, timing and positional discipline.",
+            )
+          : toBand("Tactical Maturity", executiveSnapshot.tacticalFit.score, "Decision quality, timing and positional discipline."),
+        tacticalAdaptationRisk: marketRisk.tacticalAdaptationRisk,
+        idealRole: dominantPosition || "Flexible role",
+        idealSystem: idealSystems[0] || "Flexible structure",
+        bestUseCase: executiveSnapshot.recommendation === "Target Now" ? "Immediate impact acquisition" : "Strategic monitoring with upside",
+        archetype,
+        profile: `${resolvePositionFamily(dominantPosition)}-profile`,
+      },
+      market: {
+        marketValue: query.player.marketValue,
+        salaryRange: marketRisk.salaryRange,
+        liquidity: marketRisk.liquidity,
+        financialRisk: marketRisk.financialRisk,
+        capitalEfficiency: executiveSnapshot.value?.score ?? 0,
+        valueScore: executiveSnapshot.value?.score ?? 0,
+      },
+      risk: {
+        composite: executiveSnapshot.risk,
+        structural: executiveSnapshot.risk,
+        financial: marketRisk.financialRisk,
+        physical: marketRisk.physicalRisk,
+        tacticalAdaptation: marketRisk.tacticalAdaptationRisk,
+        medical: toBand("Monitor", marketRisk.physicalRisk.score, "Medical layer still uses proxy scoring while deeper data is mocked."),
+      },
+      projection: {
+        currentLevel: overall,
+        expectedPeak,
+        expectedOverallNextSeason:
+          typeof query.projection?.projections === "object" && Array.isArray(query.projection.projections) && typeof query.projection.projections[0]?.overall === "number"
+            ? query.projection.projections[0].overall
+            : Math.round((overall + expectedPeak) / 2),
+        growthIndex,
+        growthOutlook: growthIndex >= 70 ? "High Growth" : growthIndex >= 50 ? "Positive" : "Stable",
+        resalePotential: marketRisk.resalePotential,
+      },
+      dna: {
+        dominantTags: soccerMindDna.dominantTags,
+        traits: soccerMindDna.traits,
+        archetype,
+        profile: `${resolvePositionFamily(dominantPosition)}-profile`,
+      },
       playerId: query.player.id,
       playerName: query.player.name,
       executiveSnapshot,
-      soccerMindDna: buildSoccerMindDna(query.player),
-      fieldIntelligence: buildFieldIntelligence(query.player),
-      marketRisk: buildMarketRisk(query.player, executiveSnapshot),
-      contextSimilarity: buildContextSimilarity(query.player, query.similarPlayers, executiveSnapshot, query.projection),
+      soccerMindDna,
+      fieldIntelligence,
+      marketRisk,
+      contextSimilarity,
       dataStatus: {
         source: "mock",
         eventDataReady: true,

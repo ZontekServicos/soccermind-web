@@ -197,6 +197,28 @@ function getExplainabilitySignals(comparison: unknown, playerKey: "playerA" | "p
   };
 }
 
+function getExecutiveRecommendation(comparison: unknown) {
+  const executiveRecommendation = pickRecord(comparison, "executiveRecommendation");
+  const weightedScores = pickRecord(executiveRecommendation, "weightedScores");
+
+  return {
+    winner: executiveRecommendation ? normalizeWinnerLabel(executiveRecommendation.winner) : "DRAW",
+    summary:
+      (typeof executiveRecommendation?.summary === "string" && executiveRecommendation.summary) ||
+      "Executive recommendation unavailable.",
+    sportingImpact: executiveRecommendation ? normalizeWinnerLabel(executiveRecommendation.sportingImpact) : "DRAW",
+    tacticalFit: executiveRecommendation ? normalizeWinnerLabel(executiveRecommendation.tacticalFit) : "DRAW",
+    risk: executiveRecommendation ? normalizeWinnerLabel(executiveRecommendation.risk) : "DRAW",
+    marketEfficiency: executiveRecommendation ? normalizeWinnerLabel(executiveRecommendation.marketEfficiency) : "DRAW",
+    upside: executiveRecommendation ? normalizeWinnerLabel(executiveRecommendation.upside) : "DRAW",
+    resaleLiquidity: executiveRecommendation ? normalizeWinnerLabel(executiveRecommendation.resaleLiquidity) : "DRAW",
+    weightedScores: {
+      playerA: toNumber(weightedScores?.playerA, 0),
+      playerB: toNumber(weightedScores?.playerB, 0),
+    },
+  };
+}
+
 function getMetricWinner(a: number, b: number, inverse = false): ExecutiveReportWinner {
   if (Math.abs(a - b) < 0.001) {
     return "DRAW";
@@ -207,6 +229,12 @@ function getMetricWinner(a: number, b: number, inverse = false): ExecutiveReport
   }
 
   return a > b ? "A" : "B";
+}
+
+function formatWinnerLabel(winner: ExecutiveReportWinner, nameA: string, nameB: string) {
+  if (winner === "A") return nameA;
+  if (winner === "B") return nameB;
+  return "equilibrio";
 }
 
 function buildDecisionScore(
@@ -278,12 +306,19 @@ export function buildExecutiveReportModel({
   const peakB = getExpectedPeak(comparison, "playerB", potentialB);
   const explainabilityA = getExplainabilitySignals(comparison, "playerA");
   const explainabilityB = getExplainabilitySignals(comparison, "playerB");
+  const executiveRecommendation = getExecutiveRecommendation(comparison);
   const marketValueA = parseMarketValue(playerA.marketValue);
   const marketValueB = parseMarketValue(playerB.marketValue);
   const decisionA = buildDecisionScore(playerA, potentialA, growthA, marketValueA);
   const decisionB = buildDecisionScore(playerB, potentialB, growthB, marketValueB);
   const recommendedSide: ExecutiveReportWinner =
-    Math.abs(decisionA - decisionB) < 1.5 ? winner : decisionA > decisionB ? "A" : "B";
+    executiveRecommendation.winner !== "DRAW"
+      ? executiveRecommendation.winner
+      : Math.abs(decisionA - decisionB) < 1.5
+        ? winner
+        : decisionA > decisionB
+          ? "A"
+          : "B";
 
   const recommendedPlayer = recommendedSide === "A" ? playerA : recommendedSide === "B" ? playerB : null;
   const secondaryPlayer = recommendedSide === "A" ? playerB : recommendedSide === "B" ? playerA : null;
@@ -316,14 +351,12 @@ export function buildExecutiveReportModel({
     : "aposta condicionada";
 
   const executiveSummary = recommendedPlayer && secondaryPlayer
-    ? `${opener} ${recommendedPlayer.name} fecha o recorte com melhor composicao entre overall (${recommendedPlayer.overallRating.toFixed(1)}), capital efficiency (${recommendedPlayer.capitalEfficiency.toFixed(1)}) e liquidez (${recommendedPlayer.liquidity.score.toFixed(1)}). ${marketFrame} ${secondaryPlayer.name} continua relevante, sobretudo quando o clube prioriza ${describeTimeHorizon(secondaryPlayer, secondaryPlayer.id === playerA.id ? potentialA : potentialB, secondaryPlayer.id === playerA.id ? growthA : growthB)} e aceita uma curva de maturacao menos linear.`
+    ? `${opener} ${recommendedPlayer.name} fecha o recorte com melhor composicao entre overall (${recommendedPlayer.overallRating.toFixed(1)}), capital efficiency (${recommendedPlayer.capitalEfficiency.toFixed(1)}) e liquidez (${recommendedPlayer.liquidity.score.toFixed(1)}). ${marketFrame} ${executiveRecommendation.summary} ${secondaryPlayer.name} continua relevante, sobretudo quando o clube prioriza ${describeTimeHorizon(secondaryPlayer, secondaryPlayer.id === playerA.id ? potentialA : potentialB, secondaryPlayer.id === playerA.id ? growthA : growthB)} e aceita uma curva de maturacao menos linear.`
     : `${opener} O confronto permanece equilibrado, com diferencas pequenas entre entrega imediata, risco estrutural e liquidez de saida. ${marketFrame}`;
 
-  const comparativeAnalysis = `${playerA.name} trabalha a comparacao com overall ${playerA.overallRating.toFixed(1)}, potencial estimado em ${potentialA.toFixed(1)} e pico projetado de ${peakA.toFixed(1)}, enquanto ${playerB.name} responde com overall ${playerB.overallRating.toFixed(1)}, potencial ${potentialB.toFixed(1)} e pico de ${peakB.toFixed(1)}. Em termos de capital allocation, a vantagem de ${
-    getMetricWinner(playerA.capitalEfficiency, playerB.capitalEfficiency) === "A" ? playerA.name : getMetricWinner(playerA.capitalEfficiency, playerB.capitalEfficiency) === "B" ? playerB.name : "equilibrio"
-  } em eficiencia de capital precisa ser lida ao lado da diferenca de liquidez e da pressao de risco financeiro, porque e nesse encaixe que o retorno total do investimento se torna mais previsivel.`;
+  const comparativeAnalysis = `${playerA.name} trabalha a comparacao com overall ${playerA.overallRating.toFixed(1)}, potencial estimado em ${potentialA.toFixed(1)} e pico projetado de ${peakA.toFixed(1)}, enquanto ${playerB.name} responde com overall ${playerB.overallRating.toFixed(1)}, potencial ${potentialB.toFixed(1)} e pico de ${peakB.toFixed(1)}. O bloco esportivo favorece ${formatWinnerLabel(executiveRecommendation.sportingImpact, playerA.name, playerB.name)}, o encaixe tatico favorece ${formatWinnerLabel(executiveRecommendation.tacticalFit, playerA.name, playerB.name)} e a eficiencia de mercado favorece ${formatWinnerLabel(executiveRecommendation.marketEfficiency, playerA.name, playerB.name)}. ${executiveRecommendation.summary}`;
 
-  const riskOverview = `${playerA.name} aparece com risco composto de ${playerA.risk.score.toFixed(1)} (${playerA.risk.level}), sustentado por ${playerA.risk.explanation.toLowerCase()} ${playerB.name} responde com risco composto de ${playerB.risk.score.toFixed(1)} (${playerB.risk.level}), em uma leitura em que ${playerB.risk.explanation.toLowerCase()} A vantagem real nao esta apenas em quem corre menos risco absoluto, mas em quem apresenta risco melhor remunerado pelo pacote tecnico, pela janela de revenda e pela margem de crescimento ainda capturavel.`;
+  const riskOverview = `${playerA.name} aparece com risco composto de ${playerA.risk.score.toFixed(1)} (${playerA.risk.level}), sustentado por ${playerA.risk.explanation.toLowerCase()} ${playerB.name} responde com risco composto de ${playerB.risk.score.toFixed(1)} (${playerB.risk.level}), em uma leitura em que ${playerB.risk.explanation.toLowerCase()} O bloco de risco favorece ${formatWinnerLabel(executiveRecommendation.risk, playerA.name, playerB.name)}, mas a decisao final continua dependente de como esse risco conversa com upside, liquidez e encaixe tatico.`;
 
   const narrativeParagraphs = recommendedPlayer && secondaryPlayer
     ? [
@@ -339,7 +372,7 @@ export function buildExecutiveReportModel({
         `${secondaryPlayer.name} nao deve ser descartado. O perfil dele permanece interessante quando a diretoria busca maior teto incremental, aceita uma janela de desenvolvimento mais longa ou enxerga sinergia tatico-financeira que justifique a exposicao adicional. Ainda assim, a comparacao atual sugere que a margem entre upside e risco esta mais bem calibrada em ${recommendedPlayer.name}.`,
         `Os sinais explicativos reforcam essa leitura: ${recommendedPlayer.id === playerA.id ? explainabilityA.positiveSignals[0] ?? "boa composicao estrutural" : explainabilityB.positiveSignals[0] ?? "boa composicao estrutural"}, ${recommendedPlayer.id === playerA.id ? explainabilityA.topFactors[0] ?? "controle de exposicao" : explainabilityB.topFactors[0] ?? "controle de exposicao"} e ${
           recommendedPlayer.id === playerA.id ? explainabilityA.riskDrivers[0] ?? "curva de risco administravel" : explainabilityB.riskDrivers[0] ?? "curva de risco administravel"
-        } ajudam a explicar por que a recomendacao final pende para este nome sem depender de um argumento unico ou superficial.`,
+        } ajudam a explicar por que a recomendacao final pende para este nome sem depender de um argumento unico ou superficial. ${executiveRecommendation.summary}`,
       ]
     : [
         "A comparacao indica equilibrio real entre os dois ativos, sem uma ruptura grande o bastante para produzir recomendacao incontestavel.",
