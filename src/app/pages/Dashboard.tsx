@@ -19,6 +19,7 @@ import { CapitalGauge } from "../components/CapitalGauge";
 import { useLanguage } from "../contexts/LanguageContext";
 import { type ChartDatum, type RiskBucket, type StrategicAsset, type StrategicAssetTier, getDashboardData } from "../services/dashboard";
 import type { PlayerExtended } from "../types/player";
+import { t as translate } from "../../i18n";
 
 type RiskTab = "ALL" | RiskBucket;
 
@@ -215,7 +216,7 @@ export default function Dashboard() {
             <div className="space-y-3">
               <h1 className="text-4xl">{t("dashboard.title")}</h1>
               <p className="max-w-4xl text-base leading-7 text-gray-400">
-                Painel executivo desenhado para leitura rapida de valor esportivo, risco de investimento e prioridade de ativos no elenco.
+                {t("dashboard.subtitle")}
               </p>
             </div>
 
@@ -224,7 +225,7 @@ export default function Dashboard() {
                 title={t("dashboard.players_analyzed")}
                 value={players.length.toString()}
                 icon={Users}
-                trend={`Base carregada para analise`}
+                trend={t("dashboard.baseLoaded")}
                 trendUp={true}
                 color="#00C2FF"
               />
@@ -232,7 +233,7 @@ export default function Dashboard() {
                 title={t("dashboard.avg_efficiency")}
                 value={averageEfficiency.toFixed(1)}
                 icon={Target}
-                trend={`Ranking limitado aos 20 mais relevantes`}
+                trend={t("dashboard.rankingLimited")}
                 trendUp={true}
                 color="#00FF9C"
               />
@@ -240,7 +241,7 @@ export default function Dashboard() {
                 title={t("dashboard.high_risk_players")}
                 value={riskCounts.HIGH.toString()}
                 icon={AlertTriangle}
-                trend={`${riskCounts.LOW} ativos em zona segura`}
+                trend={t("dashboard.safeZone", { count: riskCounts.LOW })}
                 trendUp={riskCounts.LOW >= riskCounts.HIGH}
                 color="#FF4D4F"
               />
@@ -248,7 +249,7 @@ export default function Dashboard() {
                 title={t("dashboard.total_market_value")}
                 value={totalMarketValue}
                 icon={DollarSign}
-                trend={error ? "API indisponivel" : "Carteira atual carregada"}
+                trend={error ? t("dashboard.apiUnavailable") : t("dashboard.portfolioLoaded")}
                 trendUp={!error}
                 color="#7A5CFF"
               />
@@ -262,17 +263,17 @@ export default function Dashboard() {
 
             {loading && (
               <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-400">
-                Carregando dashboard...
+                {t("dashboard.loading")}
               </div>
             )}
 
             <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
               <ChartCard
-                title="Capital Efficiency Ranking"
+                title={t("dashboard.efficiencyRankingTitle")}
                 icon={Target}
                 iconColor="#00C2FF"
-                subtitle="Mostra os jogadores com melhor relacao entre desempenho e custo de investimento."
-                summary="Valores mais altos indicam melhor retorno esportivo por capital alocado."
+                subtitle={t("dashboard.efficiencyRankingSubtitle")}
+                summary={t("dashboard.efficiencyRankingSummary")}
                 data={pagedEfficiencyData}
                 page={efficiencyPage}
                 totalPages={efficiencyTotalPages}
@@ -283,11 +284,11 @@ export default function Dashboard() {
               />
 
               <ChartCard
-                title="Overall Rating Ranking"
+                title={t("dashboard.overallRankingTitle")}
                 icon={TrendingUp}
                 iconColor="#7A5CFF"
-                subtitle="Mostra os jogadores com maior nivel tecnico geral no elenco analisado."
-                summary="Representa qualidade esportiva pura, sem considerar custo de mercado."
+                subtitle={t("dashboard.overallRankingSubtitle")}
+                summary={t("dashboard.overallRankingSummary")}
                 data={pagedRatingData}
                 page={ratingPage}
                 totalPages={ratingTotalPages}
@@ -303,10 +304,10 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   <h2 className="flex items-center gap-3 text-2xl font-semibold">
                     <ShieldCheck className="h-6 w-6 text-[#00FF9C]" />
-                    Top Capital Efficiency
+                    {t("dashboard.topEfficiencyTitle")}
                   </h2>
                   <p className="max-w-3xl text-sm leading-6 text-gray-400">
-                    Bloco de destaque com leitura direta dos perfis mais eficientes para scouting, investimento e composicao de curto prazo.
+                    {t("dashboard.topEfficiencySubtitle")}
                   </p>
                 </div>
               </div>
@@ -349,10 +350,10 @@ export default function Dashboard() {
                   <div className="space-y-2">
                     <h2 className="flex items-center gap-3 text-2xl font-semibold">
                       <AlertTriangle className="h-6 w-6 text-[#FF4D4F]" />
-                      Visao Geral de Risco
+                      {t("dashboard.riskOverviewTitle")}
                     </h2>
                     <p className="max-w-3xl text-sm leading-6 text-gray-400">
-                      Classificacao baseada em risco estrutural e financeiro para separar quem pede aceleracao, monitoramento ou prudencia.
+                      {t("dashboard.riskOverviewSubtitle")}
                     </p>
                   </div>
 
@@ -368,22 +369,22 @@ export default function Dashboard() {
                             : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-400 hover:text-gray-200"
                         }`}
                       >
-                        {tab === "ALL" ? `All (${riskTaggedPlayers.length})` : `${tab} (${riskCounts[tab]})`}
+                        {tab === "ALL" ? `${t("dashboard.riskTabAll")} (${riskTaggedPlayers.length})` : `${tab} (${riskCounts[tab]})`}
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <RiskSummaryCard bucket="LOW" count={riskCounts.LOW} label="Baixo risco" detail="Perfis com melhor equilibrio para decisao imediata." />
-                  <RiskSummaryCard bucket="MEDIUM" count={riskCounts.MEDIUM} label="Risco medio" detail="Demandam acompanhamento e contexto de encaixe." />
-                  <RiskSummaryCard bucket="HIGH" count={riskCounts.HIGH} label="Alto risco" detail="Precisam de maior diligencia esportiva e financeira." />
+                  <RiskSummaryCard bucket="LOW" count={riskCounts.LOW} label={t("dashboard.riskLowLabel")} detail={t("dashboard.riskLowDetail")} />
+                  <RiskSummaryCard bucket="MEDIUM" count={riskCounts.MEDIUM} label={t("dashboard.riskMediumLabel")} detail={t("dashboard.riskMediumDetail")} />
+                  <RiskSummaryCard bucket="HIGH" count={riskCounts.HIGH} label={t("dashboard.riskHighLabel")} detail={t("dashboard.riskHighDetail")} />
                 </div>
               </div>
 
               <div className="space-y-4">
                 {pagedRiskPlayers.length === 0 ? (
-                  <EmptyState message="Nenhum atleta encontrado neste filtro de risco." />
+                  <EmptyState message={t("dashboard.riskEmpty")} />
                 ) : (
                   pagedRiskPlayers.map(({ player, riskBucket, explanation }) => (
                     <RiskDecisionCard key={player.id} player={player} riskBucket={riskBucket} explanation={explanation} />
@@ -393,7 +394,7 @@ export default function Dashboard() {
 
               <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-gray-500">
-                  Mostrando {getVisibleRange(filteredRiskPlayers.length, riskPage, RISK_PAGE_SIZE, pagedRiskPlayers.length)} de {filteredRiskPlayers.length} atletas neste recorte.
+                  {t("dashboard.riskShowing", { range: getVisibleRange(filteredRiskPlayers.length, riskPage, RISK_PAGE_SIZE, pagedRiskPlayers.length), total: filteredRiskPlayers.length })}
                 </p>
                 <PaginationControls page={riskPage} totalPages={riskTotalPages} onPageChange={setRiskPage} />
               </div>
@@ -404,10 +405,10 @@ export default function Dashboard() {
                 <div className="space-y-2">
                   <h2 className="flex items-center gap-3 text-2xl font-semibold">
                     <DollarSign className="h-6 w-6 text-[#7A5CFF]" />
-                    Ativos Estrategicos
+                    {t("dashboard.strategicAssetsTitle")}
                   </h2>
                   <p className="max-w-3xl text-sm leading-6 text-gray-400">
-                    Tiers redesenhados para diferenciar impacto imediato, upside, estabilidade e oportunidade de mercado com base em idade, overall, potencial, liquidez e valor.
+                    {t("dashboard.strategicAssetsSubtitle")}
                   </p>
                 </div>
 
@@ -415,15 +416,15 @@ export default function Dashboard() {
               </div>
 
               <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
-                <TierInsightCard tier="Elite Asset" detail="Premium assets para impacto esportivo direto e liquidez alta." />
-                <TierInsightCard tier="Growth Asset" detail="Jogadores jovens com trajetoria de valorizacao e desenvolvimento." />
-                <TierInsightCard tier="Stable Asset" detail="Perfis confiaveis para manter consistencia competitiva." />
-                <TierInsightCard tier="Opportunity Asset" detail="Leituras de mercado favoraveis para capturar valor." />
+                <TierInsightCard tier="Elite Asset" detail={t("dashboard.eliteAssetDetail")} />
+                <TierInsightCard tier="Growth Asset" detail={t("dashboard.growthAssetDetail")} />
+                <TierInsightCard tier="Stable Asset" detail={t("dashboard.stableAssetDetail")} />
+                <TierInsightCard tier="Opportunity Asset" detail={t("dashboard.opportunityAssetDetail")} />
               </div>
 
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {pagedAssets.length === 0 ? (
-                  <EmptyState message="Nenhum ativo estrategico identificado no recorte atual." />
+                  <EmptyState message={t("dashboard.strategicAssetsEmpty")} />
                 ) : (
                   pagedAssets.map((asset) => <StrategicAssetCard key={`${asset.player.id}-${asset.tier}`} asset={asset} />)
                 )}
@@ -508,8 +509,8 @@ function ChartCard({
       </div>
 
       <div className="mb-4 flex items-center justify-between text-xs text-gray-500">
-        <span>Somente nomes e metricas relevantes no tooltip</span>
-        <span>{totalItems} atletas no ranking visivel</span>
+        <span>{translate("dashboard.tooltipHint")}</span>
+        <span>{translate("dashboard.visibleRanking", { count: totalItems })}</span>
       </div>
 
       <ResponsiveContainer width="100%" height={380}>
@@ -613,10 +614,10 @@ function RiskDecisionCard({
         </div>
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <RiskMetric label="Structural Risk" value={player.structuralRisk.score.toFixed(1)} />
-          <RiskMetric label="Financial Risk" value={player.financialRisk.index.toFixed(1)} />
-          <RiskMetric label="Liquidity" value={player.liquidity.score.toFixed(1)} />
-          <RiskMetric label="Composite Risk" value={compositeRisk.toFixed(1)} />
+          <RiskMetric label={translate("dashboard.structuralRisk")} value={player.structuralRisk.score.toFixed(1)} />
+          <RiskMetric label={translate("dashboard.financialRisk")} value={player.financialRisk.index.toFixed(1)} />
+          <RiskMetric label={translate("dashboard.liquidity")} value={player.liquidity.score.toFixed(1)} />
+          <RiskMetric label={translate("dashboard.compositeRisk")} value={compositeRisk.toFixed(1)} />
         </div>
       </div>
     </div>
@@ -738,7 +739,7 @@ function PaginationControls({
         <ChevronLeft className="h-4 w-4" />
       </button>
       <span className={`text-gray-400 ${compact ? "text-xs" : "text-sm"}`}>
-        Pagina {page} de {totalPages}
+        {translate("dashboard.pageLabel", { page, totalPages })}
       </span>
       <button
         type="button"

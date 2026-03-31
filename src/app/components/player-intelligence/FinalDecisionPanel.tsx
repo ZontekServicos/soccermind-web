@@ -1,4 +1,5 @@
 import { Trophy } from "lucide-react";
+import { t as translate } from "../../../i18n";
 
 interface FinalDecisionPanelProps {
   playerAName: string;
@@ -24,10 +25,10 @@ export function FinalDecisionPanel({
 }: FinalDecisionPanelProps) {
   const visibleReasons = insights.filter(Boolean).slice(0, 5);
   const decisionTiles = [
-    { label: "Better Player", value: finalDecision.betterPlayer.playerName || "Balanced" },
-    { label: "Safer Player", value: finalDecision.saferPlayer.playerName || "Balanced" },
-    { label: "Higher Upside", value: finalDecision.higherUpside.playerName || "Balanced" },
-    { label: "Best Tactical Fit", value: finalDecision.bestTacticalFit.playerName || "Balanced" },
+    { label: translate("decision.betterPlayer"), value: finalDecision.betterPlayer.playerName || translate("comparison.balanced") },
+    { label: translate("decision.saferPlayer"), value: finalDecision.saferPlayer.playerName || translate("comparison.balanced") },
+    { label: translate("decision.higherUpside"), value: finalDecision.higherUpside.playerName || translate("comparison.balanced") },
+    { label: translate("decision.bestTacticalFit"), value: finalDecision.bestTacticalFit.playerName || translate("comparison.balanced") },
   ];
 
   return (
@@ -39,9 +40,9 @@ export function FinalDecisionPanel({
         <div className="max-w-3xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">
             <Trophy className="h-3.5 w-3.5" />
-            Final Decision
+            {translate("decision.title")}
           </div>
-          <h2 className="mt-4 text-3xl font-semibold text-white">{finalDecision.betterPlayer.playerName || "Balanced"}</h2>
+          <h2 className="mt-4 text-3xl font-semibold text-white">{finalDecision.betterPlayer.playerName || translate("comparison.balanced")}</h2>
           <p className="mt-2 text-sm uppercase tracking-[0.22em] text-gray-500">
             {playerAName} vs {playerBName}
           </p>
@@ -49,7 +50,7 @@ export function FinalDecisionPanel({
         </div>
 
         <div className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-5 py-4">
-          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Confidence</p>
+          <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{translate("comparison.confidence")}</p>
           <p className="mt-2 text-3xl font-semibold text-white">{confidence}%</p>
         </div>
       </div>
@@ -72,7 +73,7 @@ export function FinalDecisionPanel({
             key={`${index}-${reason.slice(0, 20)}`}
             className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-4"
           >
-            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Reason {index + 1}</p>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{translate("decision.reason", { index: index + 1 })}</p>
             <p className="mt-3 text-sm leading-6 text-white">{reason}</p>
           </div>
         ))}

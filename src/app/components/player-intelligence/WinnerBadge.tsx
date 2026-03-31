@@ -1,3 +1,5 @@
+import { t as translate } from "../../../i18n";
+
 interface WinnerBadgeProps {
   winner: "A" | "B" | "DRAW" | "playerA" | "playerB" | "draw";
   nameA: string;
@@ -16,7 +18,7 @@ function resolveWinnerLabel(winner: WinnerBadgeProps["winner"], nameA: string, n
   const normalized = normalizeWinner(winner);
   if (normalized === "A") return nameA;
   if (normalized === "B") return nameB;
-  return "Balanced";
+  return translate("comparison.balanced");
 }
 
 function resolveWinnerTone(winner: WinnerBadgeProps["winner"]) {
@@ -36,7 +38,7 @@ export function WinnerBadge({
   winner,
   nameA,
   nameB,
-  label = "Winner",
+  label = translate("comparison.winner"),
 }: WinnerBadgeProps) {
   const normalized = normalizeWinner(winner);
   return (

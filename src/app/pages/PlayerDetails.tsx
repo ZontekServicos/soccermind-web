@@ -6,6 +6,7 @@ import { AppSidebar } from "../components/AppSidebar";
 import { DNABars } from "../components/player-intelligence/DNABars";
 import { ExecutiveSnapshotCard } from "../components/player-intelligence/ExecutiveSnapshotCard";
 import { SectionCard } from "../components/player-intelligence/SectionCard";
+import { useLanguage } from "../contexts/LanguageContext";
 import { getPlayerIntelligenceProfile } from "../services/playerIntelligence";
 import { getPlayer, getPlayerProjection, getSimilarPlayers } from "../services/players";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
@@ -17,6 +18,7 @@ import type {
 } from "../types/player-intelligence";
 import { normalizePlayerIntelligenceProfile } from "../types/player-intelligence";
 import type { PlayerCardModel, PlayerProfileModel } from "../mappers/player.mapper";
+import { t as translate } from "../../i18n";
 
 function formatMarketValue(value: number | null) {
   if (value === null) return "N/A";
@@ -186,6 +188,7 @@ function FieldFrame({
 export default function PlayerDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [player, setPlayer] = useState<PlayerProfileModel | null>(null);
   const [similarPlayers, setSimilarPlayers] = useState<PlayerCardModel[]>([]);
   const [profile, setProfile] = useState<PlayerIntelligenceProfile | null>(null);
@@ -198,7 +201,7 @@ export default function PlayerDetails() {
 
     async function loadPlayerDetails() {
       if (!id) {
-        setError("Jogador nao encontrado");
+        setError(translate("player.notFound"));
         setLoading(false);
         return;
       }
@@ -238,10 +241,10 @@ export default function PlayerDetails() {
               : null;
 
         setProfile(normalizePlayerIntelligenceProfile(rawProfile));
-        setError(nextPlayer ? null : "Jogador nao encontrado");
+        setError(nextPlayer ? null : translate("player.notFound"));
       } catch (fetchError) {
         if (!active) return;
-        setError(fetchError instanceof Error ? fetchError.message : "Erro ao carregar jogador");
+        setError(fetchError instanceof Error ? fetchError.message : translate("player.loadError"));
         setPlayer(null);
         setProfile(null);
         setSimilarPlayers([]);
@@ -299,7 +302,7 @@ export default function PlayerDetails() {
       await addToWatchlist({ playerId: player.id });
       setIsInWatchlist(true);
     } catch (watchlistError) {
-      setError(watchlistError instanceof Error ? watchlistError.message : "Erro ao atualizar watchlist");
+      setError(watchlistError instanceof Error ? watchlistError.message : translate("player.loadError"));
     }
   }
 
@@ -309,7 +312,7 @@ export default function PlayerDetails() {
         <AppSidebar />
         <div className="flex flex-1 flex-col overflow-hidden">
           <AppHeader />
-          <main className="flex flex-1 items-center justify-center text-sm text-gray-400">Carregando jogador...</main>
+          <main className="flex flex-1 items-center justify-center text-sm text-gray-400">{t("player.loading")}</main>
         </div>
       </div>
     );
@@ -323,12 +326,12 @@ export default function PlayerDetails() {
           <AppHeader />
           <main className="flex flex-1 items-center justify-center">
             <div className="text-center">
-              <p className="mb-4 text-xl text-gray-400">{error || "Jogador nao encontrado"}</p>
+              <p className="mb-4 text-xl text-gray-400">{error || t("player.notFound")}</p>
               <button
                 onClick={() => navigate("/players")}
                 className="rounded-lg bg-[#00C2FF] px-4 py-2 text-[#07142A] transition-colors hover:bg-[#00A8E0]"
               >
-                Voltar para Ranking
+                {t("player.backToRanking")}
               </button>
             </div>
           </main>
@@ -349,7 +352,7 @@ export default function PlayerDetails() {
               className="flex items-center gap-2 text-gray-400 transition-colors hover:text-[#00C2FF]"
             >
               <ArrowLeft className="h-4 w-4" />
-              Voltar para Ranking
+              {t("player.backToRanking")}
             </button>
 
             <section className="relative overflow-hidden rounded-[28px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(135deg,rgba(11,27,53,0.98),rgba(7,20,42,0.94))] px-7 py-7 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
@@ -375,9 +378,9 @@ export default function PlayerDetails() {
                     <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
                       <span>{profile.identity.nationality || "-"}</span>
                       <span>•</span>
-                      <span>{profile.identity.age ?? "-"} anos</span>
+                      <span>{profile.identity.age != null ? t("player.yearsOld", { age: profile.identity.age }) : "-"}</span>
                       <span>•</span>
-                      <span className="text-white">{profile.identity.club || "Sem clube"}</span>
+                      <span className="text-white">{profile.identity.club || t("player.noClub")}</span>
                       <span>•</span>
                       <span>{profile.identity.league || "-"}</span>
                     </div>
@@ -398,9 +401,9 @@ export default function PlayerDetails() {
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <InsightCard label="Current Level" value={`${profile.summary.currentLevel.score}`} />
-                  <InsightCard label="Expected Peak" value={`${profile.projection.expectedPeakOverall}`} tone="green" />
-                  <InsightCard label="Market Value" value={formatMarketValue(profile.market.currentValue)} tone="amber" />
+                  <InsightCard label={t("player.currentLevel")} value={`${profile.summary.currentLevel.score}`} />
+                  <InsightCard label={t("player.expectedPeak")} value={`${profile.projection.expectedPeakOverall}`} tone="green" />
+                  <InsightCard label={t("player.marketValue")} value={formatMarketValue(profile.market.currentValue)} tone="amber" />
                   <button
                     type="button"
                     onClick={handleWatchlistToggle}
@@ -413,7 +416,7 @@ export default function PlayerDetails() {
                     <div className="flex items-center gap-2">
                       <Star className="h-4 w-4" fill={isInWatchlist ? "currentColor" : "none"} />
                       <span className="text-xs font-semibold uppercase tracking-[0.18em]">
-                        {isInWatchlist ? "Na Watchlist" : "Salvar"}
+                        {isInWatchlist ? t("player.watchlistSaved") : t("player.save")}
                       </span>
                     </div>
                   </button>
@@ -423,16 +426,16 @@ export default function PlayerDetails() {
 
             <ExecutiveSnapshotCard
               snapshot={profile.summary}
-              dataSourceLabel={`Analysis ${profile.context.sourceAnalysisType ?? "live"}`}
-              subtitle="Recommendation, confidence, risk and timing stay above the fold."
+              dataSourceLabel={t("player.analysisLive", { source: profile.context.sourceAnalysisType ?? "live" })}
+              subtitle={t("player.executiveSubtitle")}
             />
 
             <DNABars dna={profile.dna} />
 
             <SectionCard
-              eyebrow="Attributes"
-              title="Technical and physical baseline"
-              description="Five signals per pillar. Fast enough for a decision call."
+              eyebrow={t("player.attributesEyebrow")}
+              title={t("player.attributesTitle")}
+              description={t("player.attributesDescription")}
               accent="cyan"
             >
               <div className="grid gap-6 xl:grid-cols-2">
@@ -450,40 +453,40 @@ export default function PlayerDetails() {
             </SectionCard>
 
             <SectionCard
-              eyebrow="Market & Risk"
-              title="Transaction shape"
-              description="Value, pressure and downside in one compact read."
+              eyebrow={t("player.marketRiskEyebrow")}
+              title={t("player.marketRiskTitle")}
+              description={t("player.marketRiskDescription")}
               accent="amber"
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <InsightCard label="Liquidity" value={profile.market.liquidity.label} tone="green" />
-                <InsightCard label="Value Retention" value={profile.market.valueRetention.label} tone="purple" />
-                <InsightCard label="Overall Risk" value={profile.risk.overall.label} tone="amber" />
-                <InsightCard label="Financial Risk" value={profile.risk.financial.label} tone="amber" />
+                <InsightCard label={t("dashboard.liquidity")} value={profile.market.liquidity.label} tone="green" />
+                <InsightCard label={t("player.valueRetention")} value={profile.market.valueRetention.label} tone="purple" />
+                <InsightCard label={t("player.overallRisk")} value={profile.risk.overall.label} tone="amber" />
+                <InsightCard label={t("dashboard.financialRisk")} value={profile.risk.financial.label} tone="amber" />
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <MetricBar label="Contract Pressure" value={profile.market.contractPressure.score} inverse />
-                <MetricBar label="Availability" value={profile.risk.availability.score} inverse />
-                <MetricBar label="Volatility" value={profile.risk.volatility.score} inverse />
-                <MetricBar label="Sample Confidence" value={profile.context.sampleConfidence} />
+                <MetricBar label={t("player.contractPressure")} value={profile.market.contractPressure.score} inverse />
+                <MetricBar label={t("player.availability")} value={profile.risk.availability.score} inverse />
+                <MetricBar label={t("player.volatility")} value={profile.risk.volatility.score} inverse />
+                <MetricBar label={t("player.sampleConfidence")} value={profile.context.sampleConfidence} />
               </div>
             </SectionCard>
 
             {fieldIntelligence ? (
               <SectionCard
-                eyebrow="Field Intelligence"
-                title="Where the player moves the pitch"
-                description="Heat, progression and shot map only."
+                eyebrow={t("player.fieldIntelligenceEyebrow")}
+                title={t("player.fieldIntelligenceTitle")}
+                description={t("player.fieldIntelligenceDescription")}
                 accent="green"
               >
                 <div className="grid gap-4 xl:grid-cols-3">
-                  <FieldFrame title="Heatmap" subtitle="occupation">
+                  <FieldFrame title={t("player.heatmap")} subtitle={t("player.heatmapSubtitle")}>
                     <HeatmapPitch zones={fieldIntelligence.heatmap} />
                   </FieldFrame>
-                  <FieldFrame title="Passes" subtitle="progression">
+                  <FieldFrame title={t("player.passes")} subtitle={t("player.passesSubtitle")}>
                     <PassMapPitch passes={fieldIntelligence.passes} />
                   </FieldFrame>
-                  <FieldFrame title="Shots" subtitle="threat">
+                  <FieldFrame title={t("player.shots")} subtitle={t("player.shotsSubtitle")}>
                     <ShotMapPitch shots={fieldIntelligence.shots} />
                   </FieldFrame>
                 </div>
@@ -491,35 +494,35 @@ export default function PlayerDetails() {
             ) : null}
 
             <SectionCard
-              eyebrow="Projection"
-              title="Expected trajectory"
-              description="Current level, next season and resale outlook in one line of sight."
+              eyebrow={t("player.projectionEyebrow")}
+              title={t("player.projectionTitle")}
+              description={t("player.projectionDescription")}
               accent="purple"
             >
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <InsightCard label="Current Overall" value={`${profile.projection.currentOverall}`} />
-                <InsightCard label="Next Season" value={`${profile.projection.nextSeasonOverall}`} tone="cyan" />
-                <InsightCard label="Expected Peak" value={`${profile.projection.expectedPeakOverall}`} tone="green" />
-                <InsightCard label="Curve" value={profile.projection.developmentCurve} tone="purple" />
-                <InsightCard label="Resale Outlook" value={profile.projection.resaleOutlook.label} tone="amber" />
+                <InsightCard label={t("player.currentOverall")} value={`${profile.projection.currentOverall}`} />
+                <InsightCard label={t("player.nextSeason")} value={`${profile.projection.nextSeasonOverall}`} tone="cyan" />
+                <InsightCard label={t("player.expectedPeak")} value={`${profile.projection.expectedPeakOverall}`} tone="green" />
+                <InsightCard label={t("player.curve")} value={profile.projection.developmentCurve} tone="purple" />
+                <InsightCard label={t("player.resaleOutlook")} value={profile.projection.resaleOutlook.label} tone="amber" />
               </div>
             </SectionCard>
 
             <SectionCard
-              eyebrow="Context"
-              title="Decision context"
-              description="Top insights, season trend and surrounding fit."
+              eyebrow={t("player.contextEyebrow")}
+              title={t("player.contextTitle")}
+              description={t("player.contextDescription")}
               accent="purple"
             >
               <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
-                    <InsightCard label="Competition Level" value={profile.context.competitionLevel} />
-                    <InsightCard label="Source Analysis" value={profile.context.sourceAnalysisType ?? "live"} tone="purple" />
+                    <InsightCard label={t("player.competitionLevel")} value={profile.context.competitionLevel} />
+                    <InsightCard label={t("player.sourceAnalysis")} value={profile.context.sourceAnalysisType ?? "live"} tone="purple" />
                   </div>
 
                   <div className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Top Insights</p>
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("player.topInsights")}</p>
                     <div className="mt-4 space-y-3">
                       {[
                         ...profile.narrative.aiInsights,
@@ -541,7 +544,7 @@ export default function PlayerDetails() {
                   </div>
 
                   <div className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">DNA Traits</p>
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("player.dnaTraits")}</p>
                     <div className="mt-4 grid gap-3 md:grid-cols-2">
                       {dnaTraits.map((trait) => (
                         <div
@@ -557,7 +560,7 @@ export default function PlayerDetails() {
                 </div>
 
                 <div className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
-                  <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Season Trend</p>
+                  <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("player.seasonTrend")}</p>
                   <div className="mt-4 space-y-3">
                     {profile.context.seasonTrend.slice(0, 5).map((point) => (
                       <div
@@ -569,8 +572,8 @@ export default function PlayerDetails() {
                           <span className="text-xs uppercase tracking-[0.18em] text-gray-500">{formatMarketValue(point.marketValue)}</span>
                         </div>
                         <div className="mt-3 grid gap-3 md:grid-cols-2">
-                          <MetricBar label="Overall" value={point.overall} />
-                          <MetricBar label="Risk" value={point.riskScore} inverse />
+                          <MetricBar label={t("player.overall")} value={point.overall} />
+                          <MetricBar label={t("player.risk")} value={point.riskScore} inverse />
                         </div>
                       </div>
                     ))}
@@ -581,9 +584,9 @@ export default function PlayerDetails() {
 
             {similarPlayers.length > 0 ? (
               <SectionCard
-                eyebrow="Related Players"
-                title="Quick follow-up options"
-                description="Fast pivots if the primary target becomes unavailable."
+                eyebrow={t("player.relatedPlayersEyebrow")}
+                title={t("player.relatedPlayersTitle")}
+                description={t("player.relatedPlayersDescription")}
                 accent="green"
               >
                 <div className="grid gap-4 md:grid-cols-3">
@@ -612,10 +615,10 @@ export default function PlayerDetails() {
                 to={`/compare?player1=${player.id}`}
                 className="rounded-[18px] bg-[#00C2FF] py-3 text-center font-semibold text-[#07142A] transition-colors hover:bg-[#00A8E0]"
               >
-                Comparar com outro jogador
+                {t("player.compareWithAnother")}
               </Link>
               <button className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] py-3 text-white transition-colors hover:bg-[rgba(255,255,255,0.05)]">
-                Adicionar ao Relatorio
+                {t("player.addToReport")}
               </button>
             </div>
           </div>

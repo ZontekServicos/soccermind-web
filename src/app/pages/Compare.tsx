@@ -14,6 +14,7 @@ import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Textarea } from "../components/ui/textarea";
 import { useAuth } from "../contexts/AuthContext";
+import { useLanguage } from "../contexts/LanguageContext";
 import { createComparisonAnalysis } from "../services/analysis";
 import { getCompareDataByIds, getCompareShortlist, type CompareViewModel, type PlayerFilterOptions } from "../services/compare";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
@@ -26,6 +27,7 @@ import {
   type PlayersFiltersState,
   parseFiltersFromSearchParams,
 } from "../utils/playerFilters";
+import { t as translate } from "../../i18n";
 
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = { positions: [], nationalities: [], teams: [], leagues: [], sources: [] };
 
@@ -39,7 +41,7 @@ function money(value: number | null) {
 function winnerLabel(winner: "A" | "B" | "DRAW", nameA: string, nameB: string) {
   if (winner === "A") return nameA;
   if (winner === "B") return nameB;
-  return "Balanced";
+  return translate("comparison.balanced");
 }
 
 function dedupe(players: PlayerExtended[]) {
@@ -61,53 +63,54 @@ function scoreItems(profileA: PlayerIntelligenceProfile | null, profileB: Player
 
   return {
     technical: [
-      { label: "Ball Striking", valueA: profileA?.technical.ballStriking ?? 0, valueB: profileB?.technical.ballStriking ?? 0 },
-      { label: "Passing", valueA: profileA?.technical.passing ?? 0, valueB: profileB?.technical.passing ?? 0 },
-      { label: "Carrying", valueA: profileA?.technical.carrying ?? 0, valueB: profileB?.technical.carrying ?? 0 },
-      { label: "First Touch", valueA: profileA?.technical.firstTouch ?? 0, valueB: profileB?.technical.firstTouch ?? 0 },
-      { label: "Creativity", valueA: profileA?.technical.creativity ?? 0, valueB: profileB?.technical.creativity ?? 0 },
+      { label: translate("metrics.ballStriking"), valueA: profileA?.technical.ballStriking ?? 0, valueB: profileB?.technical.ballStriking ?? 0 },
+      { label: translate("metrics.passing"), valueA: profileA?.technical.passing ?? 0, valueB: profileB?.technical.passing ?? 0 },
+      { label: translate("metrics.carrying"), valueA: profileA?.technical.carrying ?? 0, valueB: profileB?.technical.carrying ?? 0 },
+      { label: translate("metrics.firstTouch"), valueA: profileA?.technical.firstTouch ?? 0, valueB: profileB?.technical.firstTouch ?? 0 },
+      { label: translate("metrics.creativity"), valueA: profileA?.technical.creativity ?? 0, valueB: profileB?.technical.creativity ?? 0 },
     ] satisfies ComparisonMetricItem[],
     physical: [
-      { label: "Acceleration", valueA: profileA?.physical.acceleration ?? 0, valueB: profileB?.physical.acceleration ?? 0 },
-      { label: "Sprint Speed", valueA: profileA?.physical.sprintSpeed ?? 0, valueB: profileB?.physical.sprintSpeed ?? 0 },
-      { label: "Agility", valueA: profileA?.physical.agility ?? 0, valueB: profileB?.physical.agility ?? 0 },
-      { label: "Strength", valueA: profileA?.physical.strength ?? 0, valueB: profileB?.physical.strength ?? 0 },
-      { label: "Stamina", valueA: profileA?.physical.stamina ?? 0, valueB: profileB?.physical.stamina ?? 0 },
+      { label: translate("metrics.acceleration"), valueA: profileA?.physical.acceleration ?? 0, valueB: profileB?.physical.acceleration ?? 0 },
+      { label: translate("metrics.sprintSpeed"), valueA: profileA?.physical.sprintSpeed ?? 0, valueB: profileB?.physical.sprintSpeed ?? 0 },
+      { label: translate("metrics.agility"), valueA: profileA?.physical.agility ?? 0, valueB: profileB?.physical.agility ?? 0 },
+      { label: translate("metrics.strength"), valueA: profileA?.physical.strength ?? 0, valueB: profileB?.physical.strength ?? 0 },
+      { label: translate("metrics.stamina"), valueA: profileA?.physical.stamina ?? 0, valueB: profileB?.physical.stamina ?? 0 },
     ] satisfies ComparisonMetricItem[],
     tactical: [
-      { label: "Positioning", valueA: profileA?.tactical.positioning ?? 0, valueB: profileB?.tactical.positioning ?? 0 },
-      { label: "Decision Making", valueA: profileA?.tactical.decisionMaking ?? 0, valueB: profileB?.tactical.decisionMaking ?? 0 },
-      { label: "Transition Impact", valueA: profileA?.tactical.transitionImpact ?? 0, valueB: profileB?.tactical.transitionImpact ?? 0 },
-      { label: "Flexibility", valueA: profileA?.tactical.tacticalFlexibility ?? 0, valueB: profileB?.tactical.tacticalFlexibility ?? 0 },
-      { label: "Role Discipline", valueA: profileA?.tactical.roleDiscipline ?? 0, valueB: profileB?.tactical.roleDiscipline ?? 0 },
+      { label: translate("metrics.positioning"), valueA: profileA?.tactical.positioning ?? 0, valueB: profileB?.tactical.positioning ?? 0 },
+      { label: translate("metrics.decisionMaking"), valueA: profileA?.tactical.decisionMaking ?? 0, valueB: profileB?.tactical.decisionMaking ?? 0 },
+      { label: translate("metrics.transitionImpact"), valueA: profileA?.tactical.transitionImpact ?? 0, valueB: profileB?.tactical.transitionImpact ?? 0 },
+      { label: translate("metrics.flexibility"), valueA: profileA?.tactical.tacticalFlexibility ?? 0, valueB: profileB?.tactical.tacticalFlexibility ?? 0 },
+      { label: translate("metrics.roleDiscipline"), valueA: profileA?.tactical.roleDiscipline ?? 0, valueB: profileB?.tactical.roleDiscipline ?? 0 },
     ] satisfies ComparisonMetricItem[],
     market: [
-      { label: "Current Value", valueA: profileA?.market.currentValue ?? 0, valueB: profileB?.market.currentValue ?? 0, format: (value) => money(value) },
-      { label: "Liquidity", valueA: profileA?.market.liquidity.score ?? 0, valueB: profileB?.market.liquidity.score ?? 0 },
-      { label: "Value Retention", valueA: profileA?.market.valueRetention.score ?? 0, valueB: profileB?.market.valueRetention.score ?? 0 },
-      { label: "Contract Pressure", valueA: profileA?.market.contractPressure.score ?? 0, valueB: profileB?.market.contractPressure.score ?? 0, inverse: true },
-      { label: "Transfer Value", valueA: profileA?.market.estimatedTransferValue ?? 0, valueB: profileB?.market.estimatedTransferValue ?? 0, format: (value) => money(value) },
+      { label: translate("metrics.currentValue"), valueA: profileA?.market.currentValue ?? 0, valueB: profileB?.market.currentValue ?? 0, format: (value) => money(value) },
+      { label: translate("dashboard.liquidity"), valueA: profileA?.market.liquidity.score ?? 0, valueB: profileB?.market.liquidity.score ?? 0 },
+      { label: translate("player.valueRetention"), valueA: profileA?.market.valueRetention.score ?? 0, valueB: profileB?.market.valueRetention.score ?? 0 },
+      { label: translate("player.contractPressure"), valueA: profileA?.market.contractPressure.score ?? 0, valueB: profileB?.market.contractPressure.score ?? 0, inverse: true },
+      { label: translate("metrics.transferValue"), valueA: profileA?.market.estimatedTransferValue ?? 0, valueB: profileB?.market.estimatedTransferValue ?? 0, format: (value) => money(value) },
     ] satisfies ComparisonMetricItem[],
     risk: [
-      { label: "Overall Risk", valueA: profileA?.risk.overall.score ?? 0, valueB: profileB?.risk.overall.score ?? 0, inverse: true },
-      { label: "Physical Risk", valueA: profileA?.risk.physical.score ?? 0, valueB: profileB?.risk.physical.score ?? 0, inverse: true },
-      { label: "Tactical Risk", valueA: profileA?.risk.tactical.score ?? 0, valueB: profileB?.risk.tactical.score ?? 0, inverse: true },
-      { label: "Financial Risk", valueA: profileA?.risk.financial.score ?? 0, valueB: profileB?.risk.financial.score ?? 0, inverse: true },
-      { label: "Availability", valueA: profileA?.risk.availability.score ?? 0, valueB: profileB?.risk.availability.score ?? 0, inverse: true },
+      { label: translate("player.overallRisk"), valueA: profileA?.risk.overall.score ?? 0, valueB: profileB?.risk.overall.score ?? 0, inverse: true },
+      { label: translate("metrics.physicalRisk"), valueA: profileA?.risk.physical.score ?? 0, valueB: profileB?.risk.physical.score ?? 0, inverse: true },
+      { label: translate("metrics.tacticalRisk"), valueA: profileA?.risk.tactical.score ?? 0, valueB: profileB?.risk.tactical.score ?? 0, inverse: true },
+      { label: translate("dashboard.financialRisk"), valueA: profileA?.risk.financial.score ?? 0, valueB: profileB?.risk.financial.score ?? 0, inverse: true },
+      { label: translate("player.availability"), valueA: profileA?.risk.availability.score ?? 0, valueB: profileB?.risk.availability.score ?? 0, inverse: true },
     ] satisfies ComparisonMetricItem[],
     dna: dnaItems satisfies ComparisonMetricItem[],
     projection: [
-      { label: "Current Overall", valueA: profileA?.projection.currentOverall ?? 0, valueB: profileB?.projection.currentOverall ?? 0 },
-      { label: "Next Season", valueA: profileA?.projection.nextSeasonOverall ?? 0, valueB: profileB?.projection.nextSeasonOverall ?? 0 },
-      { label: "Expected Peak", valueA: profileA?.projection.expectedPeakOverall ?? 0, valueB: profileB?.projection.expectedPeakOverall ?? 0 },
-      { label: "Growth Index", valueA: profileA?.projection.growthIndex ?? 0, valueB: profileB?.projection.growthIndex ?? 0 },
-      { label: "Resale Outlook", valueA: profileA?.projection.resaleOutlook.score ?? 0, valueB: profileB?.projection.resaleOutlook.score ?? 0 },
+      { label: translate("player.currentOverall"), valueA: profileA?.projection.currentOverall ?? 0, valueB: profileB?.projection.currentOverall ?? 0 },
+      { label: translate("player.nextSeason"), valueA: profileA?.projection.nextSeasonOverall ?? 0, valueB: profileB?.projection.nextSeasonOverall ?? 0 },
+      { label: translate("player.expectedPeak"), valueA: profileA?.projection.expectedPeakOverall ?? 0, valueB: profileB?.projection.expectedPeakOverall ?? 0 },
+      { label: translate("metrics.growthIndex"), valueA: profileA?.projection.growthIndex ?? 0, valueB: profileB?.projection.growthIndex ?? 0 },
+      { label: translate("player.resaleOutlook"), valueA: profileA?.projection.resaleOutlook.score ?? 0, valueB: profileB?.projection.resaleOutlook.score ?? 0 },
     ] satisfies ComparisonMetricItem[],
   };
 }
 
 export default function Compare() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const [filters, setFilters] = useState<PlayersFiltersState>(() => parseFiltersFromSearchParams(urlSearchParams));
   const [filtersExpanded, setFiltersExpanded] = useState(() => countActiveFilters(parseFiltersFromSearchParams(urlSearchParams)) > 0);
@@ -154,7 +157,7 @@ export default function Compare() {
       } catch (loadError) {
         if (!active) return;
         setPlayers([]);
-        setError(loadError instanceof Error ? loadError.message : "Erro ao carregar shortlist");
+        setError(loadError instanceof Error ? loadError.message : t("comparison.empty"));
       } finally {
         if (active) setPlayersLoading(false);
       }
@@ -181,7 +184,7 @@ export default function Compare() {
       } catch (compareError) {
         if (!active) return;
         setComparisonData(null);
-        setError(compareError instanceof Error ? compareError.message : "Erro ao comparar jogadores");
+        setError(compareError instanceof Error ? compareError.message : t("comparison.loading"));
       } finally {
         if (active) setCompareLoading(false);
       }
@@ -201,10 +204,10 @@ export default function Compare() {
   const comparison = (comparisonData?.comparison as { winnersByBlock?: Record<string, unknown>; finalDecision?: any; summaryInsights?: string[] } | undefined) ?? {};
   const items = scoreItems(profileA, profileB);
   const finalDecision = comparison.finalDecision ?? {
-    betterPlayer: { playerName: "Balanced" },
-    saferPlayer: { playerName: "Balanced" },
-    higherUpside: { playerName: "Balanced" },
-    bestTacticalFit: { playerName: "Balanced" },
+    betterPlayer: { playerName: t("comparison.balanced") },
+    saferPlayer: { playerName: t("comparison.balanced") },
+    higherUpside: { playerName: t("comparison.balanced") },
+    bestTacticalFit: { playerName: t("comparison.balanced") },
   };
   const insights = Array.isArray(comparison.summaryInsights) ? comparison.summaryInsights.slice(0, 5) : [];
   const winner = finalDecision.betterPlayer.playerName === displayA.name ? "A" : finalDecision.betterPlayer.playerName === displayB.name ? "B" : normalizeWinner(comparisonData?.winner);
@@ -216,17 +219,17 @@ export default function Compare() {
     try {
       const response = await createComparisonAnalysis({
         playerIds: [playerA.id, playerB.id],
-        title: analysisTitle.trim() || `Comparacao - ${displayA.name} vs ${displayB.name}`,
+        title: analysisTitle.trim() || t("comparison.saveDefaultTitle", { playerA: displayA.name, playerB: displayB.name }),
         description: analysisDescription.trim() || undefined,
         analyst: user?.name,
       });
       setSaveTone("success");
-      setSaveFeedback(`Analise salva com sucesso: ${response.data.title}.`);
+      setSaveFeedback(t("comparison.saveSuccess", { title: response.data.title }));
       setAnalysisTitle("");
       setAnalysisDescription("");
     } catch (saveError) {
       setSaveTone("error");
-      setSaveFeedback(saveError instanceof Error ? saveError.message : "Nao foi possivel salvar a analise.");
+      setSaveFeedback(saveError instanceof Error ? saveError.message : t("comparison.saveError"));
     } finally {
       setSaveLoading(false);
     }
@@ -244,15 +247,15 @@ export default function Compare() {
                 <div className="max-w-3xl">
                   <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#C7B8FF]">
                     <GitCompareArrows className="h-3.5 w-3.5" />
-                    Compare Intelligence
+                    {t("comparison.badge")}
                   </div>
-                  <h1 className="text-4xl font-semibold text-white">Player vs Player</h1>
-                  <p className="mt-3 max-w-2xl text-sm text-gray-400">Decision-first comparison built from the two player intelligence profiles.</p>
+                  <h1 className="text-4xl font-semibold text-white">{t("comparison.title")}</h1>
+                  <p className="mt-3 max-w-2xl text-sm text-gray-400">{t("comparison.subtitle")}</p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4"><p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Shortlist</p><p className="mt-2 text-2xl font-bold text-[#C7B8FF]">{players.length}</p></div>
-                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4"><p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Filtros ativos</p><p className="mt-2 text-2xl font-bold text-[#9BE7FF]">{activeFiltersCount}</p></div>
-                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4"><p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Recommended</p><p className="mt-2 text-lg font-semibold text-white">{winnerLabel(winner, displayA.name, displayB.name)}</p></div>
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4"><p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("comparison.shortlist")}</p><p className="mt-2 text-2xl font-bold text-[#C7B8FF]">{players.length}</p></div>
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4"><p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("comparison.activeFilters")}</p><p className="mt-2 text-2xl font-bold text-[#9BE7FF]">{activeFiltersCount}</p></div>
+                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4"><p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("comparison.recommended")}</p><p className="mt-2 text-lg font-semibold text-white">{winnerLabel(winner, displayA.name, displayB.name)}</p></div>
                 </div>
               </div>
             </section>
@@ -281,45 +284,45 @@ export default function Compare() {
 
             <section className="grid gap-6 xl:grid-cols-[1fr_auto_1fr]">
               <div className="rounded-[22px] border border-[rgba(0,194,255,0.22)] bg-[rgba(255,255,255,0.03)] p-6">
-                <label className="mb-3 block text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Player A</label>
+                <label className="mb-3 block text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">{t("comparison.playerA")}</label>
                 <Select value={playerA.id} onValueChange={(value) => setPlayerA(playersById.get(value) ?? EMPTY_PLAYER)}>
-                  <SelectTrigger className="h-14 rounded-[14px] border-[rgba(0,194,255,0.28)] bg-[rgba(255,255,255,0.02)]"><SelectValue placeholder="Selecione o Jogador A" /></SelectTrigger>
+                  <SelectTrigger className="h-14 rounded-[14px] border-[rgba(0,194,255,0.28)] bg-[rgba(255,255,255,0.02)]"><SelectValue placeholder={t("comparison.selectPlayerA")} /></SelectTrigger>
                   <SelectContent className="border-[rgba(0,194,255,0.3)] bg-[#0A1B35]">{selectablePlayers.map((player) => <SelectItem key={player.id} value={player.id}>{player.name} - {player.club}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="hidden items-center justify-center xl:flex"><div className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-3 text-xl font-semibold tracking-[0.22em] text-white">VS</div></div>
               <div className="rounded-[22px] border border-[rgba(168,85,247,0.22)] bg-[rgba(255,255,255,0.03)] p-6">
-                <label className="mb-3 block text-[11px] uppercase tracking-[0.24em] text-[#D8B4FE]">Player B</label>
+                <label className="mb-3 block text-[11px] uppercase tracking-[0.24em] text-[#D8B4FE]">{t("comparison.playerB")}</label>
                 <Select value={playerB.id} onValueChange={(value) => setPlayerB(playersById.get(value) ?? EMPTY_PLAYER)}>
-                  <SelectTrigger className="h-14 rounded-[14px] border-[rgba(168,85,247,0.28)] bg-[rgba(255,255,255,0.02)]"><SelectValue placeholder="Selecione o Jogador B" /></SelectTrigger>
+                  <SelectTrigger className="h-14 rounded-[14px] border-[rgba(168,85,247,0.28)] bg-[rgba(255,255,255,0.02)]"><SelectValue placeholder={t("comparison.selectPlayerB")} /></SelectTrigger>
                   <SelectContent className="border-[rgba(168,85,247,0.3)] bg-[#0A1B35]">{selectablePlayers.map((player) => <SelectItem key={player.id} value={player.id}>{player.name} - {player.club}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
             </section>
 
-            <FinalDecisionPanel playerAName={displayA.name} playerBName={displayB.name} finalDecision={finalDecision} confidence={confidence} insights={insights} summary="Block winners, risk balance and upside are condensed into one direct recommendation." />
+            <FinalDecisionPanel playerAName={displayA.name} playerBName={displayB.name} finalDecision={finalDecision} confidence={confidence} insights={insights} summary={t("comparison.finalSummary")} />
 
             <div className="rounded-[26px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">Save Analysis</p>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">{t("comparison.saveTitle")}</p>
               <div className="mt-4 grid gap-3">
-                <Input value={analysisTitle} onChange={(event) => setAnalysisTitle(event.target.value)} maxLength={160} placeholder={`Comparacao - ${displayA.name} vs ${displayB.name}`} className="h-10 rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500" />
-                <Textarea value={analysisDescription} onChange={(event) => setAnalysisDescription(event.target.value)} maxLength={1000} placeholder="Descricao opcional para contextualizar a comparacao" className="min-h-[86px] rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500" />
-                <Button type="button" onClick={saveAnalysis} disabled={saveLoading || !playerA.id || !playerB.id || playerA.id === playerB.id} className="h-10 rounded-[12px] border border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.12)] px-5 font-semibold text-[#9BE7FF] hover:bg-[rgba(0,194,255,0.18)]">{saveLoading ? "Salvando analise..." : "Salvar na central de analises"}</Button>
+                <Input value={analysisTitle} onChange={(event) => setAnalysisTitle(event.target.value)} maxLength={160} placeholder={t("comparison.savePlaceholder", { playerA: displayA.name, playerB: displayB.name })} className="h-10 rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500" />
+                <Textarea value={analysisDescription} onChange={(event) => setAnalysisDescription(event.target.value)} maxLength={1000} placeholder={t("comparison.saveDescriptionPlaceholder")} className="min-h-[86px] rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500" />
+                <Button type="button" onClick={saveAnalysis} disabled={saveLoading || !playerA.id || !playerB.id || playerA.id === playerB.id} className="h-10 rounded-[12px] border border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.12)] px-5 font-semibold text-[#9BE7FF] hover:bg-[rgba(0,194,255,0.18)]">{saveLoading ? t("comparison.saving") : t("comparison.saveButton")}</Button>
               </div>
             </div>
 
-            <SectionCard eyebrow="Cases" title={`${displayA.name} vs ${displayB.name}`} description="Two profile snapshots before the block-by-block verdict." accent="purple" aside={<WinnerBadge winner={winner} nameA={displayA.name} nameB={displayB.name} label="Recommended" />}>
+            <SectionCard eyebrow={t("comparison.casesEyebrow")} title={`${displayA.name} vs ${displayB.name}`} description={t("comparison.casesDescription")} accent="purple" aside={<WinnerBadge winner={winner} nameA={displayA.name} nameB={displayB.name} label={t("comparison.recommended")} />}>
               <div className="grid gap-6 xl:grid-cols-2">
-                {[{ label: "Player A", player: displayA, profile: profileA }, { label: "Player B", player: displayB, profile: profileB }].map((entry) => (
+                {[{ label: t("comparison.playerA"), player: displayA, profile: profileA }, { label: t("comparison.playerB"), player: displayB, profile: profileB }].map((entry) => (
                   <div key={entry.label} className="rounded-[22px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
                     <p className="text-[11px] uppercase tracking-[0.24em] text-gray-300">{entry.label}</p>
                     <h3 className="mt-2 text-2xl font-semibold text-white">{entry.player.name}</h3>
                     <p className="mt-1 text-sm text-gray-400">{entry.player.position} • {entry.player.club}</p>
                     <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(7,20,42,0.68)] p-4"><p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Recommendation</p><p className="mt-2 text-lg font-semibold text-white">{entry.profile?.summary.recommendation ?? "N/A"}</p></div>
-                      <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(7,20,42,0.68)] p-4"><p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Confidence</p><p className="mt-2 text-lg font-semibold text-white">{entry.profile?.summary.confidence ?? 0}%</p></div>
-                      <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(7,20,42,0.68)] p-4"><p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Market Value</p><p className="mt-2 text-lg font-semibold text-white">{money(entry.profile?.market.currentValue ?? entry.player.marketValueAmount)}</p></div>
-                      <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(7,20,42,0.68)] p-4"><p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">DNA</p><p className="mt-2 text-lg font-semibold text-white">{entry.profile?.dna.archetype ?? "N/A"}</p></div>
+                      <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(7,20,42,0.68)] p-4"><p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{t("comparison.recommendation")}</p><p className="mt-2 text-lg font-semibold text-white">{entry.profile?.summary.recommendation ?? "N/A"}</p></div>
+                      <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(7,20,42,0.68)] p-4"><p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{t("comparison.confidence")}</p><p className="mt-2 text-lg font-semibold text-white">{entry.profile?.summary.confidence ?? 0}%</p></div>
+                      <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(7,20,42,0.68)] p-4"><p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{t("player.marketValue")}</p><p className="mt-2 text-lg font-semibold text-white">{money(entry.profile?.market.currentValue ?? entry.player.marketValueAmount)}</p></div>
+                      <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(7,20,42,0.68)] p-4"><p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{t("comparison.dna")}</p><p className="mt-2 text-lg font-semibold text-white">{entry.profile?.dna.archetype ?? "N/A"}</p></div>
                     </div>
                   </div>
                 ))}
@@ -327,17 +330,17 @@ export default function Compare() {
             </SectionCard>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <ComparisonBlock title="Technical" description="Core on-ball quality and execution." nameA={displayA.name} nameB={displayB.name} items={items.technical} forcedWinner={(comparison.winnersByBlock as any)?.technical?.winner} />
-              <ComparisonBlock title="Physical" description="Motor, speed and duel profile." nameA={displayA.name} nameB={displayB.name} items={items.physical} forcedWinner={(comparison.winnersByBlock as any)?.physical?.winner} />
-              <ComparisonBlock title="Tactical" description="Decision-making, discipline and fit." nameA={displayA.name} nameB={displayB.name} items={items.tactical} forcedWinner={(comparison.winnersByBlock as any)?.tactical?.winner} />
-              <ComparisonBlock title="Market" description="Transaction logic and timing." nameA={displayA.name} nameB={displayB.name} items={items.market} forcedWinner={(comparison.winnersByBlock as any)?.market?.winner} />
-              <ComparisonBlock title="Risk" description="Downside exposure and resilience." nameA={displayA.name} nameB={displayB.name} items={items.risk} forcedWinner={(comparison.winnersByBlock as any)?.risk?.winner} />
-              <ComparisonBlock title="DNA" description="Behavioral and style signature." nameA={displayA.name} nameB={displayB.name} items={items.dna} forcedWinner={(comparison.winnersByBlock as any)?.dna?.winner} />
-              <ComparisonBlock title="Projection" description="Future level and resale path." nameA={displayA.name} nameB={displayB.name} items={items.projection} forcedWinner={(comparison.winnersByBlock as any)?.projection?.winner} />
+              <ComparisonBlock title={t("comparison.technical")} description={t("comparison.technicalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.technical} forcedWinner={(comparison.winnersByBlock as any)?.technical?.winner} />
+              <ComparisonBlock title={t("comparison.physical")} description={t("comparison.physicalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.physical} forcedWinner={(comparison.winnersByBlock as any)?.physical?.winner} />
+              <ComparisonBlock title={t("comparison.tactical")} description={t("comparison.tacticalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.tactical} forcedWinner={(comparison.winnersByBlock as any)?.tactical?.winner} />
+              <ComparisonBlock title={t("comparison.market")} description={t("comparison.marketDescription")} nameA={displayA.name} nameB={displayB.name} items={items.market} forcedWinner={(comparison.winnersByBlock as any)?.market?.winner} />
+              <ComparisonBlock title={t("comparison.risk")} description={t("comparison.riskDescription")} nameA={displayA.name} nameB={displayB.name} items={items.risk} forcedWinner={(comparison.winnersByBlock as any)?.risk?.winner} />
+              <ComparisonBlock title={t("comparison.dna")} description={t("comparison.dnaDescription")} nameA={displayA.name} nameB={displayB.name} items={items.dna} forcedWinner={(comparison.winnersByBlock as any)?.dna?.winner} />
+              <ComparisonBlock title={t("comparison.projection")} description={t("comparison.projectionDescription")} nameA={displayA.name} nameB={displayB.name} items={items.projection} forcedWinner={(comparison.winnersByBlock as any)?.projection?.winner} />
             </div>
 
-            {compareLoading ? <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-400">Carregando comparacao...</div> : null}
-            {!playersLoading && selectablePlayers.length === 0 ? <div className="py-14 text-center"><div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.03)]"><Search className="h-7 w-7 text-gray-600" /></div><p className="text-sm text-gray-500">Nenhum jogador encontrado com os filtros selecionados.</p></div> : null}
+            {compareLoading ? <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-400">{t("comparison.loading")}</div> : null}
+            {!playersLoading && selectablePlayers.length === 0 ? <div className="py-14 text-center"><div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.03)]"><Search className="h-7 w-7 text-gray-600" /></div><p className="text-sm text-gray-500">{t("comparison.empty")}</p></div> : null}
           </div>
         </main>
       </div>

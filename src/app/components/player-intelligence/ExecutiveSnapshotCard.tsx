@@ -1,5 +1,6 @@
 import { ShieldAlert, Sparkles, Target, TrendingUp } from "lucide-react";
 import type { ExecutiveSnapshot } from "../../types/player-intelligence";
+import { t as translate } from "../../../i18n";
 
 interface ExecutiveSnapshotCardProps {
   snapshot: ExecutiveSnapshot;
@@ -58,8 +59,8 @@ function SnapshotMetric({
 export function ExecutiveSnapshotCard({
   snapshot,
   dataSourceLabel,
-  title = "Executive Snapshot",
-  subtitle = "Decision-first summary built for recruitment calls.",
+  title = translate("snapshot.title"),
+  subtitle = translate("snapshot.subtitle"),
 }: ExecutiveSnapshotCardProps) {
   return (
     <section className="relative overflow-hidden rounded-[26px] border border-[rgba(0,194,255,0.22)] bg-[linear-gradient(135deg,rgba(11,27,53,0.98),rgba(7,20,42,0.96))] shadow-[0_18px_60px_rgba(0,0,0,0.3)]">
@@ -79,7 +80,7 @@ export function ExecutiveSnapshotCard({
               </span>
             ) : null}
             <span className="rounded-full border border-[rgba(0,194,255,0.18)] bg-[rgba(0,194,255,0.08)] px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-[#9BE7FF]">
-              Confidence {snapshot.confidence}
+              {translate("snapshot.confidenceBadge", { value: snapshot.confidence })}
             </span>
           </div>
         </div>
@@ -87,32 +88,32 @@ export function ExecutiveSnapshotCard({
 
       <div className="grid gap-4 px-6 py-6 md:grid-cols-2 xl:grid-cols-5">
         <SnapshotMetric
-          label="Recommendation"
+          label={translate("snapshot.recommendation")}
           score={snapshot.confidence}
           value={snapshot.recommendation}
           icon={<Target className="h-4 w-4" />}
         />
         <SnapshotMetric
-          label="Confidence"
+          label={translate("snapshot.confidence")}
           score={snapshot.confidence}
           value={`${snapshot.confidence}%`}
           icon={<Sparkles className="h-4 w-4" />}
         />
         <SnapshotMetric
-          label="Risk"
+          label={translate("snapshot.risk")}
           score={snapshot.risk.score}
           value={snapshot.risk.label}
           icon={<ShieldAlert className="h-4 w-4" />}
           inverse
         />
         <SnapshotMetric
-          label="Market"
+          label={translate("snapshot.market")}
           score={snapshot.marketOpportunity.score}
           value={snapshot.marketOpportunity.label}
           icon={<TrendingUp className="h-4 w-4" />}
         />
         <SnapshotMetric
-          label="Upside"
+          label={translate("snapshot.upside")}
           score={snapshot.upside.score}
           value={snapshot.upside.label}
           icon={<Sparkles className="h-4 w-4" />}
@@ -122,15 +123,15 @@ export function ExecutiveSnapshotCard({
       <div className="border-t border-[rgba(255,255,255,0.06)] px-6 py-4">
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Decision Window</p>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{translate("snapshot.decisionWindow")}</p>
             <p className="mt-3 text-base font-semibold text-white">{snapshot.decisionWindow.replace(/_/g, " ")}</p>
           </div>
           <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Current Level</p>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{translate("snapshot.currentLevel")}</p>
             <p className="mt-3 text-base font-semibold text-white">{snapshot.currentLevel.score}</p>
           </div>
           <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
-            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Quick Take</p>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{translate("snapshot.quickTake")}</p>
             <p className="mt-3 text-sm text-gray-300">{snapshot.summary}</p>
           </div>
         </div>

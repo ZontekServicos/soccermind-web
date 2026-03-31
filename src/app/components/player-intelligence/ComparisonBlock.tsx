@@ -1,4 +1,5 @@
 import { WinnerBadge } from "./WinnerBadge";
+import { t as translate } from "../../../i18n";
 
 export interface ComparisonMetricItem {
   label: string;
@@ -78,7 +79,9 @@ export function ComparisonBlock({
               <div className="mb-3 flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-white">{item.label}</span>
                 <span className="text-[11px] uppercase tracking-[0.18em] text-gray-500">
-                  {metricWinner === "DRAW" ? "Balanced" : `${metricWinner === "A" ? nameA : nameB} edge`}
+                  {metricWinner === "DRAW"
+                    ? translate("comparison.balanced")
+                    : `${metricWinner === "A" ? nameA : nameB} ${translate("comparison.edge")}`}
                 </span>
               </div>
 
@@ -90,7 +93,7 @@ export function ComparisonBlock({
                   </div>
                 </div>
 
-                <span className="text-[10px] uppercase tracking-[0.22em] text-gray-500">vs</span>
+                <span className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{translate("comparison.vs")}</span>
 
                 <div className="text-right">
                   <p className={`text-lg font-semibold ${metricWinner === "B" ? "text-[#E9D5FF]" : "text-white"}`}>{format(item.valueB)}</p>

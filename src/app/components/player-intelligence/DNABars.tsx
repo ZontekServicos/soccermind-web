@@ -1,4 +1,5 @@
 import type { SoccerMindDna } from "../../types/player-intelligence";
+import { t as translate } from "../../../i18n";
 
 interface DNABarsProps {
   dna: SoccerMindDna;
@@ -20,7 +21,7 @@ export function DNABars({ dna, limit = 5 }: DNABarsProps) {
       <div className="border-b border-[rgba(255,255,255,0.06)] px-6 py-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.28em] text-[#E9D5FF]">SoccerMind DNA</p>
+            <p className="text-[11px] uppercase tracking-[0.28em] text-[#E9D5FF]">{translate("dna.title")}</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">{dna.archetype}</h2>
             <p className="mt-2 text-sm text-gray-400">{dna.profileLabel}</p>
           </div>
