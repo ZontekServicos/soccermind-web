@@ -255,7 +255,10 @@ export function mapCompareResponse(response: unknown) {
   const riskProfileB = pickRecord(pickRecord(source, ["riskProfile"]) ?? {}, ["playerB"]);
   const positionContextSource = pickRecord(source, ["positionContext"]);
   const intelligenceProfiles = pickRecord(source, ["intelligenceProfiles"]);
-  const blockWinners = pickRecord(source, ["blockWinners"]);
+  const comparisonRecord = pickRecord(source, ["comparison"]) ?? source;
+  const blockWinners =
+    pickRecord(source, ["blockWinners"]) ??
+    pickRecord(comparisonRecord, ["winnersByBlock"]);
   const executiveRecommendation = pickRecord(source, ["executiveRecommendation"]);
 
   const intelligenceProfileA = normalizePlayerIntelligenceProfile(
@@ -356,7 +359,16 @@ export function mapCompareResponse(response: unknown) {
   playerB.riskLevel = playerB.risk.level;
 
   const radarData = buildRadarData(playerA.stats, playerB.stats);
-  const winner = normalizeWinner(source.winner ?? pickRecord(source, ["quantitative"])?.winner);
+  const betterPlayerName = toText(pickRecord(pickRecord(comparisonRecord, ["finalDecision"]) ?? {}, ["betterPlayer"])?.playerName);
+  const winner = normalizeWinner(
+    source.winner ??
+      pickRecord(source, ["quantitative"])?.winner ??
+      (betterPlayerName && betterPlayerName === playerA.name
+        ? "A"
+        : betterPlayerName && betterPlayerName === playerB.name
+          ? "B"
+          : "DRAW"),
+  );
   const fallbackPositionContext = buildFallbackPositionContext(playerA.position, playerB.position);
   const positionContext = {
     ...fallbackPositionContext,
@@ -378,7 +390,7 @@ export function mapCompareResponse(response: unknown) {
     playerA,
     playerB,
     winner,
-    comparison: source.comparison ?? source,
+    comparison: comparisonRecord,
     intelligenceProfiles: {
       playerA: intelligenceProfileA,
       playerB: intelligenceProfileB,
@@ -386,10 +398,13 @@ export function mapCompareResponse(response: unknown) {
     blockWinners: {
       technical: blockWinners?.technical ?? null,
       physical: blockWinners?.physical ?? null,
+      tactical: blockWinners?.tactical ?? null,
       market: blockWinners?.market ?? null,
       risk: blockWinners?.risk ?? null,
+      dna: blockWinners?.dna ?? null,
+      projection: blockWinners?.projection ?? blockWinners?.upside ?? null,
       upside: blockWinners?.upside ?? null,
-      tacticalDna: blockWinners?.tacticalDna ?? null,
+      tacticalDna: blockWinners?.tacticalDna ?? blockWinners?.tactical ?? null,
     },
     executiveRecommendation: executiveRecommendation
       ? {

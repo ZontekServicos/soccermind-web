@@ -31,11 +31,23 @@ import { t as translate } from "../../i18n";
 
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = { positions: [], nationalities: [], teams: [], leagues: [], sources: [] };
 
+function average(values: number[]) {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 function money(value: number | null) {
   if (value === null) return "N/A";
   if (value >= 1_000_000) return `EUR ${(value / 1_000_000).toFixed(1)}M`;
   if (value >= 1_000) return `EUR ${(value / 1_000).toFixed(0)}K`;
   return `EUR ${value.toFixed(0)}`;
+}
+
+function normalizeWinner(value: unknown) {
+  const normalized = typeof value === "string" ? value.toUpperCase() : "DRAW";
+  if (normalized === "A" || normalized === "PLAYERA") return "A" as const;
+  if (normalized === "B" || normalized === "PLAYERB") return "B" as const;
+  return "DRAW" as const;
 }
 
 function winnerLabel(winner: "A" | "B" | "DRAW", nameA: string, nameB: string) {
