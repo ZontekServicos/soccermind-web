@@ -102,7 +102,7 @@ function toText(value: unknown, fallback: string) {
 }
 
 function mapType(value: unknown): AnalysisViewModel["type"] {
-  return value === "COMPARISON" ? "comparison" : "report";
+  return value === "COMPARISON" || value === "PLAYER_COMPARISON" ? "comparison" : "report";
 }
 
 function mapStatus(value: unknown): AnalysisViewModel["status"] {
@@ -155,7 +155,7 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
     playerAId: record.playerAId == null ? null : toText(record.playerAId, ""),
     playerBId: record.playerBId == null ? null : toText(record.playerBId, ""),
     type: mapType(record.type),
-    typeLabel: toText(record.typeLabel, record.type === "COMPARISON" ? "Comparacao" : "Relatorio"),
+    typeLabel: toText(record.typeLabel, record.type === "COMPARISON" || record.type === "PLAYER_COMPARISON" ? "Comparacao" : "Relatorio"),
     players: players.map((player) => player.name),
     playerDetails: players,
     user: toText(record.analyst, "Analista SoccerMind"),
@@ -164,8 +164,8 @@ export function mapAnalysisResponse(source: unknown): AnalysisViewModel {
     statusLabel: toText(record.statusLabel, "Em andamento"),
     canDelete,
     isLegacy,
-    sourceOrigin: sourceMetadata.origin === "ANALYSIS" ? "analysis" : "scout_report",
-    sourceLabel: isLegacy ? "Legado ScoutReport" : "Central Analysis",
+    sourceOrigin: "analysis",
+    sourceLabel: "Central Analysis",
     deleteManagedBy,
     deleteHint: toText(
       record.deleteHint ?? deletePolicy.reason,
