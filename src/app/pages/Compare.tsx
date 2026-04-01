@@ -213,16 +213,25 @@ export default function Compare() {
   const displayB = comparisonData?.playerB ?? playerB;
   const profileA = normalizePlayerIntelligenceProfile(comparisonData?.intelligenceProfiles?.playerA ?? null);
   const profileB = normalizePlayerIntelligenceProfile(comparisonData?.intelligenceProfiles?.playerB ?? null);
-  const comparison = (comparisonData?.comparison as { winnersByBlock?: Record<string, unknown>; finalDecision?: any; summaryInsights?: string[] } | undefined) ?? {};
+  const comparison = (comparisonData?.comparison as { winnersByBlock?: Record<string, "A" | "B" | "tie">; finalDecision?: Record<string, "A" | "B">; summaryInsights?: string[] } | undefined) ?? {};
   const items = scoreItems(profileA, profileB);
-  const finalDecision = comparison.finalDecision ?? {
-    betterPlayer: { playerName: t("comparison.balanced") },
-    saferPlayer: { playerName: t("comparison.balanced") },
-    higherUpside: { playerName: t("comparison.balanced") },
-    bestTacticalFit: { playerName: t("comparison.balanced") },
+
+  // Task 5 — resolve "A"|"B" keys to player names for FinalDecisionPanel
+  function resolveSide(side: "A" | "B" | undefined | null, fallback: string): string {
+    if (side === "A") return displayA.name;
+    if (side === "B") return displayB.name;
+    return fallback;
+  }
+
+  const rawFinalDecision = comparison.finalDecision;
+  const finalDecision = {
+    betterPlayer: { playerName: resolveSide(rawFinalDecision?.betterPlayer, t("comparison.balanced")) },
+    saferPlayer: { playerName: resolveSide(rawFinalDecision?.saferPlayer, t("comparison.balanced")) },
+    higherUpside: { playerName: resolveSide(rawFinalDecision?.higherUpside, t("comparison.balanced")) },
+    bestTacticalFit: { playerName: resolveSide(rawFinalDecision?.bestTacticalFit, t("comparison.balanced")) },
   };
   const insights = Array.isArray(comparison.summaryInsights) ? comparison.summaryInsights.slice(0, 5) : [];
-  const winner = finalDecision.betterPlayer.playerName === displayA.name ? "A" : finalDecision.betterPlayer.playerName === displayB.name ? "B" : normalizeWinner(comparisonData?.winner);
+  const winner = rawFinalDecision?.betterPlayer === "A" ? "A" : rawFinalDecision?.betterPlayer === "B" ? "B" : normalizeWinner(comparisonData?.winner);
   const confidence = winner === "A" ? profileA?.summary.confidence ?? 0 : winner === "B" ? profileB?.summary.confidence ?? 0 : Math.round(average([profileA?.summary.confidence ?? 0, profileB?.summary.confidence ?? 0]));
 
   async function saveAnalysis() {
@@ -342,13 +351,13 @@ export default function Compare() {
             </SectionCard>
 
             <div className="grid gap-6 xl:grid-cols-2">
-              <ComparisonBlock title={t("comparison.technical")} description={t("comparison.technicalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.technical} forcedWinner={(comparison.winnersByBlock as any)?.technical?.winner} />
-              <ComparisonBlock title={t("comparison.physical")} description={t("comparison.physicalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.physical} forcedWinner={(comparison.winnersByBlock as any)?.physical?.winner} />
-              <ComparisonBlock title={t("comparison.tactical")} description={t("comparison.tacticalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.tactical} forcedWinner={(comparison.winnersByBlock as any)?.tactical?.winner} />
-              <ComparisonBlock title={t("comparison.market")} description={t("comparison.marketDescription")} nameA={displayA.name} nameB={displayB.name} items={items.market} forcedWinner={(comparison.winnersByBlock as any)?.market?.winner} />
-              <ComparisonBlock title={t("comparison.risk")} description={t("comparison.riskDescription")} nameA={displayA.name} nameB={displayB.name} items={items.risk} forcedWinner={(comparison.winnersByBlock as any)?.risk?.winner} />
-              <ComparisonBlock title={t("comparison.dna")} description={t("comparison.dnaDescription")} nameA={displayA.name} nameB={displayB.name} items={items.dna} forcedWinner={(comparison.winnersByBlock as any)?.dna?.winner} />
-              <ComparisonBlock title={t("comparison.projection")} description={t("comparison.projectionDescription")} nameA={displayA.name} nameB={displayB.name} items={items.projection} forcedWinner={(comparison.winnersByBlock as any)?.projection?.winner} />
+              <ComparisonBlock title={t("comparison.technical")} description={t("comparison.technicalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.technical} forcedWinner={comparison.winnersByBlock?.technical} />
+              <ComparisonBlock title={t("comparison.physical")} description={t("comparison.physicalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.physical} forcedWinner={comparison.winnersByBlock?.physical} />
+              <ComparisonBlock title={t("comparison.tactical")} description={t("comparison.tacticalDescription")} nameA={displayA.name} nameB={displayB.name} items={items.tactical} forcedWinner={comparison.winnersByBlock?.tactical} />
+              <ComparisonBlock title={t("comparison.market")} description={t("comparison.marketDescription")} nameA={displayA.name} nameB={displayB.name} items={items.market} forcedWinner={comparison.winnersByBlock?.market} />
+              <ComparisonBlock title={t("comparison.risk")} description={t("comparison.riskDescription")} nameA={displayA.name} nameB={displayB.name} items={items.risk} forcedWinner={comparison.winnersByBlock?.risk} />
+              <ComparisonBlock title={t("comparison.dna")} description={t("comparison.dnaDescription")} nameA={displayA.name} nameB={displayB.name} items={items.dna} forcedWinner={comparison.winnersByBlock?.dna} />
+              <ComparisonBlock title={t("comparison.projection")} description={t("comparison.projectionDescription")} nameA={displayA.name} nameB={displayB.name} items={items.projection} forcedWinner={comparison.winnersByBlock?.projection} />
             </div>
 
             {compareLoading ? <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-400">{t("comparison.loading")}</div> : null}

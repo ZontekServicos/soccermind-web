@@ -15,7 +15,7 @@ interface ComparisonBlockProps {
   nameA: string;
   nameB: string;
   items: ComparisonMetricItem[];
-  forcedWinner?: "A" | "B" | "DRAW" | "playerA" | "playerB" | "draw";
+  forcedWinner?: "A" | "B" | "DRAW" | "tie" | "playerA" | "playerB" | "draw";
 }
 
 function getWinner(valueA: number, valueB: number, inverse = false): "A" | "B" | "DRAW" {
@@ -33,7 +33,7 @@ function getWinner(valueA: number, valueB: number, inverse = false): "A" | "B" |
 function normalizeWinner(value: ComparisonBlockProps["forcedWinner"]) {
   if (value === "playerA") return "A";
   if (value === "playerB") return "B";
-  if (value === "draw") return "DRAW";
+  if (value === "draw" || value === "tie") return "DRAW";
   return value ?? "DRAW";
 }
 

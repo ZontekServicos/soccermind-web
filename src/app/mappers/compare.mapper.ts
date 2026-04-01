@@ -10,15 +10,11 @@ function isRecord(value: unknown): value is UnknownRecord {
 }
 
 function toNumber(value: unknown, fallback = 0) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-
+  if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
     const parsed = Number.parseFloat(value);
     return Number.isFinite(parsed) ? parsed : fallback;
   }
-
   return fallback;
 }
 
@@ -27,7 +23,6 @@ function toText(value: unknown, fallback = "") {
     const normalized = value.trim();
     return normalized || fallback;
   }
-
   return fallback;
 }
 
@@ -35,88 +30,15 @@ function unwrapData(value: unknown): unknown {
   if (isRecord(value) && "data" in value && value.data !== undefined) {
     return unwrapData(value.data);
   }
-
   return value;
 }
 
 function pickRecord(source: UnknownRecord, keys: string[]) {
   for (const key of keys) {
     const value = source[key];
-    if (isRecord(value)) {
-      return value;
-    }
+    if (isRecord(value)) return value;
   }
-
   return null;
-}
-
-function mergePlayerPayload(
-  direct: UnknownRecord | null,
-  summary: UnknownRecord | null,
-  fifaCard: UnknownRecord | null,
-  overallData: UnknownRecord | null,
-) {
-  const fifaPlayer = pickRecord(fifaCard ?? {}, ["player"]);
-  const fifaCore = pickRecord(fifaCard ?? {}, ["core"]);
-  const fifaDetailedStats = pickRecord(fifaCard ?? {}, ["detailedStats"]);
-  const fifaStyle = isRecord(fifaCard)
-    ? {
-        core: fifaCore ?? {},
-        detailedStats: fifaDetailedStats ?? {},
-      }
-    : undefined;
-
-  return {
-    ...(summary ?? {}),
-    ...(fifaPlayer ?? {}),
-    ...(direct ?? {}),
-    position: direct?.position ?? fifaPlayer?.position ?? summary?.position ?? null,
-    positions:
-      direct?.positions ??
-      fifaPlayer?.positions ??
-      summary?.positions ??
-      (direct?.position ?? fifaPlayer?.position ?? summary?.position ?? null),
-    overall:
-      direct?.overall ??
-      overallData?.overall ??
-      fifaCard?.overall ??
-      summary?.overall ??
-      null,
-    potential:
-      direct?.potential ??
-      overallData?.potential ??
-      fifaCard?.potential ??
-      summary?.potential ??
-      overallData?.overall ??
-      fifaCard?.overall ??
-      null,
-    team: direct?.team ?? fifaCard?.team ?? fifaPlayer?.team ?? summary?.team ?? null,
-    league: direct?.league ?? fifaCard?.league ?? fifaPlayer?.league ?? summary?.league ?? null,
-    marketValue:
-      direct?.marketValue ??
-      fifaCard?.marketValue ??
-      fifaPlayer?.marketValue ??
-      summary?.marketValue ??
-      null,
-    attributes: {
-      ...(fifaDetailedStats ?? {}),
-      ...(fifaCore ?? {}),
-      ...(fifaCard?.attributes && isRecord(fifaCard.attributes) ? fifaCard.attributes : {}),
-      ...(direct?.attributes && isRecord(direct.attributes) ? direct.attributes : {}),
-    },
-    fifaStyle,
-  } satisfies ApiPlayerLike & UnknownRecord;
-}
-
-function normalizeWinner(value: unknown) {
-  const normalized = toText(value, "DRAW").toUpperCase();
-  if (normalized === "PLAYERA" || normalized === "A") {
-    return "A" as const;
-  }
-  if (normalized === "PLAYERB" || normalized === "B") {
-    return "B" as const;
-  }
-  return "DRAW" as const;
 }
 
 function buildRadarData(statsA: Record<string, number>, statsB: Record<string, number>) {
@@ -131,19 +53,10 @@ function buildRadarData(statsA: Record<string, number>, statsB: Record<string, n
 }
 
 const POSITION_GROUPS: Record<string, string> = {
-  ST: "attack",
-  CF: "attack",
-  RW: "attack",
-  LW: "attack",
-  CAM: "midfield",
-  CM: "midfield",
-  CDM: "midfield",
-  RB: "wide-defense",
-  LB: "wide-defense",
-  RWB: "wide-defense",
-  LWB: "wide-defense",
-  CB: "central-defense",
-  GK: "goalkeeper",
+  ST: "attack", CF: "attack", RW: "attack", LW: "attack",
+  CAM: "midfield", CM: "midfield", CDM: "midfield",
+  RB: "wide-defense", LB: "wide-defense", RWB: "wide-defense", LWB: "wide-defense",
+  CB: "central-defense", GK: "goalkeeper",
 };
 
 function getPositionGroup(position: string) {
@@ -152,18 +65,21 @@ function getPositionGroup(position: string) {
 
 function normalizePositionContextKind(value: unknown): PositionContextKind {
   const normalized = toText(value, "cross").toLowerCase();
-  if (normalized === "same" || normalized === "related" || normalized === "cross") {
-    return normalized;
-  }
+  if (normalized === "same" || normalized === "related" || normalized === "cross") return normalized;
   return "cross";
 }
 
 function normalizeRiskLevel(value: unknown) {
   const normalized = toText(value, "").toUpperCase();
-  if (normalized === "LOW" || normalized === "MEDIUM" || normalized === "HIGH") {
-    return normalized;
-  }
+  if (normalized === "LOW" || normalized === "MEDIUM" || normalized === "HIGH") return normalized;
   return null;
+}
+
+function normalizeWinner(value: unknown) {
+  const normalized = toText(value, "DRAW").toUpperCase();
+  if (normalized === "PLAYERA" || normalized === "A") return "A" as const;
+  if (normalized === "PLAYERB" || normalized === "B") return "B" as const;
+  return "DRAW" as const;
 }
 
 function buildFallbackPositionContext(positionA: string, positionB: string) {
@@ -172,186 +88,162 @@ function buildFallbackPositionContext(positionA: string, positionB: string) {
 
   if (positionA === positionB) {
     return {
-      kind: "same" as const,
-      label: "Comparacao posicional direta",
-      tone: "neutral",
+      kind: "same" as const, label: "Comparacao posicional direta", tone: "neutral",
       message: "Os dois jogadores compartilham a mesma posicao primaria.",
-      positionA,
-      positionB,
-      groupA,
-      groupB,
+      positionA, positionB, groupA, groupB,
     };
   }
 
   if (groupA === groupB) {
     return {
-      kind: "related" as const,
-      label: "Comparacao compativel",
-      tone: "info",
+      kind: "related" as const, label: "Comparacao compativel", tone: "info",
       message: "As posicoes sao diferentes, mas pertencem ao mesmo grupo funcional.",
-      positionA,
-      positionB,
-      groupA,
-      groupB,
+      positionA, positionB, groupA, groupB,
     };
   }
 
   return {
-    kind: "cross" as const,
-    label: "Comparacao cruzada",
-    tone: "warning",
+    kind: "cross" as const, label: "Comparacao cruzada", tone: "warning",
     message: "A leitura deve considerar contextos taticos distintos entre as funcoes.",
-    positionA,
-    positionB,
-    groupA,
-    groupB,
+    positionA, positionB, groupA, groupB,
   };
+}
+
+/**
+ * Build an ApiPlayerLike payload from a PlayerIntelligenceProfile identity block.
+ * Used when the API returns playerAProfile/playerBProfile (new format) instead of
+ * legacy playerA/playerB flat objects.
+ */
+function playerFromIntelligenceIdentity(identity: UnknownRecord): ApiPlayerLike & UnknownRecord {
+  return {
+    id: toText(identity.id, ""),
+    name: toText(identity.name, ""),
+    position: toText(identity.primaryPosition, "") || null,
+    positions: identity.secondaryPositions ?? identity.primaryPosition ?? null,
+    age: typeof identity.age === "number" ? identity.age : null,
+    nationality: toText(identity.nationality, "") || null,
+    team: toText(identity.club, "") || null,
+    league: toText(identity.league, "") || null,
+    marketValue: null,
+    overall: null,
+    potential: null,
+    attributes: {},
+  } as ApiPlayerLike & UnknownRecord;
 }
 
 export function mapCompareResponse(response: unknown) {
   const payload = unwrapData(response);
   const source = isRecord(payload) ? payload : {};
 
-  const normalizedPlayerA =
+  // New format: { playerAProfile, playerBProfile, comparison }
+  const playerAProfileSource = pickRecord(source, ["playerAProfile"]);
+  const playerBProfileSource = pickRecord(source, ["playerBProfile"]);
+  const profileIdentityA = playerAProfileSource ? pickRecord(playerAProfileSource, ["identity"]) : null;
+  const profileIdentityB = playerBProfileSource ? pickRecord(playerBProfileSource, ["identity"]) : null;
+
+  // Resolve player payload — prefer direct playerA/B (legacy), fall back to identity from profile (new)
+  const rawPlayerA =
     pickRecord(source, ["playerA"]) ??
-    mergePlayerPayload(
-      pickRecord(pickRecord(source, ["players"]) ?? {}, ["playerA"]),
-      pickRecord(pickRecord(source, ["summary"]) ?? {}, ["playerA"]),
-      pickRecord(pickRecord(source, ["fifaCards"]) ?? {}, ["playerA"]),
-      pickRecord(pickRecord(source, ["overallRating"]) ?? {}, ["playerA"]),
-    );
+    (profileIdentityA !== null ? playerFromIntelligenceIdentity(profileIdentityA) : null) ??
+    ({} as UnknownRecord);
 
-  const normalizedPlayerB =
+  const rawPlayerB =
     pickRecord(source, ["playerB"]) ??
-    mergePlayerPayload(
-      pickRecord(pickRecord(source, ["players"]) ?? {}, ["playerB"]),
-      pickRecord(pickRecord(source, ["summary"]) ?? {}, ["playerB"]),
-      pickRecord(pickRecord(source, ["fifaCards"]) ?? {}, ["playerB"]),
-      pickRecord(pickRecord(source, ["overallRating"]) ?? {}, ["playerB"]),
-    );
+    (profileIdentityB !== null ? playerFromIntelligenceIdentity(profileIdentityB) : null) ??
+    ({} as UnknownRecord);
 
-  const playerA = mapApiPlayerToExtended(normalizedPlayerA);
-  const playerB = mapApiPlayerToExtended(normalizedPlayerB);
-  const normalizedStructuralA = pickRecord(normalizedPlayerA, ["structuralRisk"]);
-  const normalizedStructuralB = pickRecord(normalizedPlayerB, ["structuralRisk"]);
-  const normalizedLiquidityA = pickRecord(normalizedPlayerA, ["liquidity"]);
-  const normalizedLiquidityB = pickRecord(normalizedPlayerB, ["liquidity"]);
-  const normalizedFinancialA = pickRecord(normalizedPlayerA, ["financialRisk"]);
-  const normalizedFinancialB = pickRecord(normalizedPlayerB, ["financialRisk"]);
+  const playerA = mapApiPlayerToExtended(rawPlayerA);
+  const playerB = mapApiPlayerToExtended(rawPlayerB);
 
-  const overallA = pickRecord(pickRecord(source, ["overallRating"]) ?? {}, ["playerA"]);
-  const overallB = pickRecord(pickRecord(source, ["overallRating"]) ?? {}, ["playerB"]);
-  const capitalA = pickRecord(pickRecord(source, ["capitalEfficiency"]) ?? {}, ["playerA"]);
-  const capitalB = pickRecord(pickRecord(source, ["capitalEfficiency"]) ?? {}, ["playerB"]);
-  const liquidityA = pickRecord(pickRecord(source, ["liquidity"]) ?? {}, ["playerA"]);
-  const liquidityB = pickRecord(pickRecord(source, ["liquidity"]) ?? {}, ["playerB"]);
-  const financialA = pickRecord(pickRecord(source, ["financialRisk"]) ?? {}, ["playerA"]);
-  const financialB = pickRecord(pickRecord(source, ["financialRisk"]) ?? {}, ["playerB"]);
-  const riskA = pickRecord(pickRecord(source, ["risk"]) ?? {}, ["playerA"]);
-  const riskB = pickRecord(pickRecord(source, ["risk"]) ?? {}, ["playerB"]);
-  const antiFlopA = pickRecord(pickRecord(source, ["antiFlop"]) ?? {}, ["playerA"]);
-  const antiFlopB = pickRecord(pickRecord(source, ["antiFlop"]) ?? {}, ["playerB"]);
-  const riskProfileA = pickRecord(pickRecord(source, ["riskProfile"]) ?? {}, ["playerA"]);
-  const riskProfileB = pickRecord(pickRecord(source, ["riskProfile"]) ?? {}, ["playerB"]);
-  const positionContextSource = pickRecord(source, ["positionContext"]);
+  // Intelligence profiles — support both legacy intelligenceProfiles.playerA and new playerAProfile
   const intelligenceProfiles = pickRecord(source, ["intelligenceProfiles"]);
-  const comparisonRecord = pickRecord(source, ["comparison"]) ?? source;
-  const blockWinners =
-    pickRecord(source, ["blockWinners"]) ??
-    pickRecord(comparisonRecord, ["winnersByBlock"]);
-  const executiveRecommendation = pickRecord(source, ["executiveRecommendation"]);
-
   const intelligenceProfileA = normalizePlayerIntelligenceProfile(
     pickRecord(intelligenceProfiles ?? {}, ["playerA"]) ??
-      pickRecord(source, ["playerAProfile"]) ??
-      pickRecord(normalizedPlayerA, ["intelligenceProfile"]),
+      playerAProfileSource ??
+      pickRecord(rawPlayerA, ["intelligenceProfile"]),
   ) as PlayerIntelligenceProfile | null;
   const intelligenceProfileB = normalizePlayerIntelligenceProfile(
     pickRecord(intelligenceProfiles ?? {}, ["playerB"]) ??
-      pickRecord(source, ["playerBProfile"]) ??
-      pickRecord(normalizedPlayerB, ["intelligenceProfile"]),
+      playerBProfileSource ??
+      pickRecord(rawPlayerB, ["intelligenceProfile"]),
   ) as PlayerIntelligenceProfile | null;
 
-  playerA.capitalEfficiency = toNumber(capitalA?.index, playerA.capitalEfficiency);
-  playerB.capitalEfficiency = toNumber(capitalB?.index, playerB.capitalEfficiency);
-  playerA.overallRating = toNumber(overallA?.overall, playerA.overallRating);
-  playerB.overallRating = toNumber(overallB?.overall, playerB.overallRating);
-  playerA.positionRank = toNumber(overallA?.positionRank, playerA.positionRank);
-  playerB.positionRank = toNumber(overallB?.positionRank, playerB.positionRank);
+  // Enrich playerA/B from intelligence profile if available
+  if (intelligenceProfileA) {
+    if (!playerA.name) playerA.name = intelligenceProfileA.identity.name;
+    if (!playerA.position) playerA.position = intelligenceProfileA.identity.primaryPosition ?? "";
+    if (!playerA.club) playerA.club = intelligenceProfileA.identity.club ?? "";
+  }
+  if (intelligenceProfileB) {
+    if (!playerB.name) playerB.name = intelligenceProfileB.identity.name;
+    if (!playerB.position) playerB.position = intelligenceProfileB.identity.primaryPosition ?? "";
+    if (!playerB.club) playerB.club = intelligenceProfileB.identity.club ?? "";
+  }
 
-  playerA.structuralRisk = {
-    score: normalizedStructuralA ? playerA.structuralRisk.score : toNumber(riskA?.totalRisk, playerA.structuralRisk.score),
-    level: normalizedStructuralA
-      ? playerA.structuralRisk.level
-      : toNumber(riskA?.totalRisk, playerA.structuralRisk.score) >= 60
-        ? "HIGH"
-        : toNumber(riskA?.totalRisk, playerA.structuralRisk.score) >= 20
-          ? "MEDIUM"
-          : "LOW",
-    breakdown: normalizedStructuralA
-      ? playerA.structuralRisk.breakdown
-      : toText(riskA?.executiveSummary, playerA.structuralRisk.breakdown),
-  };
-  playerB.structuralRisk = {
-    score: normalizedStructuralB ? playerB.structuralRisk.score : toNumber(riskB?.totalRisk, playerB.structuralRisk.score),
-    level: normalizedStructuralB
-      ? playerB.structuralRisk.level
-      : toNumber(riskB?.totalRisk, playerB.structuralRisk.score) >= 60
-        ? "HIGH"
-        : toNumber(riskB?.totalRisk, playerB.structuralRisk.score) >= 20
-          ? "MEDIUM"
-          : "LOW",
-    breakdown: normalizedStructuralB
-      ? playerB.structuralRisk.breakdown
-      : toText(riskB?.executiveSummary, playerB.structuralRisk.breakdown),
-  };
+  const comparisonRecord = pickRecord(source, ["comparison"]) ?? source;
+  const winnersByBlock = pickRecord(comparisonRecord, ["winnersByBlock"]);
+  const positionContextSource = pickRecord(source, ["positionContext"]);
 
-  playerA.antiFlopIndex = {
-    flopProbability: toNumber(antiFlopA?.flopProbability, playerA.antiFlopIndex.flopProbability),
-    safetyIndex: toNumber(antiFlopA?.safetyIndex, playerA.antiFlopIndex.safetyIndex),
-    classification: toText(antiFlopA?.classification, playerA.antiFlopIndex.classification),
-  };
-  playerB.antiFlopIndex = {
-    flopProbability: toNumber(antiFlopB?.flopProbability, playerB.antiFlopIndex.flopProbability),
-    safetyIndex: toNumber(antiFlopB?.safetyIndex, playerB.antiFlopIndex.safetyIndex),
-    classification: toText(antiFlopB?.classification, playerB.antiFlopIndex.classification),
-  };
+  // Winner resolution — handle new "A"|"B" string format and legacy name-based format
+  const finalDecisionRecord = pickRecord(comparisonRecord, ["finalDecision"]);
+  const betterPlayerRaw = finalDecisionRecord?.betterPlayer;
 
-  playerA.liquidity = {
-    score: normalizedLiquidityA ? playerA.liquidity.score : toNumber(liquidityA?.liquidityScore, playerA.liquidity.score),
-    resaleWindow: toText(liquidityA?.resaleWindow, playerA.liquidity.resaleWindow),
-    marketProfile: toText(liquidityA?.marketProfile, playerA.liquidity.marketProfile),
-  };
-  playerB.liquidity = {
-    score: normalizedLiquidityB ? playerB.liquidity.score : toNumber(liquidityB?.liquidityScore, playerB.liquidity.score),
-    resaleWindow: toText(liquidityB?.resaleWindow, playerB.liquidity.resaleWindow),
-    marketProfile: toText(liquidityB?.marketProfile, playerB.liquidity.marketProfile),
-  };
+  let winner: "A" | "B" | "DRAW";
+  if (typeof betterPlayerRaw === "string" && (betterPlayerRaw === "A" || betterPlayerRaw === "B")) {
+    winner = betterPlayerRaw;
+  } else if (isRecord(betterPlayerRaw)) {
+    const betterName = toText(betterPlayerRaw.playerName);
+    winner = normalizeWinner(
+      betterName === playerA.name ? "A" : betterName === playerB.name ? "B" : source.winner,
+    );
+  } else {
+    winner = normalizeWinner(source.winner);
+  }
 
-  playerA.financialRisk = {
-    index: normalizedFinancialA ? playerA.financialRisk.index : toNumber(financialA?.riskIndex, playerA.financialRisk.index),
-    capitalExposure: toText(financialA?.capitalExposure, playerA.financialRisk.capitalExposure),
-    investmentProfile: toText(financialA?.investmentProfile, playerA.financialRisk.investmentProfile),
-  };
-  playerB.financialRisk = {
-    index: normalizedFinancialB ? playerB.financialRisk.index : toNumber(financialB?.riskIndex, playerB.financialRisk.index),
-    capitalExposure: toText(financialB?.capitalExposure, playerB.financialRisk.capitalExposure),
-    investmentProfile: toText(financialB?.investmentProfile, playerB.financialRisk.investmentProfile),
-  };
+  // Normalize block winners — support both "A"|"B" string (new) and { winner } object (legacy)
+  function extractBlockWinner(key: string): { winner: "A" | "B" | "DRAW" } | null {
+    const raw = winnersByBlock?.[key];
+    if (typeof raw === "string") return { winner: normalizeWinner(raw) };
+    if (isRecord(raw)) return { winner: normalizeWinner(raw.winner), ...raw };
+    return null;
+  }
 
-  if (riskProfileA) {
-    playerA.risk = {
-      score: toNumber(riskProfileA.score, playerA.risk.score),
-      level: normalizeRiskLevel(riskProfileA.level) ?? playerA.risk.level,
-      explanation: toText(riskProfileA.explanation, playerA.risk.explanation),
+  // Enrich risk from intelligence profile (no longer from legacy antiFlop/riskProfile fields)
+  if (intelligenceProfileA) {
+    const riskScore = intelligenceProfileA.risk.overall.score;
+    playerA.structuralRisk = {
+      score: riskScore,
+      level: riskScore >= 60 ? "HIGH" : riskScore >= 20 ? "MEDIUM" : "LOW",
+      breakdown: intelligenceProfileA.risk.overall.summary,
+    };
+    playerA.liquidity = {
+      score: intelligenceProfileA.market.liquidity.score,
+      resaleWindow: playerA.liquidity.resaleWindow,
+      marketProfile: playerA.liquidity.marketProfile,
+    };
+    playerA.financialRisk = {
+      index: intelligenceProfileA.risk.financial.score,
+      capitalExposure: playerA.financialRisk.capitalExposure,
+      investmentProfile: playerA.financialRisk.investmentProfile,
     };
   }
 
-  if (riskProfileB) {
-    playerB.risk = {
-      score: toNumber(riskProfileB.score, playerB.risk.score),
-      level: normalizeRiskLevel(riskProfileB.level) ?? playerB.risk.level,
-      explanation: toText(riskProfileB.explanation, playerB.risk.explanation),
+  if (intelligenceProfileB) {
+    const riskScore = intelligenceProfileB.risk.overall.score;
+    playerB.structuralRisk = {
+      score: riskScore,
+      level: riskScore >= 60 ? "HIGH" : riskScore >= 20 ? "MEDIUM" : "LOW",
+      breakdown: intelligenceProfileB.risk.overall.summary,
+    };
+    playerB.liquidity = {
+      score: intelligenceProfileB.market.liquidity.score,
+      resaleWindow: playerB.liquidity.resaleWindow,
+      marketProfile: playerB.liquidity.marketProfile,
+    };
+    playerB.financialRisk = {
+      index: intelligenceProfileB.risk.financial.score,
+      capitalExposure: playerB.financialRisk.capitalExposure,
+      investmentProfile: playerB.financialRisk.investmentProfile,
     };
   }
 
@@ -359,16 +251,6 @@ export function mapCompareResponse(response: unknown) {
   playerB.riskLevel = playerB.risk.level;
 
   const radarData = buildRadarData(playerA.stats, playerB.stats);
-  const betterPlayerName = toText(pickRecord(pickRecord(comparisonRecord, ["finalDecision"]) ?? {}, ["betterPlayer"])?.playerName);
-  const winner = normalizeWinner(
-    source.winner ??
-      pickRecord(source, ["quantitative"])?.winner ??
-      (betterPlayerName && betterPlayerName === playerA.name
-        ? "A"
-        : betterPlayerName && betterPlayerName === playerB.name
-          ? "B"
-          : "DRAW"),
-  );
   const fallbackPositionContext = buildFallbackPositionContext(playerA.position, playerB.position);
   const positionContext = {
     ...fallbackPositionContext,
@@ -396,40 +278,19 @@ export function mapCompareResponse(response: unknown) {
       playerB: intelligenceProfileB,
     },
     blockWinners: {
-      technical: blockWinners?.technical ?? null,
-      physical: blockWinners?.physical ?? null,
-      tactical: blockWinners?.tactical ?? null,
-      market: blockWinners?.market ?? null,
-      risk: blockWinners?.risk ?? null,
-      dna: blockWinners?.dna ?? null,
-      projection: blockWinners?.projection ?? blockWinners?.upside ?? null,
-      upside: blockWinners?.upside ?? null,
-      tacticalDna: blockWinners?.tacticalDna ?? blockWinners?.tactical ?? null,
+      technical: extractBlockWinner("technical"),
+      physical: extractBlockWinner("physical"),
+      tactical: extractBlockWinner("tactical"),
+      market: extractBlockWinner("market"),
+      risk: extractBlockWinner("risk"),
+      dna: extractBlockWinner("dna"),
+      projection: extractBlockWinner("projection") ?? extractBlockWinner("upside"),
+      upside: extractBlockWinner("upside"),
+      tacticalDna: extractBlockWinner("tacticalDna") ?? extractBlockWinner("tactical"),
     },
-    executiveRecommendation: executiveRecommendation
-      ? {
-          winner: normalizeWinner(executiveRecommendation.winner),
-          summary: toText(executiveRecommendation.summary),
-          sportingImpact: normalizeWinner(executiveRecommendation.sportingImpact),
-          tacticalFit: normalizeWinner(executiveRecommendation.tacticalFit),
-          risk: normalizeWinner(executiveRecommendation.risk),
-          marketEfficiency: normalizeWinner(executiveRecommendation.marketEfficiency),
-          upside: normalizeWinner(executiveRecommendation.upside),
-          resaleLiquidity: normalizeWinner(executiveRecommendation.resaleLiquidity),
-          weightedScores: isRecord(executiveRecommendation.weightedScores)
-            ? {
-                playerA: toNumber(executiveRecommendation.weightedScores.playerA),
-                playerB: toNumber(executiveRecommendation.weightedScores.playerB),
-              }
-            : { playerA: 0, playerB: 0 },
-        }
-      : null,
+    executiveRecommendation: null,
     radarData,
-    comparisonStats: radarData.map((item) => ({
-      name: item.attribute,
-      a: item.A,
-      b: item.B,
-    })),
+    comparisonStats: radarData.map((item) => ({ name: item.attribute, a: item.A, b: item.B })),
     positionContext,
   };
 }
