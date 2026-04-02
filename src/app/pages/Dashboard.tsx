@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ElementType } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   AlertTriangle,
+  BarChart2,
   ChevronLeft,
   ChevronRight,
   DollarSign,
@@ -10,6 +10,7 @@ import {
   TrendingDown,
   TrendingUp,
   Users,
+  Zap,
 } from "lucide-react";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
@@ -17,194 +18,163 @@ import { TierBadge } from "../components/TierBadge";
 import { RiskBadge } from "../components/RiskBadge";
 import { CapitalGauge } from "../components/CapitalGauge";
 import { useLanguage } from "../contexts/LanguageContext";
-import { type ChartDatum, type RiskBucket, type StrategicAsset, type StrategicAssetTier, getDashboardData } from "../services/dashboard";
+import {
+  type RiskBucket,
+  type StrategicAsset,
+  type StrategicAssetTier,
+  getDashboardData,
+} from "../services/dashboard";
 import type { PlayerExtended } from "../types/player";
 import { t as translate } from "../../i18n";
 
 type RiskTab = "ALL" | RiskBucket;
+type AssetTierFilter = "ALL" | StrategicAssetTier;
 
-const CHART_PAGE_SIZE = 10;
-const RISK_PAGE_SIZE = 10;
+const RISK_PAGE_SIZE = 8;
 const ASSET_PAGE_SIZE = 4;
+
+const TIER_ORDER: StrategicAssetTier[] = [
+  "Elite Asset",
+  "Growth Asset",
+  "Stable Asset",
+  "Opportunity Asset",
+];
 
 function paginate<T>(items: T[], page: number, pageSize: number) {
   const start = (page - 1) * pageSize;
   return items.slice(start, start + pageSize);
 }
 
-function getAssetTierColor(tier: StrategicAsset["tier"]) {
+function getAssetTierColor(tier: StrategicAsset["tier"]): string {
   switch (tier) {
-    case "Elite Asset":
-      return "#A855F7";
-    case "Growth Asset":
-      return "#00C2FF";
-    case "Stable Asset":
-      return "#00FF9C";
-    case "Opportunity Asset":
-      return "#FBBF24";
+    case "Elite Asset": return "#A855F7";
+    case "Growth Asset": return "#00C2FF";
+    case "Stable Asset": return "#00FF9C";
+    case "Opportunity Asset": return "#FBBF24";
   }
 }
 
 function getRiskCount(players: PlayerExtended[], bucket: RiskBucket) {
-  return players.filter((player) => player.risk.level === bucket).length;
+  return players.filter((p) => p.risk.level === bucket).length;
 }
 
 function getRiskSectionColor(bucket: RiskBucket) {
   switch (bucket) {
-    case "HIGH":
-      return {
-        text: "#FF8B8D",
-        border: "rgba(255,77,79,0.24)",
-        background: "rgba(255,77,79,0.07)",
-      };
-    case "MEDIUM":
-      return {
-        text: "#FFD66B",
-        border: "rgba(251,191,36,0.18)",
-        background: "rgba(251,191,36,0.06)",
-      };
-    case "LOW":
-      return {
-        text: "#7DFFD0",
-        border: "rgba(0,255,156,0.18)",
-        background: "rgba(0,255,156,0.06)",
-      };
+    case "HIGH":   return { text: "#FF8B8D", border: "rgba(255,77,79,0.24)",   bg: "rgba(255,77,79,0.07)" };
+    case "MEDIUM": return { text: "#FFD66B", border: "rgba(251,191,36,0.18)",  bg: "rgba(251,191,36,0.06)" };
+    case "LOW":    return { text: "#7DFFD0", border: "rgba(0,255,156,0.18)",   bg: "rgba(0,255,156,0.06)" };
   }
+}
+
+function getShortName(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length <= 2) return name.length > 18 ? `${name.slice(0, 18)}…` : name;
+  const compact = `${parts[0]} ${parts[parts.length - 1]}`;
+  return compact.length > 18 ? `${compact.slice(0, 18)}…` : compact;
 }
 
 function getVisibleRange(total: number, page: number, pageSize: number, currentCount: number) {
-  if (total === 0 || currentCount === 0) {
-    return "0-0";
-  }
-
+  if (total === 0 || currentCount === 0) return "0–0";
   const start = (page - 1) * pageSize + 1;
-  const end = start + currentCount - 1;
-  return `${start}-${end}`;
+  return `${start}–${start + currentCount - 1}`;
 }
 
+// ---------------------------------------------------------------------------
 export default function Dashboard() {
   const { t, language } = useLanguage();
-  const [players, setPlayers] = useState<PlayerExtended[]>([]);
-  const [averageEfficiency, setAverageEfficiency] = useState(0);
-  const [totalMarketValue, setTotalMarketValue] = useState("N/A");
-  const [riskCounts, setRiskCounts] = useState<Record<RiskBucket, number>>({ LOW: 0, MEDIUM: 0, HIGH: 0 });
+
+  const [players,              setPlayers]              = useState<PlayerExtended[]>([]);
+  const [averageEfficiency,    setAverageEfficiency]    = useState(0);
+  const [totalMarketValue,     setTotalMarketValue]     = useState("N/A");
+  const [riskCounts,           setRiskCounts]           = useState<Record<RiskBucket, number>>({ LOW: 0, MEDIUM: 0, HIGH: 0 });
   const [topEfficiencyPlayers, setTopEfficiencyPlayers] = useState<PlayerExtended[]>([]);
-  const [efficiencyChartData, setEfficiencyChartData] = useState<ChartDatum[]>([]);
-  const [ratingChartData, setRatingChartData] = useState<ChartDatum[]>([]);
-  const [riskTaggedPlayers, setRiskTaggedPlayers] = useState<Array<{ player: PlayerExtended; riskBucket: RiskBucket; explanation: string }>>([]);
-  const [strategicAssets, setStrategicAssets] = useState<StrategicAsset[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [efficiencyPage, setEfficiencyPage] = useState(1);
-  const [ratingPage, setRatingPage] = useState(1);
-  const [riskPage, setRiskPage] = useState(1);
-  const [assetPage, setAssetPage] = useState(1);
-  const [riskTab, setRiskTab] = useState<RiskTab>("ALL");
+  const [riskTaggedPlayers,    setRiskTaggedPlayers]    = useState<Array<{ player: PlayerExtended; riskBucket: RiskBucket; explanation: string }>>([]);
+  const [strategicAssets,      setStrategicAssets]      = useState<StrategicAsset[]>([]);
+  const [error,                setError]                = useState<string | null>(null);
+  const [loading,              setLoading]              = useState(true);
+
+  const [riskTab,         setRiskTab]         = useState<RiskTab>("ALL");
+  const [riskPage,        setRiskPage]        = useState(1);
+  const [assetTierFilter, setAssetTierFilter] = useState<AssetTierFilter>("ALL");
+  const [assetPage,       setAssetPage]       = useState(1);
 
   useEffect(() => {
     let active = true;
-
-    async function loadPlayers() {
+    async function load() {
       try {
         const response = await getDashboardData(80);
-        if (!active) {
-          return;
-        }
-
-        const dashboardData = response.data;
-
-        setPlayers(Array.isArray(dashboardData.players) ? dashboardData.players : []);
-        setAverageEfficiency(dashboardData.averageEfficiency ?? 0);
-        setTotalMarketValue(dashboardData.totalMarketValue ?? "N/A");
-        setRiskCounts(dashboardData.riskCounts ?? { LOW: 0, MEDIUM: 0, HIGH: 0 });
-        setTopEfficiencyPlayers(dashboardData.topEfficiencyPlayers ?? []);
-        setEfficiencyChartData(dashboardData.efficiencyChartData ?? []);
-        setRatingChartData(dashboardData.ratingChartData ?? []);
-        setRiskTaggedPlayers(dashboardData.riskTaggedPlayers ?? []);
-        setStrategicAssets(dashboardData.strategicAssets ?? []);
+        if (!active) return;
+        const d = response.data;
+        setPlayers(Array.isArray(d.players) ? d.players : []);
+        setAverageEfficiency(d.averageEfficiency ?? 0);
+        setTotalMarketValue(d.totalMarketValue ?? "N/A");
+        setRiskCounts(d.riskCounts ?? { LOW: 0, MEDIUM: 0, HIGH: 0 });
+        setTopEfficiencyPlayers(d.topEfficiencyPlayers ?? []);
+        setRiskTaggedPlayers(d.riskTaggedPlayers ?? []);
+        setStrategicAssets(d.strategicAssets ?? []);
         setError(null);
-      } catch (fetchError) {
-        if (!active) {
-          return;
-        }
-
-        setPlayers([]);
-        setAverageEfficiency(0);
-        setTotalMarketValue("N/A");
+      } catch (err) {
+        if (!active) return;
+        setPlayers([]); setAverageEfficiency(0); setTotalMarketValue("N/A");
         setRiskCounts({ LOW: 0, MEDIUM: 0, HIGH: 0 });
-        setTopEfficiencyPlayers([]);
-        setEfficiencyChartData([]);
-        setRatingChartData([]);
-        setRiskTaggedPlayers([]);
-        setStrategicAssets([]);
-        setError(fetchError instanceof Error ? fetchError.message : "API request failed");
+        setTopEfficiencyPlayers([]); setRiskTaggedPlayers([]); setStrategicAssets([]);
+        setError(err instanceof Error ? err.message : "API request failed");
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
-
-    loadPlayers();
-
-    return () => {
-      active = false;
-    };
+    load();
+    return () => { active = false; };
   }, []);
 
-  const efficiencyTotalPages = Math.max(1, Math.ceil(efficiencyChartData.length / CHART_PAGE_SIZE));
-  const ratingTotalPages = Math.max(1, Math.ceil(ratingChartData.length / CHART_PAGE_SIZE));
-
-  const pagedEfficiencyData = useMemo(
-    () => paginate(efficiencyChartData, efficiencyPage, CHART_PAGE_SIZE),
-    [efficiencyChartData, efficiencyPage],
+  // Risk filter
+  const filteredRiskPlayers = useMemo(() =>
+    riskTab === "ALL" ? riskTaggedPlayers : riskTaggedPlayers.filter((e) => e.riskBucket === riskTab),
+    [riskTab, riskTaggedPlayers],
   );
-
-  const pagedRatingData = useMemo(
-    () => paginate(ratingChartData, ratingPage, CHART_PAGE_SIZE),
-    [ratingChartData, ratingPage],
-  );
-
-  const filteredRiskPlayers = useMemo(() => {
-    if (riskTab === "ALL") {
-      return riskTaggedPlayers;
-    }
-
-    return riskTaggedPlayers.filter((entry) => entry.riskBucket === riskTab);
-  }, [riskTab, riskTaggedPlayers]);
-
   const riskTotalPages = Math.max(1, Math.ceil(filteredRiskPlayers.length / RISK_PAGE_SIZE));
-
   const pagedRiskPlayers = useMemo(
     () => paginate(filteredRiskPlayers, riskPage, RISK_PAGE_SIZE),
     [filteredRiskPlayers, riskPage],
   );
-  const assetTotalPages = Math.max(1, Math.ceil(strategicAssets.length / ASSET_PAGE_SIZE));
 
+  // Asset tier filter
+  const filteredAssets = useMemo(() =>
+    assetTierFilter === "ALL" ? strategicAssets : strategicAssets.filter((a) => a.tier === assetTierFilter),
+    [assetTierFilter, strategicAssets],
+  );
+  const assetTotalPages = Math.max(1, Math.ceil(filteredAssets.length / ASSET_PAGE_SIZE));
   const pagedAssets = useMemo(
-    () => paginate(strategicAssets, assetPage, ASSET_PAGE_SIZE),
-    [strategicAssets, assetPage],
+    () => paginate(filteredAssets, assetPage, ASSET_PAGE_SIZE),
+    [filteredAssets, assetPage],
   );
 
-  useEffect(() => {
-    setRiskPage(1);
-  }, [riskTab]);
+  // Portfolio tier breakdown
+  const tierDistribution = useMemo(() =>
+    TIER_ORDER.map((tier) => {
+      const count = strategicAssets.filter((a) => a.tier === tier).length;
+      const pct = strategicAssets.length > 0 ? Math.round((count / strategicAssets.length) * 100) : 0;
+      const top = strategicAssets.find((a) => a.tier === tier);
+      return { tier, count, pct, top, color: getAssetTierColor(tier) };
+    }),
+    [strategicAssets],
+  );
 
-  useEffect(() => {
-    setEfficiencyPage((current) => Math.min(current, efficiencyTotalPages));
-  }, [efficiencyTotalPages]);
+  // Scouting signals
+  const topRiskSignal = useMemo(
+    () => riskTaggedPlayers.find((e) => e.riskBucket === "HIGH") ?? riskTaggedPlayers.find((e) => e.riskBucket === "MEDIUM"),
+    [riskTaggedPlayers],
+  );
+  const topGrowthAsset = useMemo(
+    () => strategicAssets.find((a) => a.tier === "Growth Asset"),
+    [strategicAssets],
+  );
 
-  useEffect(() => {
-    setRatingPage((current) => Math.min(current, ratingTotalPages));
-  }, [ratingTotalPages]);
-
-  useEffect(() => {
-    setRiskPage((current) => Math.min(current, riskTotalPages));
-  }, [riskTotalPages]);
-
-  useEffect(() => {
-    setAssetPage((current) => Math.min(current, assetTotalPages));
-  }, [assetTotalPages]);
+  // Sync pages
+  useEffect(() => setRiskPage(1), [riskTab]);
+  useEffect(() => setAssetPage(1), [assetTierFilter]);
+  useEffect(() => setRiskPage((p) => Math.min(p, riskTotalPages)), [riskTotalPages]);
+  useEffect(() => setAssetPage((p) => Math.min(p, assetTotalPages)), [assetTotalPages]);
 
   return (
     <div className="flex h-screen bg-[var(--background)]" key={language}>
@@ -212,230 +182,267 @@ export default function Dashboard() {
       <div className="flex flex-1 flex-col overflow-hidden">
         <AppHeader />
         <main className="flex-1 overflow-y-auto px-6 py-8 lg:px-8">
-          <div className="mx-auto max-w-[1600px] space-y-12">
-            <div className="space-y-3">
-              <h1 className="text-4xl">{t("dashboard.title")}</h1>
-              <p className="max-w-4xl text-base leading-7 text-gray-400">
-                {t("dashboard.subtitle")}
-              </p>
+          <div className="mx-auto max-w-[1600px] space-y-10">
+
+            {/* ── Header ── */}
+            <div className="space-y-2">
+              <h1 className="text-4xl font-bold">{t("dashboard.title")}</h1>
+              <p className="max-w-3xl text-sm leading-7 text-gray-400">{t("dashboard.subtitle")}</p>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
-              <MetricCard
-                title={t("dashboard.players_analyzed")}
-                value={players.length.toString()}
-                icon={Users}
-                trend={t("dashboard.baseLoaded")}
-                trendUp={true}
-                color="#00C2FF"
-              />
-              <MetricCard
-                title={t("dashboard.avg_efficiency")}
-                value={averageEfficiency.toFixed(1)}
-                icon={Target}
-                trend={t("dashboard.rankingLimited")}
-                trendUp={true}
-                color="#00FF9C"
-              />
-              <MetricCard
-                title={t("dashboard.high_risk_players")}
-                value={riskCounts.HIGH.toString()}
-                icon={AlertTriangle}
-                trend={t("dashboard.safeZone", { count: riskCounts.LOW })}
-                trendUp={riskCounts.LOW >= riskCounts.HIGH}
-                color="#FF4D4F"
-              />
-              <MetricCard
-                title={t("dashboard.total_market_value")}
-                value={totalMarketValue}
-                icon={DollarSign}
-                trend={error ? t("dashboard.apiUnavailable") : t("dashboard.portfolioLoaded")}
-                trendUp={!error}
-                color="#7A5CFF"
-              />
+            {/* ── KPI Cards ── */}
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard title={t("dashboard.players_analyzed")}  value={players.length.toString()}   icon={Users}         trend={t("dashboard.baseLoaded")}                                                        trendUp={true}             color="#00C2FF" />
+              <MetricCard title={t("dashboard.avg_efficiency")}    value={averageEfficiency.toFixed(1)} icon={Target}        trend={t("dashboard.rankingLimited")}                                                   trendUp={true}             color="#00FF9C" />
+              <MetricCard title={t("dashboard.high_risk_players")} value={riskCounts.HIGH.toString()}  icon={AlertTriangle} trend={t("dashboard.safeZone", { count: riskCounts.LOW })}                             trendUp={riskCounts.LOW >= riskCounts.HIGH} color="#FF4D4F" />
+              <MetricCard title={t("dashboard.total_market_value")} value={totalMarketValue}           icon={DollarSign}    trend={error ? t("dashboard.apiUnavailable") : t("dashboard.portfolioLoaded")}         trendUp={!error}           color="#7A5CFF" />
             </div>
 
             {error && (
-              <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+              <div className="rounded-2xl border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
                 {error}
               </div>
             )}
-
             {loading && (
-              <div className="rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-400">
+              <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-4 text-sm text-gray-400">
                 {t("dashboard.loading")}
               </div>
             )}
 
-            <div className="grid grid-cols-1 gap-8 xl:grid-cols-2">
-              <ChartCard
-                title={t("dashboard.efficiencyRankingTitle")}
-                icon={Target}
-                iconColor="#00C2FF"
-                subtitle={t("dashboard.efficiencyRankingSubtitle")}
-                summary={t("dashboard.efficiencyRankingSummary")}
-                data={pagedEfficiencyData}
-                page={efficiencyPage}
-                totalPages={efficiencyTotalPages}
-                totalItems={efficiencyChartData.length}
-                onPageChange={setEfficiencyPage}
-                barColor="#00C2FF"
-                domain={[0, 10]}
-              />
+            {/* ── Portfolio Intelligence ── */}
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
 
-              <ChartCard
-                title={t("dashboard.overallRankingTitle")}
-                icon={TrendingUp}
-                iconColor="#7A5CFF"
-                subtitle={t("dashboard.overallRankingSubtitle")}
-                summary={t("dashboard.overallRankingSummary")}
-                data={pagedRatingData}
-                page={ratingPage}
-                totalPages={ratingTotalPages}
-                totalItems={ratingChartData.length}
-                onPageChange={setRatingPage}
-                barColor="#7A5CFF"
-                domain={[60, 99]}
-              />
-            </div>
+              {/* Portfolio Breakdown */}
+              <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-7 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
+                <h2 className="mb-7 flex items-center gap-2.5 text-lg font-semibold">
+                  <BarChart2 className="h-5 w-5 text-[#00C2FF]" />
+                  Composição do portfólio
+                </h2>
 
-            <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
-              <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                <div className="space-y-2">
-                  <h2 className="flex items-center gap-3 text-2xl font-semibold">
-                    <ShieldCheck className="h-6 w-6 text-[#00FF9C]" />
-                    {t("dashboard.topEfficiencyTitle")}
-                  </h2>
-                  <p className="max-w-3xl text-sm leading-6 text-gray-400">
-                    {t("dashboard.topEfficiencySubtitle")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-                {topEfficiencyPlayers.map((player, index) => (
-                  <div
-                    key={player.id || `${player.name}-${index}`}
-                    className={`relative rounded-[18px] bg-[rgba(255,255,255,0.03)] p-7 transition-all duration-200 ${
-                      index === 0
-                        ? "shadow-[0_0_20px_rgba(0,255,156,0.08)] hover:shadow-[0_0_24px_rgba(0,255,156,0.12)]"
-                        : "shadow-[0_4px_16px_rgba(0,0,0,0.2)] hover:-translate-y-1 hover:shadow-[0_6px_20px_rgba(0,0,0,0.25)]"
-                    }`}
-                  >
-                    <div className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(255,255,255,0.08)] text-xs font-semibold text-gray-300">
-                      #{index + 1}
+                <div className="space-y-5">
+                  {tierDistribution.map(({ tier, count, pct, top, color }) => (
+                    <div key={tier}>
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color }}>
+                            {tier.replace(" Asset", "")}
+                          </span>
+                          {top && (
+                            <span className="truncate text-[11px] text-gray-500">
+                              · {getShortName(top.player.name)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="ml-4 flex-shrink-0 text-sm font-semibold text-white">{count}</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-[rgba(255,255,255,0.07)]">
+                        <div
+                          className="h-full rounded-full transition-all duration-700"
+                          style={{ width: `${Math.max(pct, count > 0 ? 4 : 0)}%`, background: color }}
+                        />
+                      </div>
+                      <p className="mt-1 text-[10px] text-gray-600">{pct}% dos ativos classificados</p>
                     </div>
+                  ))}
+                </div>
 
-                    <div className="mb-6 pr-10">
-                      <h3 className="mb-2 truncate text-base font-semibold text-gray-100">{player.name}</h3>
-                      <p className="mb-4 truncate text-xs text-gray-500">
-                        {player.position} - {player.club}
+                {/* Market value footer */}
+                <div className="mt-7 flex items-center justify-between rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] px-5 py-4">
+                  <div>
+                    <p className="mb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Valor total monitorado</p>
+                    <p className="text-xl font-bold text-[#7A5CFF]">{totalMarketValue}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="mb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Ativos classificados</p>
+                    <p className="text-xl font-bold text-white">{strategicAssets.length}</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Scouting Signals */}
+              <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-7 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
+                <h2 className="mb-7 flex items-center gap-2.5 text-lg font-semibold">
+                  <Zap className="h-5 w-5 text-[#FBBF24]" />
+                  Sinais de scouting
+                </h2>
+
+                <div className="space-y-4">
+                  {topEfficiencyPlayers[0] && (
+                    <SignalCard
+                      label="Alvo prioritário"
+                      tag="FECHAR"
+                      tagColor="#00FF9C"
+                      name={topEfficiencyPlayers[0].name}
+                      meta={`${topEfficiencyPlayers[0].position} · ${topEfficiencyPlayers[0].club}`}
+                      metric={`Eficiência ${topEfficiencyPlayers[0].capitalEfficiency.toFixed(1)} · Overall ${topEfficiencyPlayers[0].overallRating}`}
+                      icon={Target}
+                    />
+                  )}
+                  {topGrowthAsset && (
+                    <SignalCard
+                      label="Upside identificado"
+                      tag="MONITORAR"
+                      tagColor="#00C2FF"
+                      name={topGrowthAsset.player.name}
+                      meta={`${topGrowthAsset.player.position} · ${topGrowthAsset.player.club}`}
+                      metric={`Potencial ${topGrowthAsset.player.potential} · Liquidez ${topGrowthAsset.player.liquidity.score.toFixed(1)}`}
+                      icon={TrendingUp}
+                    />
+                  )}
+                  {topRiskSignal && (
+                    <SignalCard
+                      label="Risco elevado"
+                      tag="ATENÇÃO"
+                      tagColor="#FF4D4F"
+                      name={topRiskSignal.player.name}
+                      meta={`${topRiskSignal.player.position} · ${topRiskSignal.player.club}`}
+                      metric={topRiskSignal.explanation.length > 90 ? `${topRiskSignal.explanation.slice(0, 90)}…` : topRiskSignal.explanation}
+                      icon={AlertTriangle}
+                    />
+                  )}
+
+                  {/* Top Efficiency mini-list */}
+                  {topEfficiencyPlayers.length > 0 && (
+                    <div className="mt-2 rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-5 py-4">
+                      <p className="mb-4 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-500">
+                        <ShieldCheck className="h-3.5 w-3.5 text-[#00FF9C]" />
+                        Top eficiência de capital
                       </p>
-                      <div className="inline-block">
-                        <TierBadge tier={player.tier} className="!px-3 !py-1 !text-xs !shadow-[0_0_12px_rgba(122,92,255,0.35)]" />
+                      <div className="space-y-3">
+                        {topEfficiencyPlayers.slice(0, 3).map((player, i) => (
+                          <div key={player.id ?? player.name} className="flex items-center gap-3">
+                            <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[rgba(255,255,255,0.07)] text-[10px] font-semibold text-gray-400">
+                              {i + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-white">{player.name}</p>
+                              <p className="text-[11px] text-gray-500">{player.position} · {player.club}</p>
+                            </div>
+                            <div className="flex-shrink-0">
+                              <CapitalGauge value={player.capitalEfficiency} size="xs" showLabel={false} />
+                            </div>
+                            <TierBadge tier={player.tier} className="!px-2 !py-0.5 !text-[9px]" />
+                          </div>
+                        ))}
                       </div>
                     </div>
+                  )}
+                </div>
+              </section>
+            </div>
 
-                    <div className="flex items-center justify-center pt-2">
-                      <CapitalGauge value={player.capitalEfficiency} size="xs" showLabel={true} />
-                    </div>
-                  </div>
-                ))}
+            {/* ── Strategic Assets ── */}
+            <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-7 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
+              <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-1.5">
+                  <h2 className="flex items-center gap-2.5 text-lg font-semibold">
+                    <DollarSign className="h-5 w-5 text-[#7A5CFF]" />
+                    {t("dashboard.strategicAssetsTitle")}
+                  </h2>
+                  <p className="text-sm text-gray-400">{t("dashboard.strategicAssetsSubtitle")}</p>
+                </div>
+                <PaginationControls page={assetPage} totalPages={assetTotalPages} onPageChange={setAssetPage} compact />
+              </div>
+
+              {/* Tier filter tabs */}
+              <div className="mb-6 flex flex-wrap gap-2">
+                {(["ALL", ...TIER_ORDER] as const).map((tier) => {
+                  const count = tier === "ALL" ? strategicAssets.length : strategicAssets.filter((a) => a.tier === tier).length;
+                  const color = tier !== "ALL" ? getAssetTierColor(tier) : undefined;
+                  const active = assetTierFilter === tier;
+                  return (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() => { setAssetTierFilter(tier); setAssetPage(1); }}
+                      className="rounded-full border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition-all"
+                      style={{
+                        borderColor: active && color ? `${color}55` : active ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)",
+                        background: active && color ? `${color}14` : active ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)",
+                        color: active && color ? color : active ? "#fff" : "rgba(148,163,184,0.8)",
+                      }}
+                    >
+                      {tier === "ALL" ? `Todos (${count})` : `${tier.replace(" Asset", "")} (${count})`}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                {pagedAssets.length === 0
+                  ? <EmptyState message={t("dashboard.strategicAssetsEmpty")} />
+                  : pagedAssets.map((asset) => (
+                    <StrategicAssetCard key={`${asset.player.id}-${asset.tier}`} asset={asset} />
+                  ))
+                }
               </div>
             </section>
 
-            <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
-              <div className="mb-8 flex flex-col gap-6">
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="space-y-2">
-                    <h2 className="flex items-center gap-3 text-2xl font-semibold">
-                      <AlertTriangle className="h-6 w-6 text-[#FF4D4F]" />
-                      {t("dashboard.riskOverviewTitle")}
-                    </h2>
-                    <p className="max-w-3xl text-sm leading-6 text-gray-400">
-                      {t("dashboard.riskOverviewSubtitle")}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {(["ALL", "LOW", "MEDIUM", "HIGH"] as const).map((tab) => (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setRiskTab(tab)}
-                        className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition-all ${
-                          riskTab === tab
-                            ? "border-[rgba(0,194,255,0.32)] bg-[rgba(0,194,255,0.12)] text-[#9BE7FF]"
-                            : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-400 hover:text-gray-200"
-                        }`}
-                      >
-                        {tab === "ALL" ? `${t("dashboard.riskTabAll")} (${riskTaggedPlayers.length})` : `${tab} (${riskCounts[tab]})`}
-                      </button>
-                    ))}
-                  </div>
+            {/* ── Risk Overview ── */}
+            <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-7 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
+              <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div className="space-y-1.5">
+                  <h2 className="flex items-center gap-2.5 text-lg font-semibold">
+                    <AlertTriangle className="h-5 w-5 text-[#FF4D4F]" />
+                    {t("dashboard.riskOverviewTitle")}
+                  </h2>
+                  <p className="text-sm text-gray-400">{t("dashboard.riskOverviewSubtitle")}</p>
                 </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                  <RiskSummaryCard bucket="LOW" count={riskCounts.LOW} label={t("dashboard.riskLowLabel")} detail={t("dashboard.riskLowDetail")} />
-                  <RiskSummaryCard bucket="MEDIUM" count={riskCounts.MEDIUM} label={t("dashboard.riskMediumLabel")} detail={t("dashboard.riskMediumDetail")} />
-                  <RiskSummaryCard bucket="HIGH" count={riskCounts.HIGH} label={t("dashboard.riskHighLabel")} detail={t("dashboard.riskHighDetail")} />
+                <div className="flex flex-wrap gap-2">
+                  {(["ALL", "LOW", "MEDIUM", "HIGH"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setRiskTab(tab)}
+                      className={`rounded-full border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition-all ${
+                        riskTab === tab
+                          ? "border-[rgba(0,194,255,0.32)] bg-[rgba(0,194,255,0.1)] text-[#9BE7FF]"
+                          : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-400 hover:text-gray-200"
+                      }`}
+                    >
+                      {tab === "ALL" ? `${t("dashboard.riskTabAll")} (${riskTaggedPlayers.length})` : `${tab} (${riskCounts[tab]})`}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {pagedRiskPlayers.length === 0 ? (
-                  <EmptyState message={t("dashboard.riskEmpty")} />
-                ) : (
-                  pagedRiskPlayers.map(({ player, riskBucket, explanation }) => (
+              {/* Risk summary cards */}
+              <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <RiskSummaryCard bucket="LOW"    count={riskCounts.LOW}    label={t("dashboard.riskLowLabel")}    detail={t("dashboard.riskLowDetail")} />
+                <RiskSummaryCard bucket="MEDIUM" count={riskCounts.MEDIUM} label={t("dashboard.riskMediumLabel")} detail={t("dashboard.riskMediumDetail")} />
+                <RiskSummaryCard bucket="HIGH"   count={riskCounts.HIGH}   label={t("dashboard.riskHighLabel")}   detail={t("dashboard.riskHighDetail")} />
+              </div>
+
+              <div className="space-y-3">
+                {pagedRiskPlayers.length === 0
+                  ? <EmptyState message={t("dashboard.riskEmpty")} />
+                  : pagedRiskPlayers.map(({ player, riskBucket, explanation }) => (
                     <RiskDecisionCard key={player.id} player={player} riskBucket={riskBucket} explanation={explanation} />
                   ))
-                )}
+                }
               </div>
 
-              <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-gray-500">
-                  {t("dashboard.riskShowing", { range: getVisibleRange(filteredRiskPlayers.length, riskPage, RISK_PAGE_SIZE, pagedRiskPlayers.length), total: filteredRiskPlayers.length })}
+                  {t("dashboard.riskShowing", {
+                    range: getVisibleRange(filteredRiskPlayers.length, riskPage, RISK_PAGE_SIZE, pagedRiskPlayers.length),
+                    total: filteredRiskPlayers.length,
+                  })}
                 </p>
                 <PaginationControls page={riskPage} totalPages={riskTotalPages} onPageChange={setRiskPage} />
               </div>
             </section>
 
-            <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
-              <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-                <div className="space-y-2">
-                  <h2 className="flex items-center gap-3 text-2xl font-semibold">
-                    <DollarSign className="h-6 w-6 text-[#7A5CFF]" />
-                    {t("dashboard.strategicAssetsTitle")}
-                  </h2>
-                  <p className="max-w-3xl text-sm leading-6 text-gray-400">
-                    {t("dashboard.strategicAssetsSubtitle")}
-                  </p>
-                </div>
-
-                <PaginationControls page={assetPage} totalPages={assetTotalPages} onPageChange={setAssetPage} />
-              </div>
-
-              <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-4">
-                <TierInsightCard tier="Elite Asset" detail={t("dashboard.eliteAssetDetail")} />
-                <TierInsightCard tier="Growth Asset" detail={t("dashboard.growthAssetDetail")} />
-                <TierInsightCard tier="Stable Asset" detail={t("dashboard.stableAssetDetail")} />
-                <TierInsightCard tier="Opportunity Asset" detail={t("dashboard.opportunityAssetDetail")} />
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                {pagedAssets.length === 0 ? (
-                  <EmptyState message={t("dashboard.strategicAssetsEmpty")} />
-                ) : (
-                  pagedAssets.map((asset) => <StrategicAssetCard key={`${asset.player.id}-${asset.tier}`} asset={asset} />)
-                )}
-              </div>
-            </section>
           </div>
         </main>
       </div>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
 interface MetricCardProps {
   title: string;
@@ -445,21 +452,20 @@ interface MetricCardProps {
   trendUp: boolean;
   color: string;
 }
-
 function MetricCard({ title, value, icon: Icon, trend, trendUp, color }: MetricCardProps) {
   return (
-    <div className="relative overflow-hidden rounded-[20px] bg-[rgba(255,255,255,0.02)] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_12px_40px_rgba(0,0,0,0.4)] backdrop-blur-sm">
-      <div className="absolute right-0 top-0 h-32 w-32 blur-3xl opacity-10" style={{ background: color }} />
+    <div className="relative overflow-hidden rounded-[20px] bg-[rgba(255,255,255,0.02)] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.28)] backdrop-blur-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_14px_40px_rgba(0,0,0,0.38)]">
+      <div className="absolute right-0 top-0 h-28 w-28 blur-3xl opacity-[0.09]" style={{ background: color }} />
       <div className="relative z-10">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h3 className="text-xs font-medium uppercase tracking-wider text-gray-400">{title}</h3>
-          <Icon className="h-5 w-5" style={{ color }} />
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-400">{title}</h3>
+          <Icon className="h-4 w-4 flex-shrink-0" style={{ color }} />
         </div>
-        <p className="mb-2 text-3xl font-bold" style={{ color }}>
-          {value}
-        </p>
-        <div className="flex items-center gap-2 text-xs text-gray-400">
-          {trendUp ? <TrendingUp className="h-3 w-3 text-[#00FF9C]" /> : <TrendingDown className="h-3 w-3 text-[#FF4D4F]" />}
+        <p className="mb-2.5 text-3xl font-bold leading-none" style={{ color }}>{value}</p>
+        <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+          {trendUp
+            ? <TrendingUp className="h-3 w-3 text-[#00FF9C]" />
+            : <TrendingDown className="h-3 w-3 text-[#FF4D4F]" />}
           <span>{trend}</span>
         </div>
       </div>
@@ -467,157 +473,70 @@ function MetricCard({ title, value, icon: Icon, trend, trendUp, color }: MetricC
   );
 }
 
-function ChartCard({
-  title,
-  subtitle,
-  summary,
-  icon: Icon,
-  iconColor,
-  data,
-  page,
-  totalPages,
-  totalItems,
-  onPageChange,
-  barColor,
-  domain,
+function SignalCard({
+  label, tag, tagColor, name, meta, metric, icon: Icon,
 }: {
-  title: string;
-  subtitle: string;
-  summary: string;
+  label: string; tag: string; tagColor: string;
+  name: string; meta: string; metric: string;
   icon: ElementType;
-  iconColor: string;
-  data: ChartDatum[];
-  page: number;
-  totalPages: number;
-  totalItems: number;
-  onPageChange: (page: number) => void;
-  barColor: string;
-  domain: [number, number];
 }) {
   return (
-    <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-8 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
-      <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-        <div className="space-y-2">
-          <h2 className="flex items-center gap-3 text-2xl font-semibold">
-            <Icon className="h-6 w-6" style={{ color: iconColor }} />
-            {title}
-          </h2>
-          <p className="text-sm text-gray-400">{subtitle}</p>
-          <p className="text-xs uppercase tracking-[0.2em] text-gray-500">{summary}</p>
+    <div className="flex items-start gap-4 rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3.5 transition-all hover:bg-[rgba(255,255,255,0.05)]">
+      <div
+        className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full"
+        style={{ background: `${tagColor}18`, border: `1px solid ${tagColor}30` }}
+      >
+        <Icon className="h-4 w-4" style={{ color: tagColor }} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="text-[9px] font-semibold uppercase tracking-[0.2em] text-gray-500">{label}</span>
+          <span
+            className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider"
+            style={{ background: `${tagColor}18`, color: tagColor }}
+          >
+            {tag}
+          </span>
         </div>
-        <PaginationControls page={page} totalPages={totalPages} onPageChange={onPageChange} compact />
+        <p className="truncate text-sm font-semibold text-white">{name}</p>
+        <p className="truncate text-[11px] text-gray-500">{meta}</p>
+        <p className="mt-1 truncate text-[11px] text-gray-400">{metric}</p>
       </div>
-
-      <div className="mb-4 flex items-center justify-between text-xs text-gray-500">
-        <span>{translate("dashboard.tooltipHint")}</span>
-        <span>{translate("dashboard.visibleRanking", { count: totalItems })}</span>
-      </div>
-
-      <ResponsiveContainer width="100%" height={380}>
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 18, left: 8, bottom: 4 }} barCategoryGap={12}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" horizontal={true} vertical={false} />
-          <XAxis type="number" stroke="rgba(148,163,184,0.6)" domain={domain} style={{ fontSize: "12px" }} tickLine={false} axisLine={false} />
-          <YAxis
-            type="category"
-            dataKey="shortName"
-            width={110}
-            stroke="rgba(148,163,184,0.72)"
-            style={{ fontSize: "12px" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <Tooltip
-            cursor={{ fill: "rgba(255,255,255,0.03)" }}
-            contentStyle={{
-              backgroundColor: "rgba(10,27,53,0.96)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "14px",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.38)",
-            }}
-            formatter={(value: number, _name: string, props: { payload?: ChartDatum }) => [
-              `${props.payload?.name ?? ""} - ${props.payload?.metricLabel ?? ""}: ${Number(value).toFixed(1)}`,
-              "",
-            ]}
-            labelFormatter={() => ""}
-          />
-          <Bar dataKey="value" fill={barColor} radius={[0, 10, 10, 0]} maxBarSize={18}>
-            {data.map((entry) => (
-              <Cell key={`${entry.name}-${entry.metricLabel}`} fill={entry.accent} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </section>
+    </div>
   );
 }
 
-function RiskSummaryCard({
-  bucket,
-  count,
-  label,
-  detail,
-}: {
-  bucket: RiskBucket;
-  count: number;
-  label: string;
-  detail: string;
-}) {
-  const palette = getRiskSectionColor(bucket);
-
+function RiskSummaryCard({ bucket, count, label, detail }: { bucket: RiskBucket; count: number; label: string; detail: string }) {
+  const p = getRiskSectionColor(bucket);
   return (
-    <div
-      className="rounded-[18px] border p-5"
-      style={{
-        borderColor: palette.border,
-        background: palette.background,
-      }}
-    >
-      <p className="mb-2 text-[11px] uppercase tracking-[0.2em]" style={{ color: palette.text }}>
-        {label}
-      </p>
-      <div className="mb-2 text-3xl font-semibold text-white">{count}</div>
+    <div className="rounded-[16px] border p-5" style={{ borderColor: p.border, background: p.bg }}>
+      <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.2em]" style={{ color: p.text }}>{label}</p>
+      <div className="mb-2 text-3xl font-bold text-white">{count}</div>
       <p className="text-sm leading-6 text-gray-400">{detail}</p>
     </div>
   );
 }
 
-function RiskDecisionCard({
-  player,
-  riskBucket,
-  explanation,
-}: {
-  player: PlayerExtended;
-  riskBucket: RiskBucket;
-  explanation: string;
-}) {
-  const palette = getRiskSectionColor(riskBucket);
-  const compositeRisk = player.risk.score;
-
+function RiskDecisionCard({ player, riskBucket, explanation }: { player: PlayerExtended; riskBucket: RiskBucket; explanation: string }) {
+  const p = getRiskSectionColor(riskBucket);
   return (
-    <div
-      className="rounded-[18px] border p-5 transition-all duration-200"
-      style={{
-        borderColor: palette.border,
-        background: palette.background,
-      }}
-    >
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-        <div className="max-w-2xl space-y-2">
-          <div className="flex flex-wrap items-center gap-3">
-            <h4 className="text-lg font-semibold text-white">{player.name}</h4>
+    <div className="rounded-[16px] border px-5 py-4 transition-all duration-200" style={{ borderColor: p.border, background: p.bg }}>
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="max-w-2xl space-y-1.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h4 className="text-base font-semibold text-white">{player.name}</h4>
             <RiskBadge level={riskBucket} />
           </div>
-          <p className="text-sm text-gray-400">
-            {player.position} - {player.club} - Overall {player.overallRating} - Potential {player.potential}
+          <p className="text-xs text-gray-500">
+            {player.position} · {player.club} · Overall {player.overallRating} · Potential {player.potential}
           </p>
           <p className="text-sm leading-6 text-gray-300">{explanation}</p>
         </div>
-
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-4 gap-3 xl:flex-shrink-0">
           <RiskMetric label={translate("dashboard.structuralRisk")} value={player.structuralRisk.score.toFixed(1)} />
-          <RiskMetric label={translate("dashboard.financialRisk")} value={player.financialRisk.index.toFixed(1)} />
-          <RiskMetric label={translate("dashboard.liquidity")} value={player.liquidity.score.toFixed(1)} />
-          <RiskMetric label={translate("dashboard.compositeRisk")} value={compositeRisk.toFixed(1)} />
+          <RiskMetric label={translate("dashboard.financialRisk")}  value={player.financialRisk.index.toFixed(1)} />
+          <RiskMetric label={translate("dashboard.liquidity")}       value={player.liquidity.score.toFixed(1)} />
+          <RiskMetric label={translate("dashboard.compositeRisk")}   value={player.risk.score.toFixed(1)} />
         </div>
       </div>
     </div>
@@ -626,22 +545,9 @@ function RiskDecisionCard({
 
 function RiskMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[14px] bg-[rgba(255,255,255,0.03)] px-4 py-3 text-right">
-      <p className="mb-1 text-[10px] uppercase tracking-wider text-gray-500">{label}</p>
-      <p className="text-lg font-semibold text-white">{value}</p>
-    </div>
-  );
-}
-
-function TierInsightCard({ tier, detail }: { tier: StrategicAssetTier; detail: string }) {
-  const color = getAssetTierColor(tier);
-
-  return (
-    <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] p-4">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color }}>
-        {tier}
-      </p>
-      <p className="text-sm leading-6 text-gray-400">{detail}</p>
+    <div className="rounded-[12px] bg-[rgba(255,255,255,0.03)] px-3 py-2.5 text-right">
+      <p className="mb-1 text-[9px] uppercase tracking-wider text-gray-500">{label}</p>
+      <p className="text-base font-semibold text-white">{value}</p>
     </div>
   );
 }
@@ -649,50 +555,46 @@ function TierInsightCard({ tier, detail }: { tier: StrategicAssetTier; detail: s
 function StrategicAssetCard({ asset }: { asset: StrategicAsset }) {
   const { player, tier, description, summary, marketValueLabel, liquidityLabel, potentialLabel } = asset;
   const color = getAssetTierColor(tier);
-  const technicalDigest = `Overall ${player.overallRating} • Potencial ${player.potential} • Liquidez ${player.liquidity.score.toFixed(1)} • Revenda ${player.liquidity.resaleWindow}`;
+  const digest = `Overall ${player.overallRating} · Potencial ${player.potential} · Liquidez ${player.liquidity.score.toFixed(1)} · Revenda ${player.liquidity.resaleWindow}`;
 
   return (
     <div
-      className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] p-7 shadow-[0_10px_30px_rgba(0,0,0,0.28)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(0,0,0,0.36)]"
-      style={{ boxShadow: `0 14px 36px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.02), 0 0 0 1px ${color}10` }}
+      className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.26)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(0,0,0,0.34)]"
+      style={{ boxShadow: `0 12px 32px rgba(0,0,0,0.24), 0 0 0 1px ${color}14` }}
     >
-      <div className="mb-7 flex items-start justify-between gap-4">
-        <div className="max-w-[70%] space-y-3">
-          <div className="space-y-1.5">
-            <h3 className="text-[1.35rem] font-semibold leading-tight text-white">{player.name}</h3>
-            <p className="text-sm font-medium text-gray-400">
-              {player.position} • {player.club}
-            </p>
-          </div>
-          <div
-            className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em]"
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div className="min-w-0 space-y-2">
+          <h3 className="truncate text-[1.2rem] font-semibold leading-tight text-white">{player.name}</h3>
+          <p className="text-sm text-gray-400">{player.position} · {player.club}</p>
+          <span
+            className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]"
             style={{ color: color === "#00FF9C" ? "#7DFFD0" : color, borderColor: `${color}40`, background: `${color}12` }}
           >
             {summary}
-          </div>
+          </span>
         </div>
-        <div
-          className="rounded-full border px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em]"
+        <span
+          className="flex-shrink-0 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
           style={{ color, borderColor: `${color}55`, background: `${color}16` }}
         >
-          {tier}
-        </div>
+          {tier.replace(" Asset", "")}
+        </span>
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3">
+      <div className="mb-5 grid grid-cols-2 gap-3">
         <AssetMetric label="Valor de mercado" value={marketValueLabel} />
-        <AssetMetric label="Liquidity Score" value={liquidityLabel} highlight="#00FF9C" />
-        <AssetMetric label="Resale Window" value={player.liquidity.resaleWindow} />
-        <AssetMetric label="Potential" value={potentialLabel} highlight="#00C2FF" />
+        <AssetMetric label="Liquidity Score"  value={liquidityLabel}  highlight="#00FF9C" />
+        <AssetMetric label="Resale Window"    value={player.liquidity.resaleWindow} />
+        <AssetMetric label="Potential"        value={potentialLabel}  highlight="#00C2FF" />
       </div>
 
-      <div className="mb-4 rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.028)] px-4 py-4">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.22em] text-gray-500">Resumo estrategico</p>
-        <p className="max-w-[46ch] text-sm leading-6 text-gray-200">{description}</p>
+      <div className="mb-3 rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.026)] px-4 py-3.5">
+        <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-gray-500">Resumo estratégico</p>
+        <p className="text-sm leading-6 text-gray-200">{description}</p>
       </div>
 
-      <div className="rounded-[14px] border border-[rgba(255,255,255,0.05)] bg-[rgba(5,12,24,0.42)] px-4 py-3">
-        <p className="text-sm leading-6 text-gray-400">{technicalDigest}</p>
+      <div className="rounded-[12px] border border-[rgba(255,255,255,0.05)] bg-[rgba(5,12,24,0.42)] px-4 py-2.5">
+        <p className="text-[11px] leading-5 text-gray-500">{digest}</p>
       </div>
     </div>
   );
@@ -700,41 +602,31 @@ function StrategicAssetCard({ asset }: { asset: StrategicAsset }) {
 
 function AssetMetric({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
   return (
-    <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.028)] px-4 py-3.5">
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500">{label}</p>
-      <p className="text-lg font-semibold leading-none" style={{ color: highlight ?? "#F8FAFC" }}>
-        {value}
-      </p>
+    <div className="rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.026)] px-4 py-3">
+      <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-gray-500">{label}</p>
+      <p className="text-base font-semibold leading-none" style={{ color: highlight ?? "#F8FAFC" }}>{value}</p>
     </div>
   );
 }
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="rounded-[18px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-5 py-6 text-sm text-gray-400">
+    <div className="col-span-2 rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] px-5 py-6 text-sm text-gray-400">
       {message}
     </div>
   );
 }
 
-function PaginationControls({
-  page,
-  totalPages,
-  onPageChange,
-  compact = false,
-}: {
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
-  compact?: boolean;
+function PaginationControls({ page, totalPages, onPageChange, compact = false }: {
+  page: number; totalPages: number; onPageChange: (p: number) => void; compact?: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2.5">
       <button
         type="button"
         onClick={() => onPageChange(Math.max(1, page - 1))}
         disabled={page <= 1}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300 transition-all hover:border-[rgba(255,255,255,0.18)] disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300 transition-all hover:border-[rgba(255,255,255,0.18)] disabled:cursor-not-allowed disabled:opacity-35"
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -745,7 +637,7 @@ function PaginationControls({
         type="button"
         onClick={() => onPageChange(Math.min(totalPages, page + 1))}
         disabled={page >= totalPages}
-        className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300 transition-all hover:border-[rgba(255,255,255,0.18)] disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300 transition-all hover:border-[rgba(255,255,255,0.18)] disabled:cursor-not-allowed disabled:opacity-35"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
