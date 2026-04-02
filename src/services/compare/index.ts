@@ -40,6 +40,10 @@ export async function getCompareDataByIds(idA: string, idB: string) {
   return comparePlayersByEndpoint(`/compare/${idA}/${idB}`);
 }
 
+export async function getCompareEngineData(idA: string, idB: string) {
+  return apiFetch<unknown>(`/compare/engine/${idA}/${idB}`);
+}
+
 export async function getCompareDataByNames(nameA: string, nameB: string) {
   if (getDataSource("compare") === "mock") {
     const shortlist = await getCompareShortlist({ search: nameA || nameB, limit: 2 });

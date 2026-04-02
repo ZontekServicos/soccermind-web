@@ -16,7 +16,8 @@ import { Textarea } from "../components/ui/textarea";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { createComparisonAnalysis } from "../services/analysis";
-import { getCompareDataByIds, getCompareShortlist, type CompareViewModel, type PlayerFilterOptions } from "../services/compare";
+import { getCompareDataByIds, getCompareEngineData, getCompareShortlist, type CompareViewModel, type PlayerFilterOptions } from "../services/compare";
+import { EngineComparisonSection, type EngineComparisonOutput } from "../components/player-intelligence/EngineComparisonSection";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import { normalizePlayerIntelligenceProfile, type PlayerIntelligenceProfile } from "../types/player-intelligence";
 import {
@@ -133,6 +134,8 @@ export default function Compare() {
   const [comparisonData, setComparisonData] = useState<CompareViewModel | null>(null);
   const [playersLoading, setPlayersLoading] = useState(true);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [engineData, setEngineData] = useState<EngineComparisonOutput | null>(null);
+  const [engineLoading, setEngineLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisTitle, setAnalysisTitle] = useState("");
   const [analysisDescription, setAnalysisDescription] = useState("");
@@ -205,6 +208,32 @@ export default function Compare() {
     return () => {
       active = false;
     };
+  }, [playerA.id, playerB.id]);
+
+  useEffect(() => {
+    let active = true;
+    async function loadEngine() {
+      if (!playerA.id || !playerB.id || playerA.id === playerB.id) {
+        setEngineData(null);
+        return;
+      }
+      setEngineLoading(true);
+      try {
+        const response = await getCompareEngineData(playerA.id, playerB.id);
+        if (!active) return;
+        const payload = (response as { data?: unknown }).data;
+        if (payload && typeof payload === "object" && "betterOverall" in payload) {
+          setEngineData(payload as EngineComparisonOutput);
+        }
+      } catch {
+        // engine is best-effort — don't block the page if it fails
+        if (active) setEngineData(null);
+      } finally {
+        if (active) setEngineLoading(false);
+      }
+    }
+    void loadEngine();
+    return () => { active = false; };
   }, [playerA.id, playerB.id]);
 
   const selectablePlayers = useMemo(() => dedupe([playerA, playerB, ...players].filter((item) => item.id && item.id !== EMPTY_PLAYER.id)), [playerA, playerB, players]);
@@ -320,6 +349,16 @@ export default function Compare() {
                 </Select>
               </div>
             </section>
+
+            {/* Engine comparison section — radar chart + dimension scores */}
+            {engineLoading ? (
+              <div className="rounded-[26px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-6 py-8 text-center">
+                <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-[rgba(0,194,255,0.3)] border-t-[#9BE7FF]" />
+                <p className="text-sm text-gray-500">Carregando engine de análise...</p>
+              </div>
+            ) : engineData ? (
+              <EngineComparisonSection nameA={displayA.name} nameB={displayB.name} data={engineData} />
+            ) : null}
 
             <FinalDecisionPanel playerAName={displayA.name} playerBName={displayB.name} finalDecision={finalDecision} confidence={confidence} insights={insights} summary={t("comparison.finalSummary")} />
 
