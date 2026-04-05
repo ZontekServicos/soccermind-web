@@ -24,17 +24,17 @@ const navigationGroups = [
     label: "nav.operation",
     items: [
       { name: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { name: "nav.tactical_fit", href: "/squad", icon: Target },
+      { name: "nav.history", href: "/history", icon: History },
     ],
   },
   {
     label: "nav.analysis",
     items: [
+      { name: "nav.tactical_fit", href: "/squad", icon: Target },
       { name: "nav.players_ranking", href: "/players", icon: Trophy },
       { name: "nav.player_vs_player", href: "/compare", icon: Users },
       { name: "nav.health_analytics", href: "/health-analytics", icon: Activity },
       { name: "nav.reports", href: "/reports", icon: FileText },
-      { name: "nav.history", href: "/history", icon: History },
     ],
   },
   {

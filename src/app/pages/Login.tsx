@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { Mail, Lock } from "lucide-react";
+import { motion } from "motion/react";
 import { AuthLayout } from "../components/AuthLayout";
 import { FormField, CheckboxField, AuthButton, AlertMessage, PasswordField } from "../components/AuthFormFields";
 import { useAuth } from "../contexts/AuthContext";
@@ -37,7 +38,7 @@ export default function Login() {
 
   return (
     <AuthLayout backgroundVariant="premium" key={language}>
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {/* Error Message */}
         {error && <AlertMessage type="error" message={error} onClose={() => setError("")} />}
 
@@ -69,46 +70,83 @@ export default function Login() {
         />
 
         {/* Remember Me & Forgot Password */}
-        <div className="flex items-center justify-between pt-1">
+        <motion.div
+          className="flex items-center justify-between"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.25 }}
+        >
           <CheckboxField id="remember" label={t("login.remember_me")} checked={rememberMe} onChange={setRememberMe} />
           <Link
             to="/forgot-password"
-            className="text-sm text-[#00C2FF]/90 hover:text-[#00C2FF] transition-colors font-medium"
+            className="text-sm text-[#67E8F9] hover:text-[#00C2FF] transition-all duration-200 font-semibold"
           >
             {t("login.forgot_password")}
           </Link>
-        </div>
+        </motion.div>
 
         {/* Submit Button */}
-        <div className="pt-2">
+        <motion.div
+          className="pt-1"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
           <AuthButton type="submit" isLoading={isLoading}>
             {t("login.submit_button")}
           </AuthButton>
-        </div>
+        </motion.div>
 
         {/* Divider */}
-        <div className="relative pt-2">
+        <motion.div
+          className="relative pt-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+        >
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-[rgba(255,255,255,0.06)]" />
+            <div className="w-full border-t border-white/10" />
           </div>
-          <div className="relative flex justify-center text-xs">
-            <span className="bg-[rgba(10,20,40,0.7)] px-4 text-gray-600">{t("login.new_to_platform")}</span>
+          <div className="relative flex justify-center">
+            <span
+              className="px-4 py-1 text-xs font-semibold text-gray-400/70 uppercase tracking-widest"
+              style={{
+                background: "rgba(15, 24, 48, 0.8)",
+                backdropFilter: "blur(10px)",
+                borderRadius: "20px",
+              }}
+            >
+              {t("login.new_to_platform")}
+            </span>
           </div>
-        </div>
+        </motion.div>
 
         {/* Contact Link */}
-        <div className="text-center space-y-2 pb-1">
-          <p className="text-sm text-gray-500/80">{t("login.no_account")}</p>
-          <a
+        <motion.div
+          className="text-center space-y-2 pt-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.5 }}
+        >
+          <p className="text-sm text-gray-400/80 font-medium">{t("login.no_account")}</p>
+          <motion.a
             href="https://wa.me/5511913267962"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-sm text-[#00C2FF]/90 hover:text-[#00C2FF] font-medium transition-colors group"
+            className="inline-flex items-center gap-2 text-[15px] text-[#00C6FF] hover:text-[#67E8F9] font-bold transition-all duration-200 group"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             {t("login.contact_team")}
-            <span className="inline-block transition-transform group-hover:translate-x-0.5">→</span>
-          </a>
-        </div>
+            <motion.span
+              className="inline-block"
+              animate={{ x: [0, 5, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              →
+            </motion.span>
+          </motion.a>
+        </motion.div>
       </form>
     </AuthLayout>
   );
