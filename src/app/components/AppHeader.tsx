@@ -56,7 +56,7 @@ export function AppHeader({
         <LanguageSelector />
 
         {/* Notification Button */}
-        <NotificationButton count={3} />
+        <NotificationButton count={0} />
 
         {/* Profile Section */}
         <ProfileSection

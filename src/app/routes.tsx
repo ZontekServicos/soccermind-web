@@ -6,7 +6,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 
 // Public pages (Authentication only)
 import Login from "./pages/Login";
-import LoginClean from "./pages/LoginClean";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 
@@ -24,7 +23,6 @@ import PlayerDetails from "./pages/PlayerDetails";
 import SmartMatch from "./pages/SmartMatch";
 import Profile from "./pages/Profile";
 import Squad from "./pages/Squad";
-import ActionsDemo from "./pages/ActionsDemo";
 import HealthAnalytics from "./pages/HealthAnalytics";
 import ServiceDesk from "./pages/ServiceDesk";
 
@@ -54,10 +52,6 @@ export const router = createBrowserRouter([
         Component: Login,
       },
       {
-        path: "/login-clean",
-        Component: LoginClean,
-      },
-      {
         path: "/forgot-password",
         Component: ForgotPassword,
       },
@@ -80,14 +74,6 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <Profile />
-          </ProtectedRoute>
-        ),
-      },
-      {
-        path: "/actions-demo",
-        element: (
-          <ProtectedRoute>
-            <ActionsDemo />
           </ProtectedRoute>
         ),
       },
