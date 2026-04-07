@@ -25,7 +25,6 @@ import Profile from "./pages/Profile";
 import Squad from "./pages/Squad";
 import HealthAnalytics from "./pages/HealthAnalytics";
 import ServiceDesk from "./pages/ServiceDesk";
-import MirassolProfile from "./pages/MirassolProfile";
 
 // Root layout that provides contexts
 function RootLayout() {
@@ -190,15 +189,6 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      {
-        path: "/mirassol",
-        element: (
-          <ProtectedRoute>
-            <MirassolProfile />
-          </ProtectedRoute>
-        ),
-      },
-
       // Fallback - redirect to login
       {
         path: "*",
