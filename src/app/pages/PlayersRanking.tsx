@@ -37,6 +37,59 @@ interface PaginationMeta extends PlayersResponseMeta {
   total?: number;
 }
 
+const SPORTMONKS_PLACEHOLDER = "placeholder.png";
+
+function RankingAvatar({
+  name,
+  image,
+  overall,
+}: {
+  name: string;
+  image: string | null;
+  overall: number | null;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2);
+  const hasRealImage =
+    !!image && !image.includes(SPORTMONKS_PLACEHOLDER) && !imgFailed;
+
+  const ovr = overall ?? 0;
+  const borderColor =
+    ovr >= 80 ? "rgba(0,255,156,0.6)" : ovr >= 70 ? "rgba(251,191,36,0.6)" : "rgba(0,194,255,0.4)";
+
+  if (hasRealImage) {
+    return (
+      <div
+        className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+        style={{ border: `1.5px solid ${borderColor}` }}
+      >
+        <img
+          src={image!}
+          alt={name}
+          className="h-full w-full object-cover object-top"
+          onError={() => setImgFailed(true)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-[12px] text-base font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+      style={{
+        background: "linear-gradient(135deg, rgba(0,194,255,0.25) 0%, rgba(122,92,255,0.25) 100%)",
+        border: `1.5px solid ${borderColor}`,
+      }}
+    >
+      <span className="relative z-10 text-white">{initials}</span>
+    </div>
+  );
+}
+
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
   positions: [],
   nationalities: [],
@@ -432,21 +485,11 @@ export default function PlayersRanking() {
 
                       <div className="min-w-[240px] flex-1">
                         <div className="flex items-center gap-4">
-                          <div
-                            className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-[12px] text-base font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-                            style={{
-                              background: "linear-gradient(135deg, rgba(0,194,255,0.25) 0%, rgba(122,92,255,0.25) 100%)",
-                              border: "1px solid rgba(255,255,255,0.1)",
-                            }}
-                          >
-                            <span className="relative z-10 text-white">
-                              {player.name
-                                .split(" ")
-                                .map((name) => name[0])
-                                .join("")
-                                .slice(0, 2)}
-                            </span>
-                          </div>
+                          <RankingAvatar
+                            name={player.name}
+                            image={player.image}
+                            overall={player.overall}
+                          />
                           <div>
                             <p className="mb-0.5 font-semibold text-gray-100 transition-colors group-hover:text-[#00C2FF]">{player.name}</p>
                             <p className="text-xs text-gray-600">{player.nationality}</p>

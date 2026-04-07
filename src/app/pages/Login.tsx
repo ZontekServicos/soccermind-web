@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
 import { Mail, Lock } from "lucide-react";
-import { motion } from "motion/react";
 import { AuthLayout } from "../components/AuthLayout";
 import { FormField, CheckboxField, AuthButton, AlertMessage, PasswordField } from "../components/AuthFormFields";
 import { useAuth } from "../contexts/AuthContext";
@@ -70,40 +69,25 @@ export default function Login() {
         />
 
         {/* Remember Me & Forgot Password */}
-        <motion.div
-          className="flex items-center justify-between"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.25 }}
-        >
+        <div className="flex items-center justify-between">
           <CheckboxField id="remember" label={t("login.remember_me")} checked={rememberMe} onChange={setRememberMe} />
           <Link
             to="/forgot-password"
-            className="text-sm text-[#67E8F9] hover:text-[#00C2FF] transition-all duration-200 font-semibold"
+            className="text-sm text-[#67E8F9] hover:text-[#00C2FF] transition-colors duration-200 font-semibold"
           >
             {t("login.forgot_password")}
           </Link>
-        </motion.div>
+        </div>
 
         {/* Submit Button */}
-        <motion.div
-          className="pt-1"
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
+        <div className="pt-1">
           <AuthButton type="submit" isLoading={isLoading}>
             {t("login.submit_button")}
           </AuthButton>
-        </motion.div>
+        </div>
 
         {/* Divider */}
-        <motion.div
-          className="relative pt-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
+        <div className="relative pt-4">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-white/10" />
           </div>
@@ -119,34 +103,20 @@ export default function Login() {
               {t("login.new_to_platform")}
             </span>
           </div>
-        </motion.div>
+        </div>
 
         {/* Contact Link */}
-        <motion.div
-          className="text-center space-y-2 pt-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-        >
+        <div className="text-center space-y-2 pt-2">
           <p className="text-sm text-gray-400/80 font-medium">{t("login.no_account")}</p>
-          <motion.a
+          <a
             href="https://wa.me/5511913267962"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-[15px] text-[#00C6FF] hover:text-[#67E8F9] font-bold transition-all duration-200 group"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            className="inline-flex items-center gap-2 text-[15px] text-[#00C6FF] hover:text-[#67E8F9] font-bold transition-colors duration-200"
           >
-            {t("login.contact_team")}
-            <motion.span
-              className="inline-block"
-              animate={{ x: [0, 5, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              →
-            </motion.span>
-          </motion.a>
-        </motion.div>
+            {t("login.contact_team")} →
+          </a>
+        </div>
       </form>
     </AuthLayout>
   );
