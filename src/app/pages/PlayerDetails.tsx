@@ -185,6 +185,41 @@ function FieldFrame({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Player avatar — shows real photo or initials fallback
+// ---------------------------------------------------------------------------
+const SPORTMONKS_PLACEHOLDER = "placeholder.png";
+
+function PlayerAvatar({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
+  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const hasRealImage = !!imageUrl && !imageUrl.includes(SPORTMONKS_PLACEHOLDER);
+
+  if (hasRealImage) {
+    return (
+      <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-full shadow-[0_0_30px_rgba(0,194,255,0.4)] ring-2 ring-[rgba(0,194,255,0.4)]">
+        <img
+          src={imageUrl!}
+          alt={name}
+          className="h-full w-full object-cover object-top"
+          onError={(e) => {
+            const parent = e.currentTarget.parentElement;
+            if (parent) {
+              e.currentTarget.remove();
+              parent.innerHTML = `<div class="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#00C2FF] to-[#7A5CFF] text-3xl font-bold text-white">${initials}</div>`;
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#00C2FF] to-[#7A5CFF] text-3xl font-bold text-white shadow-[0_0_30px_rgba(0,194,255,0.4)]">
+      {initials}
+    </div>
+  );
+}
+
 export default function PlayerDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -360,13 +395,10 @@ export default function PlayerDetails() {
               <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(0,255,156,0.12),transparent_72%)] blur-2xl" />
               <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-6">
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#00C2FF] to-[#7A5CFF] text-3xl shadow-[0_0_30px_rgba(0,194,255,0.4)]">
-                    {profile.identity.name
-                      .split(" ")
-                      .map((name) => name[0])
-                      .join("")
-                      .slice(0, 2)}
-                  </div>
+                  <PlayerAvatar
+                    name={profile.identity.name}
+                    imageUrl={player.image}
+                  />
 
                   <div>
                     <div className="mb-2 flex items-center gap-3">

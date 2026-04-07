@@ -10,7 +10,9 @@
     "history": "History",
     "health_analytics": "Health Analytics",
     "support": "Support",
-    "service_desk": "Service Desk"
+    "service_desk": "Service Desk",
+    "clubs": "Partner Clubs",
+    "mirassol": "Mirassol FC"
   },
   "dashboard": {
     "title": "Strategic monitoring hub",

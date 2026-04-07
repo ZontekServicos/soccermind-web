@@ -10,6 +10,7 @@ import {
   Target,
   Activity,
   Headset,
+  Swords,
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useState, memo } from "react";
@@ -40,6 +41,10 @@ const navigationGroups = [
   {
     label: "nav.support",
     items: [{ name: "nav.service_desk", href: "/service-desk", icon: Headset }],
+  },
+  {
+    label: "nav.clubs",
+    items: [{ name: "nav.mirassol", href: "/mirassol", icon: Swords }],
   },
 ];
 
