@@ -1,5 +1,13 @@
 export type SquadRiskLevel = "LOW" | "MEDIUM" | "HIGH";
 
+export interface DnaScore {
+  impact: number;
+  intelligence: number;
+  defensiveIQ: number;
+  consistency: number;
+  potential: number;
+}
+
 export type FieldPosition =
   | "GK"
   | "LB"
@@ -37,6 +45,9 @@ export interface SquadPlayer {
   riskLevel: SquadRiskLevel;
   contractUntil: string;
   marketValue: string;
+  image?: string | null;
+  potential?: number;
+  dna?: DnaScore;
   stats: {
     pace: number;
     shooting: number;
