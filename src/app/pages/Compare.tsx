@@ -66,6 +66,32 @@ function dedupe(players: PlayerExtended[]) {
   });
 }
 
+function syncSelectedPlayers(
+  currentA: PlayerExtended,
+  currentB: PlayerExtended,
+  nextPlayers: PlayerExtended[],
+) {
+  const fallbackA = nextPlayers[0] ?? EMPTY_PLAYER;
+  const fallbackB = nextPlayers[1] ?? nextPlayers[0] ?? EMPTY_PLAYER;
+
+  const nextA =
+    currentA.id &&
+    currentA.id !== EMPTY_PLAYER.id &&
+    nextPlayers.some((player) => player.id === currentA.id)
+      ? currentA
+      : fallbackA;
+
+  const nextB =
+    currentB.id &&
+    currentB.id !== EMPTY_PLAYER.id &&
+    currentB.id !== nextA.id &&
+    nextPlayers.some((player) => player.id === currentB.id)
+      ? currentB
+      : nextPlayers.find((player) => player.id !== nextA.id) ?? fallbackB;
+
+  return { nextA, nextB };
+}
+
 function scoreItems(profileA: PlayerIntelligenceProfile | null, profileB: PlayerIntelligenceProfile | null) {
   const topTraits = Array.from(new Map([...(profileA?.dna.traits ?? []), ...(profileB?.dna.traits ?? [])].map((trait) => [trait.key, trait])).values()).slice(0, 5);
   const dnaItems = topTraits.map((trait) => ({
@@ -166,8 +192,8 @@ export default function Compare() {
         const nextPlayers = Array.isArray(response.data.players) ? response.data.players : [];
         setPlayers(nextPlayers);
         setFilterOptions(response.data.filterOptions ?? EMPTY_FILTER_OPTIONS);
-        setPlayerA((current) => (current.id && current.id !== EMPTY_PLAYER.id ? current : nextPlayers[0] ?? EMPTY_PLAYER));
-        setPlayerB((current) => (current.id && current.id !== EMPTY_PLAYER.id ? current : nextPlayers[1] ?? nextPlayers[0] ?? EMPTY_PLAYER));
+        setPlayerA((currentA) => syncSelectedPlayers(currentA, playerB, nextPlayers).nextA);
+        setPlayerB((currentB) => syncSelectedPlayers(playerA, currentB, nextPlayers).nextB);
         setError(null);
       } catch (loadError) {
         if (!active) return;
