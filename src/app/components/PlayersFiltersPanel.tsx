@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { PlayerFilterOptions } from "../services/players";
 import type { PlayersFiltersState } from "../utils/playerFilters";
+import { positionLabel } from "../utils/positions";
 import { cn } from "./ui/utils";
 
 interface PlayersFiltersPanelProps {
@@ -257,10 +258,12 @@ function PositionSelector({
   selectedPositions,
   options,
   onTogglePosition,
+  labelFor = (v) => v,
 }: {
   selectedPositions: string[];
   options: string[];
   onTogglePosition: (position: string) => void;
+  labelFor?: (value: string) => string;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -272,8 +275,11 @@ function PositionSelector({
       return options;
     }
 
-    return options.filter((option) => option.toLowerCase().includes(normalizedQuery));
-  }, [options, query]);
+    return options.filter((option) =>
+      option.toLowerCase().includes(normalizedQuery) ||
+      labelFor(option).toLowerCase().includes(normalizedQuery),
+    );
+  }, [options, query, labelFor]);
 
   return (
     <div ref={ref}>
@@ -320,7 +326,7 @@ function PositionSelector({
                           : "text-gray-300 hover:bg-[rgba(255,255,255,0.04)]",
                       )}
                     >
-                      <span>{option}</span>
+                      <span>{labelFor(option)}</span>
                       {selected ? <Check className="h-4 w-4" /> : null}
                     </button>
                   );
@@ -343,7 +349,7 @@ function PositionSelector({
                 onClick={() => onTogglePosition(position)}
                 className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(0,194,255,0.22)] bg-[linear-gradient(180deg,rgba(0,194,255,0.16),rgba(0,194,255,0.08))] px-3 py-1.5 text-xs font-medium text-[#AEEBFF] transition-colors hover:bg-[rgba(0,194,255,0.18)]"
               >
-                <span>{position}</span>
+                <span>{labelFor(position)}</span>
                 <X className="h-3 w-3" />
               </button>
             ))}
@@ -473,6 +479,7 @@ export function PlayersFiltersPanel({
                 selectedPositions={filters.positions}
                 options={options.positions}
                 onTogglePosition={onTogglePosition}
+                labelFor={positionLabel}
               />
             </FilterGroup>
 

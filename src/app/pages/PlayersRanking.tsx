@@ -27,6 +27,7 @@ import {
   type PlayersFiltersState,
   parseFiltersFromSearchParams,
 } from "../utils/playerFilters";
+import { positionLabel } from "../utils/positions";
 
 type SortBy = "overall" | "potential" | "age";
 type SortOrder = "asc" | "desc";
@@ -511,7 +512,7 @@ export default function PlayersRanking() {
 
                       <div className="flex w-20 justify-center">
                         <span className={`${getPositionColor(player.position || "-")} rounded-[8px] border px-2.5 py-1 text-[11px] font-semibold tracking-wide`}>
-                          {player.position || "-"}
+                          {player.position ? positionLabel(player.position) : "-"}
                         </span>
                       </div>
 

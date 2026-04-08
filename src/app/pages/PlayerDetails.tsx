@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ArrowLeft, Star } from "lucide-react";
+import { positionLabel } from "../utils/positions";
 import { Link, useNavigate, useParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
 import { AppSidebar } from "../components/AppSidebar";
@@ -404,7 +405,7 @@ export default function PlayerDetails() {
                     <div className="mb-2 flex items-center gap-3 flex-wrap">
                       <h1 className="text-4xl font-semibold text-white">{profile.identity.name}</h1>
                       <span className={`${getPositionColor(profile.identity.primaryPosition || "-")} rounded px-3 py-1 text-sm text-white`}>
-                        {profile.identity.primaryPosition || "-"}
+                        {profile.identity.primaryPosition ? positionLabel(profile.identity.primaryPosition) : "-"}
                       </span>
                       {(() => {
                         const ovr = player.overall ?? null;
@@ -649,7 +650,7 @@ export default function PlayerDetails() {
                     >
                       <p className="font-semibold text-white">{similarPlayer.name}</p>
                       <p className="mt-1 text-sm text-gray-400">
-                        {(similarPlayer.position || "-")} • {(similarPlayer.team || "Sem clube")}
+                        {similarPlayer.position ? positionLabel(similarPlayer.position) : "-"} • {(similarPlayer.team || "Sem clube")}
                       </p>
                       <p className="mt-3 text-xs uppercase tracking-[0.18em] text-[#B6FFD8]">
                         {formatMarketValue(similarPlayer.marketValue)}

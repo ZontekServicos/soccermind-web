@@ -1,4 +1,5 @@
 import type { PlayersFiltersParams } from "../services/players";
+import { positionLabel } from "./positions";
 
 export interface PlayersFiltersState {
   search: string;
@@ -134,7 +135,7 @@ export function getActivePlayerFilterDescriptors(filters: PlayersFiltersState): 
   filters.positions.forEach((position) => {
     descriptors.push({
       key: `position-${position}`,
-      label: `Posicao: ${position}`,
+      label: `Posição: ${positionLabel(position)}`,
       kind: "position",
       position,
     });
