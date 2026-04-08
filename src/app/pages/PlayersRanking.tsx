@@ -570,7 +570,7 @@ export default function PlayersRanking() {
                     </div>
                   ))}
               </div>
-            </div>
+            </div>}
 
             {!hasSearched && !loading && (
               <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -626,7 +626,6 @@ export default function PlayersRanking() {
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
-            </div>}
           </div>
         </main>
       </div>
