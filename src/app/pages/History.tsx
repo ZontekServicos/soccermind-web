@@ -94,6 +94,8 @@ export default function History() {
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -227,6 +229,7 @@ export default function History() {
     setFilterStatus("all");
     setFilterClub("all");
     setFilterPeriod("30d");
+    setSelectedIds(new Set());
   };
 
   const handleSort = (field: SortField) => {
@@ -268,6 +271,66 @@ export default function History() {
     }
   };
 
+  const handleToggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.size === filteredData.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredData.map((item) => item.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const deletable = filteredData.filter((item) => selectedIds.has(item.id) && item.canDelete);
+    if (deletable.length === 0) return;
+    const confirmed = window.confirm(`Excluir ${deletable.length} analise(s) selecionada(s)?`);
+    if (!confirmed) return;
+
+    setBulkDeleting(true);
+    setActionFeedback(null);
+    setActionError(null);
+
+    const results = await Promise.allSettled(deletable.map((item) => deleteAnalysisHubEntry(item)));
+    const failed = results.filter((r) => r.status === "rejected").length;
+
+    setHistoryItems((current) =>
+      current.filter((entry) => !deletable.some((d) => d.id === entry.id)),
+    );
+    setSelectedIds(new Set());
+    setBulkDeleting(false);
+
+    if (failed > 0) {
+      setActionError(`${failed} exclus${failed > 1 ? "ões" : "ão"} falhou.`);
+    } else {
+      setActionFeedback(`${deletable.length} analise(s) removida(s) com sucesso.`);
+    }
+  };
+
+  const handleBulkDownload = () => {
+    const selected = filteredData.filter((item) => selectedIds.has(item.id));
+    const content = selected
+      .map(
+        (item) =>
+          `ID: ${item.id}\nTipo: ${item.typeLabel}\nTítulo: ${item.title}\nJogadores: ${item.players.join(", ")}\nAnalista: ${item.user}\nData: ${new Date(item.date).toLocaleString("pt-BR")}\nStatus: ${item.statusLabel}\n`,
+      )
+      .join("\n---\n\n");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `historico-soccermind-${Date.now()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex h-screen bg-[#07142A]">
       <AppSidebar />
@@ -304,6 +367,40 @@ export default function History() {
                 {loadError ?? actionError}
               </div>
             )}
+            {selectedIds.size > 0 && (
+              <div className="mb-4 flex items-center gap-4 rounded-[14px] border border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.07)] px-5 py-3">
+                <span className="text-sm font-semibold text-[#00C2FF]">
+                  {selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={handleBulkDownload}
+                    className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(0,194,255,0.3)] bg-[rgba(0,194,255,0.1)] px-4 py-2 text-xs font-semibold text-[#00C2FF] transition-all hover:bg-[rgba(0,194,255,0.18)]"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Baixar selecionados
+                  </button>
+                  <button
+                    onClick={() => void handleBulkDelete()}
+                    disabled={bulkDeleting}
+                    className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,77,79,0.3)] bg-[rgba(255,77,79,0.1)] px-4 py-2 text-xs font-semibold text-[#FF4D4F] transition-all hover:bg-[rgba(255,77,79,0.18)] disabled:opacity-50"
+                  >
+                    {bulkDeleting ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                    {bulkDeleting ? "Excluindo..." : "Excluir selecionados"}
+                  </button>
+                  <button
+                    onClick={() => setSelectedIds(new Set())}
+                    className="rounded-[8px] p-2 text-gray-500 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-gray-300"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
             <ActivityTable
               data={filteredData}
               sortField={sortField}
@@ -311,6 +408,10 @@ export default function History() {
               onSort={handleSort}
               isLoading={isLoading}
               deletingId={deletingId}
+              selectedIds={selectedIds}
+              allSelected={filteredData.length > 0 && selectedIds.size === filteredData.length}
+              onSelectAll={handleSelectAll}
+              onToggleSelect={handleToggleSelect}
               onViewReport={(item) => navigate(`/analysis/${item.id}`)}
               onDelete={handleDeleteAnalysis}
             />
@@ -606,6 +707,10 @@ interface ActivityTableProps {
   onSort: (field: SortField) => void;
   isLoading: boolean;
   deletingId: string | null;
+  selectedIds: Set<string>;
+  allSelected: boolean;
+  onSelectAll: () => void;
+  onToggleSelect: (id: string) => void;
   onViewReport: (item: AnalysisHistory) => void;
   onDelete: (item: AnalysisHistory) => void;
 }
@@ -617,6 +722,10 @@ const ActivityTable = memo(({
   onSort,
   isLoading,
   deletingId,
+  selectedIds,
+  allSelected,
+  onSelectAll,
+  onToggleSelect,
   onViewReport,
   onDelete,
 }: ActivityTableProps) => {
@@ -634,6 +743,15 @@ const ActivityTable = memo(({
         <table className="w-full min-w-[980px]">
           <thead className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
             <tr>
+              <th className="px-5 py-4 text-left">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={onSelectAll}
+                  className="h-4 w-4 cursor-pointer rounded border-[rgba(255,255,255,0.2)] bg-transparent accent-[#00C2FF]"
+                  title="Selecionar todos"
+                />
+              </th>
               <TableHeader label="Tipo" field="type" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
               <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">Analise</th>
               <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">Jogadores</th>
@@ -649,6 +767,8 @@ const ActivityTable = memo(({
                 key={item.id}
                 item={item}
                 deleting={deletingId === item.id}
+                selected={selectedIds.has(item.id)}
+                onToggleSelect={onToggleSelect}
                 onViewReport={onViewReport}
                 onDelete={onDelete}
               />
@@ -696,11 +816,15 @@ TableHeader.displayName = "TableHeader";
 const ActivityRow = memo(({
   item,
   deleting,
+  selected,
+  onToggleSelect,
   onViewReport,
   onDelete,
 }: {
   item: AnalysisHistory;
   deleting: boolean;
+  selected: boolean;
+  onToggleSelect: (id: string) => void;
   onViewReport: (item: AnalysisHistory) => void;
   onDelete: (item: AnalysisHistory) => void;
 }) => {
@@ -713,7 +837,18 @@ const ActivityRow = memo(({
       : "Removivel via Analysis";
 
   return (
-    <tr className="group transition-colors hover:bg-[rgba(255,255,255,0.02)]">
+    <tr
+      className={`group transition-colors hover:bg-[rgba(255,255,255,0.02)] ${selected ? "bg-[rgba(0,194,255,0.04)]" : ""}`}
+    >
+      <td className="px-5 py-4">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelect(item.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="h-4 w-4 cursor-pointer rounded border-[rgba(255,255,255,0.2)] bg-transparent accent-[#00C2FF]"
+        />
+      </td>
       <td className="px-5 py-4">
         <TypeBadge type={item.type} label={item.typeLabel} />
       </td>
