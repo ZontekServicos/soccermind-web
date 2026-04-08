@@ -328,9 +328,11 @@ export default function Squad() {
 
   // ── Team stats ─────────────────────────────────────────────────────────────
   const teamStats = useMemo(() => {
+    const formationSlots = formations[formation].positions;
     const starters = Object.values(lineup).filter(Boolean);
+
     if (starters.length === 0) {
-      return { avgOVR: 0, avgCapital: 0, offensive: 0, defensive: 0, chemistry: 85, dna: null };
+      return { avgOVR: 0, avgCapital: 0, offensive: 0, defensive: 0, chemistry: 0, dna: null };
     }
 
     const avgOVR = starters.reduce((sum, p) => sum + p.overallRating, 0) / starters.length;
@@ -342,8 +344,15 @@ export default function Squad() {
       starters.reduce((sum, p) => sum + (p.stats.defending + p.stats.physical) / 2, 0) / starters.length;
     const dna = calcCollectiveDna(lineup);
 
-    return { avgOVR, avgCapital, offensive, defensive, chemistry: 85, dna };
-  }, [lineup]);
+    // Chemistry = fraction of formation slots where the placed player matches a compatible position
+    const totalSlots = Object.keys(formationSlots).length;
+    const compatibleCount = Object.entries(lineup).filter(
+      ([slot, player]) => formationSlots[slot]?.compatiblePositions.includes(player.position),
+    ).length;
+    const chemistry = totalSlots > 0 ? Math.round((compatibleCount / totalSlots) * 100) : 0;
+
+    return { avgOVR, avgCapital, offensive, defensive, chemistry, dna };
+  }, [lineup, formation]);
 
   // ── Drag & drop ────────────────────────────────────────────────────────────
   const handleDragStart = useCallback((player: SquadPlayer, fromPosition?: string) => {
@@ -625,7 +634,10 @@ export default function Squad() {
                         <label className="text-xs text-gray-400 mb-1 block">Formação</label>
                         <Select
                           value={formation}
-                          onValueChange={(v) => setFormation(v as Formation)}
+                          onValueChange={(v) => {
+                            setFormation(v as Formation);
+                            setLineup({});
+                          }}
                         >
                           <SelectTrigger className="w-32 bg-[#07142A] border-[rgba(0,194,255,0.3)]">
                             <SelectValue />

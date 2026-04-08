@@ -78,6 +78,7 @@ export default function Reports() {
   const [reportModel, setReportModel] = useState<ExecutiveReportModel | null>(null);
   const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
   const [savedAnalysis, setSavedAnalysis] = useState<AnalysisViewModel | null>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
   const lastPersistedSelectionRef = useRef<string>("");
 
   useEffect(() => {
@@ -188,41 +189,7 @@ export default function Reports() {
         setReportModel(payload?.reportModel ?? null);
         setReportError(null);
 
-        const selectionKey = [playerA.id, playerB.id].sort().join(":");
-
-        if (payload?.reportModel && selectionKey !== lastPersistedSelectionRef.current) {
-          try {
-            const persisted = await createReportAnalysis({
-              playerIds: [playerA.id, playerB.id],
-              title: `Relatorio Executivo - ${payload.reportModel.subtitle}`,
-              description: payload.reportModel.recommendationSummary,
-              analyst: user?.name,
-            });
-
-            if (!active) {
-              return;
-            }
-
-            lastPersistedSelectionRef.current = selectionKey;
-            setSavedAnalysis(persisted.data);
-            setSaveFeedbackTone("success");
-            setSaveFeedback(
-              `Relatorio persistido na central Analysis: ${persisted.data.title}. A visualizacao atual segue o fluxo oficial do projeto.`,
-            );
-          } catch (persistError) {
-            if (!active) {
-              return;
-            }
-
-            setSavedAnalysis(null);
-            setSaveFeedbackTone("error");
-            setSaveFeedback(
-              persistError instanceof Error
-                ? `O relatorio foi gerado, mas nao foi possivel persisti-lo em Analysis: ${persistError.message}`
-                : "O relatorio foi gerado, mas nao foi possivel persisti-lo em Analysis.",
-            );
-          }
-        }
+        // Auto-save removido — use o botão "Salvar no Histórico" para persistir manualmente.
       } catch (error) {
         if (!active) {
           return;
@@ -299,12 +266,33 @@ export default function Reports() {
   const handleOpenSavedReport = () => {
     if (!savedAnalysis?.id) {
       setSaveFeedbackTone("error");
-      setSaveFeedback("A analise ainda nao foi persistida para esta comparacao.");
-      toast.error("A analise ainda nao foi persistida.");
+      setSaveFeedback("Salve o relatório no histórico primeiro.");
       return;
     }
-
     navigate(`/analysis/${savedAnalysis.id}`);
+  };
+
+  const handleSaveToHistory = async () => {
+    if (!reportModel || saveLoading) return;
+    setSaveLoading(true);
+    setSaveFeedback(null);
+    try {
+      const persisted = await createReportAnalysis({
+        playerIds: [playerA.id, playerB.id],
+        title: `Relatório Executivo - ${reportModel.subtitle}`,
+        description: reportModel.recommendationSummary,
+        analyst: user?.name,
+      });
+      lastPersistedSelectionRef.current = [playerA.id, playerB.id].sort().join(":");
+      setSavedAnalysis(persisted.data);
+      setSaveFeedbackTone("success");
+      setSaveFeedback(`Salvo no histórico: "${persisted.data.title}"`);
+    } catch (err) {
+      setSaveFeedbackTone("error");
+      setSaveFeedback(err instanceof Error ? err.message : "Não foi possível salvar.");
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   return (
@@ -344,20 +332,29 @@ export default function Reports() {
                   <MetricHeroCard label="Shortlist" value={`${availablePlayers.length}`} caption="Apos aplicacao dos filtros" accent="cyan" />
                   <MetricHeroCard label="Filtros ativos" value={`${activeFiltersCount}`} caption="Refinando o radar atual" accent="violet" />
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-5 py-4 backdrop-blur-sm">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Acoes</p>
-                    <p className="mt-2 text-lg font-semibold text-white">Persistido por padrao</p>
-                    <p className="mt-1 text-xs text-gray-500">A geracao executiva persiste o relatorio na central Analysis e mantem o fluxo oficial do produto.</p>
+                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Ações</p>
+                    <p className="mt-1 text-xs text-gray-500">Salve manualmente quando quiser registrar esta análise no histórico.</p>
                     <div className="mt-4 grid gap-3">
                       <Button
-                        className="h-11 rounded-[14px] border border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.14)] px-4 font-semibold text-[#B6FFD8] shadow-[0_6px_18px_rgba(0,255,156,0.14)] hover:bg-[rgba(0,255,156,0.2)]"
-                        onClick={handleOpenSavedReport}
-                        disabled={!savedAnalysis || reportLoading}
+                        className="h-11 rounded-[14px] border border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.14)] px-4 font-semibold text-[#B6FFD8] shadow-[0_6px_18px_rgba(0,255,156,0.14)] hover:bg-[rgba(0,255,156,0.2)] disabled:opacity-50"
+                        onClick={() => void handleSaveToHistory()}
+                        disabled={!reportModel || reportLoading || saveLoading || !!savedAnalysis}
                       >
-                        {reportLoading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <ExternalLink className="mr-2 h-4 w-4" />}
-                        Abrir Analysis
+                        {saveLoading ? <LoaderCircle className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                        {savedAnalysis ? "Salvo no histórico ✓" : "Salvar no Histórico"}
                       </Button>
+                      {savedAnalysis && (
+                        <Button
+                          variant="ghost"
+                          className="h-9 rounded-[12px] border border-[rgba(255,255,255,0.08)] text-xs text-gray-400 hover:text-gray-200"
+                          onClick={handleOpenSavedReport}
+                        >
+                          <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                          Abrir no Histórico
+                        </Button>
+                      )}
                       <Button
-                        className="h-11 rounded-[14px] bg-[#00C2FF]/90 px-4 font-semibold text-[#07142A] shadow-[0_6px_18px_rgba(0,194,255,0.25)] hover:bg-[#00C2FF]"
+                        className="h-11 rounded-[14px] bg-[#00C2FF]/90 px-4 font-semibold text-[#07142A] shadow-[0_6px_18px_rgba(0,194,255,0.25)] hover:bg-[#00C2FF] disabled:opacity-50"
                         onClick={handleExportPdf}
                         disabled={!reportModel || reportLoading || exporting}
                       >

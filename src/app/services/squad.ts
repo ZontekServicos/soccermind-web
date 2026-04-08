@@ -8,6 +8,63 @@ const SQUAD_STORAGE_KEY = "soccermind-squad";
 const LINEUP_STORAGE_KEY = "soccermind-lineup";
 const SPORTMONKS_PLACEHOLDER = "placeholder.png";
 
+// ─── Position normalisation ────────────────────────────────────────────────
+// Maps Sportmonks / API English position strings to the squad module's
+// internal Portuguese vocabulary, which must match the `compatiblePositions`
+// arrays defined in the formations object in Squad.tsx.
+
+const API_TO_SQUAD_POSITION: Record<string, string> = {
+  // Full English names (Sportmonks)
+  GOALKEEPER:           "Goleiro",
+  "CENTRE BACK":        "Zagueiro",
+  DEFENDER:             "Zagueiro",
+  "LEFT BACK":          "Lateral Esquerdo",
+  "RIGHT BACK":         "Lateral Direito",
+  "LEFT WING BACK":     "Lateral Esquerdo",
+  "RIGHT WING BACK":    "Lateral Direito",
+  WINGBACK:             "Lateral Esquerdo",
+  "DEFENSIVE MIDFIELD": "Volante",
+  "CENTRAL MIDFIELD":   "Volante",
+  MIDFIELD:             "Volante",
+  "LEFT MIDFIELD":      "Meia Atacante",
+  "RIGHT MIDFIELD":     "Meia Atacante",
+  "ATTACKING MIDFIELD": "Meia Atacante",
+  "LEFT WINGER":        "Atacante",
+  "RIGHT WINGER":       "Atacante",
+  WINGER:               "Atacante",
+  ATTACKER:             "Atacante",
+  FORWARD:              "Atacante",
+  STRIKER:              "Atacante",
+  "CENTRE FORWARD":     "Atacante",
+  "SECOND STRIKER":     "Meia Atacante",
+  // Short codes (FIFA / mock)
+  GK:  "Goleiro",
+  CB:  "Zagueiro",
+  LB:  "Lateral Esquerdo",
+  RB:  "Lateral Direito",
+  LWB: "Lateral Esquerdo",
+  RWB: "Lateral Direito",
+  CDM: "Volante",
+  DM:  "Volante",
+  CM:  "Volante",
+  LM:  "Meia Atacante",
+  RM:  "Meia Atacante",
+  CAM: "Meia Atacante",
+  AM:  "Meia Atacante",
+  LW:  "Atacante",
+  RW:  "Atacante",
+  SS:  "Meia Atacante",
+  CF:  "Atacante",
+  ST:  "Atacante",
+  FW:  "Atacante",
+};
+
+function toSquadPosition(apiPosition: string): string {
+  if (!apiPosition) return apiPosition;
+  const key = apiPosition.trim().toUpperCase();
+  return API_TO_SQUAD_POSITION[key] ?? apiPosition;
+}
+
 // ─── DNA approximation from FIFA-style stats ───────────────────────────────
 
 export function approximateDNA(
@@ -74,7 +131,7 @@ function mapApiPlayerToSquad(apiPlayer: PlayerCardModel): SquadPlayer {
     id: apiPlayer.id,
     name: apiPlayer.name,
     number: 0,
-    position: apiPlayer.position,
+    position: toSquadPosition(apiPlayer.position),
     age,
     nationality: apiPlayer.nationality,
     overallRating: overall,

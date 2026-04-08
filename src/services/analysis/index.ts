@@ -196,24 +196,21 @@ export async function getAnalyses() {
   try {
     const response = await getAnalysesFromApi();
     const apiData = Array.isArray(response.data) ? response.data : [];
+    // Only show data the user actually saved — no demo injection in production mode
     const merged = dedupeById([...sessionEntries, ...apiData]);
-
-    // If both API and session are empty, show demo mock data so the page is not blank
-    const final = merged.length > 0 ? merged : MOCK_ANALYSES;
 
     return {
       ...response,
-      data: final,
+      data: merged,
       meta: { ...(response.meta ?? {}), source: "api" as const },
     };
   } catch {
-    // API unavailable — use session + mock fallback
-    const merged = dedupeById([...sessionEntries, ...MOCK_ANALYSES]);
+    // API unavailable — show only what was saved in this session
     return {
       success: true,
-      data: merged,
+      data: sessionEntries,
       error: null,
-      meta: { source: "mock" as const },
+      meta: { source: "session" as const },
     };
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
 import {
   ArrowLeft,
+  BookmarkCheck,
   Brain,
   CheckCircle2,
   Clock3,
@@ -16,6 +17,7 @@ import { AppSidebar } from "../components/AppSidebar";
 import { Button } from "../components/ui/button";
 import { Skeleton } from "../components/ui/skeleton";
 import { getScoutReportById, type ExplainabilityItem, type StoredScoutReport } from "../../services/scoutReports";
+import { createReportAnalysis } from "../../services/analysis";
 
 function stringifyBlock(value: unknown) {
   try {
@@ -228,6 +230,32 @@ export default function ScoutReportDetail() {
   const [report, setReport] = useState<StoredScoutReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<{ msg: string; tone: "success" | "error" } | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
+
+  const handleSaveToHistory = async () => {
+    if (!report || saveLoading) return;
+    setSaveLoading(true);
+    setSaveFeedback(null);
+    try {
+      const playerIds = Array.isArray(report.players)
+        ? report.players.map((p: any) => String(p.id ?? p)).filter(Boolean)
+        : [];
+      const persisted = await createReportAnalysis({
+        playerIds,
+        title: report.title,
+        description: report.description ?? undefined,
+        analyst: report.analyst ?? undefined,
+      });
+      setSavedId(persisted.data.id);
+      setSaveFeedback({ msg: `Salvo no histórico: "${persisted.data.title}"`, tone: "success" });
+    } catch (err) {
+      setSaveFeedback({ msg: err instanceof Error ? err.message : "Não foi possível salvar.", tone: "error" });
+    } finally {
+      setSaveLoading(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -350,6 +378,43 @@ export default function ScoutReportDetail() {
               <p className="mt-3 max-w-4xl text-sm leading-relaxed text-gray-400">
                 {report.description || "Leitura persistida a partir do motor executivo do SoccerMind."}
               </p>
+
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={() => void handleSaveToHistory()}
+                  disabled={saveLoading || !!savedId}
+                  className="h-10 rounded-[12px] border border-[rgba(0,255,156,0.24)] bg-[rgba(0,255,156,0.12)] px-5 text-sm font-semibold text-[#B6FFD8] hover:bg-[rgba(0,255,156,0.2)] disabled:opacity-60"
+                >
+                  {saveLoading ? (
+                    <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <BookmarkCheck className="mr-2 h-4 w-4" />
+                  )}
+                  {savedId ? "Salvo no Histórico ✓" : "Salvar no Histórico"}
+                </Button>
+                {savedId && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate(`/analysis/${savedId}`)}
+                    className="h-10 rounded-[12px] border border-white/10 px-4 text-xs text-gray-400 hover:text-white"
+                  >
+                    <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                    Abrir no Histórico
+                  </Button>
+                )}
+              </div>
+
+              {saveFeedback && (
+                <div
+                  className={`mt-4 rounded-[12px] border px-4 py-3 text-sm ${
+                    saveFeedback.tone === "success"
+                      ? "border-[rgba(0,255,156,0.2)] bg-[rgba(0,255,156,0.08)] text-[#9CFFD1]"
+                      : "border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] text-[#FFB4B5]"
+                  }`}
+                >
+                  {saveFeedback.msg}
+                </div>
+              )}
             </section>
 
             {decisionSummary ? (

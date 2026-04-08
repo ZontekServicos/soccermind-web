@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { Minus } from "lucide-react";
 import type { DnaScore, SquadPlayer } from "../types/squad";
 
@@ -206,6 +206,12 @@ export const PlayerFieldCard = memo(function PlayerFieldCard({
   onRemove,
 }: PlayerFieldCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
+
+  // Reset tooltip when a different player occupies this slot (e.g. after Auto IA)
+  useEffect(() => {
+    setShowTooltip(false);
+  }, [player.id]);
+
   const ovr = player.overallRating;
   const ovrGlow = getOvrGlow(ovr);
   const ovrColor = getOvrColor(ovr);

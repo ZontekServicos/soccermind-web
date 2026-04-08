@@ -4,7 +4,6 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
-  AlertCircle,
   Calendar,
   ChevronDown,
   ChevronUp,
@@ -17,7 +16,6 @@ import {
   Plus,
   Search,
   Trash2,
-  TrendingUp,
   Users,
   X,
 } from "lucide-react";
@@ -31,8 +29,7 @@ import {
 } from "../services/analysis";
 
 type FilterType = "all" | AnalysisHistory["type"];
-type FilterStatus = "all" | AnalysisHistory["status"];
-type PeriodType = "7d" | "30d" | "90d" | "all" | "custom";
+type PeriodType = "7d" | "30d" | "90d" | "all";
 type SortField = "date" | "type" | "user";
 type SortOrder = "asc" | "desc";
 
@@ -66,14 +63,9 @@ const TYPE_OPTIONS: Array<{ value: FilterType; label: string }> = [
   { value: "report", label: "Relatório" },
 ];
 
-const STATUS_OPTIONS: Array<{ value: FilterStatus; label: string }> = [
-  { value: "all", label: "Todos os status" },
-  { value: "completed", label: "Concluido" },
-  { value: "in_progress", label: "Em andamento" },
-  { value: "archived", label: "Arquivado" },
-];
 
-const PERIOD_IN_DAYS: Partial<Record<Exclude<PeriodType, "custom" | "all">, number>> = {
+
+const PERIOD_IN_DAYS: Partial<Record<Exclude<PeriodType, "all">, number>> = {
   "7d": 7,
   "30d": 30,
   "90d": 90,
@@ -84,9 +76,7 @@ export default function History() {
   const [historyItems, setHistoryItems] = useState<AnalysisHistory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [filterPeriod, setFilterPeriod] = useState<PeriodType>("90d");
-  const [filterClub, setFilterClub] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [isLoading, setIsLoading] = useState(true);
@@ -139,11 +129,6 @@ export default function History() {
     };
   }, []);
 
-  const availableClubs = useMemo(() => {
-    const clubs = Array.from(new Set(historyItems.map((item) => item.club).filter(Boolean)));
-    return clubs.sort((a, b) => a.localeCompare(b));
-  }, [historyItems]);
-
   const filteredData = useMemo(() => {
     let filtered = [...historyItems];
 
@@ -151,7 +136,6 @@ export default function History() {
       const normalizedQuery = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (item) =>
-          item.id.toLowerCase().includes(normalizedQuery) ||
           item.title.toLowerCase().includes(normalizedQuery) ||
           item.description.toLowerCase().includes(normalizedQuery) ||
           item.players.some((player) => player.toLowerCase().includes(normalizedQuery)) ||
@@ -163,15 +147,7 @@ export default function History() {
       filtered = filtered.filter((item) => item.type === filterType);
     }
 
-    if (filterStatus !== "all") {
-      filtered = filtered.filter((item) => item.status === filterStatus);
-    }
-
-    if (filterClub !== "all") {
-      filtered = filtered.filter((item) => item.club === filterClub);
-    }
-
-    if (filterPeriod !== "custom" && filterPeriod !== "all") {
+    if (filterPeriod !== "all") {
       const periodDays = PERIOD_IN_DAYS[filterPeriod];
       if (periodDays) {
         const cutoff = Date.now() - periodDays * 24 * 60 * 60 * 1000;
@@ -194,41 +170,28 @@ export default function History() {
     });
 
     return filtered;
-  }, [filterClub, filterPeriod, filterStatus, filterType, historyItems, searchQuery, sortField, sortOrder]);
+  }, [filterPeriod, filterType, historyItems, searchQuery, sortField, sortOrder]);
 
   const stats = useMemo(() => {
     const total = historyItems.length;
     const comparisons = historyItems.filter((item) => item.type === "comparison").length;
     const reports = historyItems.filter((item) => item.type === "report").length;
 
-    return {
-      total: { value: total, change: 12 },
-      comparisons: { value: comparisons, change: 8 },
-      reports: { value: reports, change: 15 },
-    };
+    return { total, comparisons, reports };
   }, [historyItems]);
 
   const activeFiltersCount = [
     filterType !== "all",
-    filterStatus !== "all",
-    filterClub !== "all",
     searchQuery !== "",
   ].filter(Boolean).length;
 
   const filterTypeLabel =
     filterType === "all" ? "Todos os tipos" : TYPE_OPTIONS.find((option) => option.value === filterType)?.label ?? filterType;
 
-  const filterStatusLabel =
-    filterStatus === "all"
-      ? "Todos os status"
-      : STATUS_OPTIONS.find((option) => option.value === filterStatus)?.label ?? filterStatus;
-
   const handleClearFilters = () => {
     setSearchQuery("");
     setFilterType("all");
-    setFilterStatus("all");
-    setFilterClub("all");
-    setFilterPeriod("30d");
+    setFilterPeriod("90d");
     setSelectedIds(new Set());
   };
 
@@ -346,14 +309,8 @@ export default function History() {
               filterType={filterType}
               setFilterType={setFilterType}
               filterTypeLabel={filterTypeLabel}
-              filterStatus={filterStatus}
-              setFilterStatus={setFilterStatus}
-              filterStatusLabel={filterStatusLabel}
               filterPeriod={filterPeriod}
               setFilterPeriod={setFilterPeriod}
-              filterClub={filterClub}
-              setFilterClub={setFilterClub}
-              availableClubs={availableClubs}
               activeFiltersCount={activeFiltersCount}
               onClearFilters={handleClearFilters}
             />
@@ -452,11 +409,7 @@ const HeaderSection = memo(({ onCreateAnalysis }: { onCreateAnalysis: () => void
 HeaderSection.displayName = "HeaderSection";
 
 interface KPISectionProps {
-  stats: {
-    total: { value: number; change: number };
-    comparisons: { value: number; change: number };
-    reports: { value: number; change: number };
-  };
+  stats: { total: number; comparisons: number; reports: number };
   onFilterClick: (type: FilterType) => void;
 }
 
@@ -467,30 +420,27 @@ const KPISection = memo(({ stats, onFilterClick }: KPISectionProps) => {
         icon={HistoryIcon}
         iconColor="#00C2FF"
         iconBg="rgba(0,194,255,0.15)"
-        label="Total de Analises"
-        value={stats.total.value}
-        change={stats.total.change}
-        subtitle="Ultimos 30 dias"
+        label="Total de registros"
+        value={stats.total}
+        subtitle="Itens salvos manualmente"
         onClick={() => onFilterClick("all")}
       />
       <KPICard
         icon={Users}
         iconColor="#7A5CFF"
         iconBg="rgba(122,92,255,0.15)"
-        label="Comparacoes"
-        value={stats.comparisons.value}
-        change={stats.comparisons.change}
-        subtitle="Analises comparativas"
+        label="Comparações"
+        value={stats.comparisons}
+        subtitle="Análises comparativas salvas"
         onClick={() => onFilterClick("comparison")}
       />
       <KPICard
         icon={FileText}
         iconColor="#00FF9C"
         iconBg="rgba(0,255,156,0.15)"
-        label="Relatorios"
-        value={stats.reports.value}
-        change={stats.reports.change}
-        subtitle="Relatorios gerados"
+        label="Relatórios"
+        value={stats.reports}
+        subtitle="Relatórios salvos"
         onClick={() => onFilterClick("report")}
       />
     </div>
@@ -505,35 +455,21 @@ interface KPICardProps {
   iconBg: string;
   label: string;
   value: number;
-  change: number;
   subtitle: string;
   onClick: () => void;
 }
 
-const KPICard = memo(({ icon: Icon, iconColor, iconBg, label, value, change, subtitle, onClick }: KPICardProps) => {
+const KPICard = memo(({ icon: Icon, iconColor, iconBg, label, value, subtitle, onClick }: KPICardProps) => {
   return (
     <button
       onClick={onClick}
       className="group rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 text-left backdrop-blur-sm transition-all hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)]"
     >
-      <div className="mb-4 flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-[10px]" style={{ background: iconBg }}>
-            <Icon className="h-5 w-5" style={{ color: iconColor }} />
-          </div>
-          <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">{label}</span>
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-[10px]" style={{ background: iconBg }}>
+          <Icon className="h-5 w-5" style={{ color: iconColor }} />
         </div>
-        <div
-          className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-          style={{
-            background: change > 0 ? "rgba(0,255,156,0.15)" : "rgba(255,77,79,0.15)",
-            color: change > 0 ? "#00FF9C" : "#FF4D4F",
-          }}
-        >
-          <TrendingUp className="h-3 w-3" />
-          {change > 0 ? "+" : ""}
-          {change}%
-        </div>
+        <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">{label}</span>
       </div>
       <p className="mb-2 text-4xl font-bold" style={{ color: iconColor }}>
         {value}
@@ -551,14 +487,8 @@ interface FiltersSectionProps {
   filterType: FilterType;
   setFilterType: (value: FilterType) => void;
   filterTypeLabel: string;
-  filterStatus: FilterStatus;
-  setFilterStatus: (value: FilterStatus) => void;
-  filterStatusLabel: string;
   filterPeriod: PeriodType;
   setFilterPeriod: (value: PeriodType) => void;
-  filterClub: string;
-  setFilterClub: (value: string) => void;
-  availableClubs: string[];
   activeFiltersCount: number;
   onClearFilters: () => void;
 }
@@ -569,32 +499,26 @@ const FiltersSection = memo(({
   filterType,
   setFilterType,
   filterTypeLabel,
-  filterStatus,
-  setFilterStatus,
-  filterStatusLabel,
   filterPeriod,
   setFilterPeriod,
-  filterClub,
-  setFilterClub,
-  availableClubs,
   activeFiltersCount,
   onClearFilters,
 }: FiltersSectionProps) => {
   return (
     <div className="mb-8 rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 backdrop-blur-sm">
       <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="relative lg:col-span-4">
+        <div className="relative lg:col-span-6">
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
           <Input
             type="text"
-            placeholder="Buscar por jogador, analista ou ID..."
+            placeholder="Buscar por título, jogador ou analista..."
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
             className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] pl-11 focus:border-[#00C2FF]"
           />
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           <Select value={filterType} onValueChange={(value) => setFilterType(value as FilterType)}>
             <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
               <Filter className="mr-2 h-4 w-4 text-gray-500" />
@@ -610,49 +534,17 @@ const FiltersSection = memo(({
           </Select>
         </div>
 
-        <div className="lg:col-span-2">
-          <Select value={filterStatus} onValueChange={(value) => setFilterStatus(value as FilterStatus)}>
-            <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
-              {STATUS_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           <Select value={filterPeriod} onValueChange={(value) => setFilterPeriod(value as PeriodType)}>
             <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
               <Calendar className="mr-2 h-4 w-4 text-gray-500" />
-              <SelectValue placeholder="Periodo" />
+              <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
               <SelectItem value="all">Todos os períodos</SelectItem>
               <SelectItem value="7d">Últimos 7 dias</SelectItem>
               <SelectItem value="30d">Últimos 30 dias</SelectItem>
               <SelectItem value="90d">Últimos 90 dias</SelectItem>
-              <SelectItem value="custom">Personalizado</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="lg:col-span-2">
-          <Select value={filterClub} onValueChange={setFilterClub}>
-            <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
-              <SelectValue placeholder="Clube" />
-            </SelectTrigger>
-            <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
-              <SelectItem value="all">Todos os clubes</SelectItem>
-              {availableClubs.map((club) => (
-                <SelectItem key={club} value={club}>
-                  {club}
-                </SelectItem>
-              ))}
             </SelectContent>
           </Select>
         </div>
@@ -665,10 +557,6 @@ const FiltersSection = memo(({
           </span>
           <div className="flex flex-wrap items-center gap-2">
             {filterType !== "all" && <FilterChip label={`Tipo: ${filterTypeLabel}`} onRemove={() => setFilterType("all")} />}
-            {filterStatus !== "all" && (
-              <FilterChip label={`Status: ${filterStatusLabel}`} onRemove={() => setFilterStatus("all")} />
-            )}
-            {filterClub !== "all" && <FilterChip label={`Clube: ${filterClub}`} onRemove={() => setFilterClub("all")} />}
             {searchQuery && <FilterChip label={`Busca: "${searchQuery}"`} onRemove={() => setSearchQuery("")} />}
           </div>
           <Button
@@ -828,14 +716,6 @@ const ActivityRow = memo(({
   onViewReport: (item: AnalysisHistory) => void;
   onDelete: (item: AnalysisHistory) => void;
 }) => {
-  const canDelete = item.canDelete;
-  const canViewReport = !item.isLegacy;
-  const deleteLabel = !canDelete
-    ? "Remocao indisponivel"
-    : item.deleteManagedBy === "scout_report"
-      ? "Removivel via ScoutReport"
-      : "Removivel via Analysis";
-
   return (
     <tr
       className={`group transition-colors hover:bg-[rgba(255,255,255,0.02)] ${selected ? "bg-[rgba(0,194,255,0.04)]" : ""}`}
@@ -855,21 +735,7 @@ const ActivityRow = memo(({
       <td className="px-5 py-4">
         <div className="space-y-1">
           <p className="text-sm font-medium text-gray-200">{item.title}</p>
-          {item.description && <p className="max-w-[320px] text-xs text-gray-500">{item.description}</p>}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className={`text-[11px] ${item.isLegacy ? "text-[#fbbf24]" : "text-gray-500"}`}>{item.sourceLabel}</span>
-            <span
-              className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
-                canDelete
-                  ? "border-[rgba(0,255,156,0.22)] text-[#9CFFD1]"
-                  : "border-[rgba(251,191,36,0.28)] text-[#F8D98B]"
-              }`}
-              title={item.deleteHint}
-            >
-              {deleteLabel}
-            </span>
-          </div>
-          <span className="font-mono text-xs text-gray-500">{item.id}</span>
+          {item.description && <p className="max-w-[360px] text-xs text-gray-500">{item.description}</p>}
         </div>
       </td>
       <td className="px-5 py-4">
@@ -894,33 +760,14 @@ const ActivityRow = memo(({
       </td>
       <td className="px-5 py-4">
         <div className="flex items-center justify-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-          {canViewReport ? (
-            <ActionButton icon={Eye} tooltip="Ver relatorio" onClick={() => onViewReport(item)} />
-          ) : (
-            <span
-              className="text-center text-[11px] text-gray-500"
-              title={
-                item.type === "report"
-                  ? "Visualizacao detalhada disponivel apenas para relatorios persistidos na central Analysis."
-                  : "Visualizacao detalhada desta analise ainda nao esta habilitada."
-              }
-            >
-              Sem viewer
-            </span>
-          )}
-          {canDelete ? (
-            <ActionButton
-              icon={Trash2}
-              tooltip={deleting ? "Excluindo..." : item.deleteHint}
-              variant="danger"
-              disabled={deleting}
-              onClick={() => onDelete(item)}
-            />
-          ) : (
-            <span className="text-center text-[11px] text-[#F8D98B]" title={item.deleteHint}>
-              Gerenciado pelo legado
-            </span>
-          )}
+          <ActionButton icon={Eye} tooltip="Abrir análise" onClick={() => onViewReport(item)} />
+          <ActionButton
+            icon={Trash2}
+            tooltip={deleting ? "Excluindo..." : "Remover do histórico"}
+            variant="danger"
+            disabled={deleting || !item.canDelete}
+            onClick={() => onDelete(item)}
+          />
         </div>
       </td>
     </tr>
