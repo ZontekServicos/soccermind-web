@@ -3,6 +3,8 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  Crosshair,
+  RotateCcw,
   Search,
   SlidersHorizontal,
   Star,
@@ -148,29 +150,26 @@ export default function PlayersRanking() {
   const navigate = useNavigate();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
+
   const [players, setPlayers] = useState<PlayerCardModel[]>([]);
   const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<PlayersFiltersState>(initialFilters);
-  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search.trim());
   const [sortBy, setSortBy] = useState<SortBy>(() => parseSortBy(urlSearchParams));
   const [sortOrder, setSortOrder] = useState<SortOrder>(() => parseSortOrder(urlSearchParams));
   const [page, setPage] = useState(() => parsePage(urlSearchParams));
   const [meta, setMeta] = useState<PaginationMeta>({});
   const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filtersExpanded, setFiltersExpanded] = useState(() => countActiveFilters(initialFilters) > 0);
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [hasSearched, setHasSearched] = useState(false);
+  // Committed filters — only updated when user clicks "Buscar"
+  const [committedFilters, setCommittedFilters] = useState<PlayersFiltersState | null>(null);
+  const [committedPage, setCommittedPage] = useState(1);
   const limit = 20;
 
-  useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      setDebouncedSearch(filters.search.trim());
-    }, 300);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [filters.search]);
+  // Dirty flag: user changed filters after last search
+  const isDirty = hasSearched && JSON.stringify(filters) !== JSON.stringify(committedFilters);
 
   useEffect(() => {
     let active = true;
@@ -178,10 +177,7 @@ export default function PlayersRanking() {
     async function loadWatchlist() {
       try {
         const response = await getWatchlist();
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         const ids = new Set(
           Array.isArray(response.data)
             ? response.data
@@ -193,82 +189,70 @@ export default function PlayersRanking() {
         );
         setWatchlistIds(ids);
       } catch {
-        if (active) {
-          setWatchlistIds(new Set());
-        }
+        if (active) setWatchlistIds(new Set());
       }
     }
 
     loadWatchlist();
-
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, []);
 
-  const apiFilters = useMemo(() => buildApiFilters(filters, debouncedSearch), [filters, debouncedSearch]);
-
+  // Fetch only when committed filters change
   useEffect(() => {
+    if (!committedFilters) return;
     let active = true;
 
     async function loadPlayers() {
       setLoading(true);
       try {
-        const response = await getRankingData({ ...apiFilters, page, limit });
-        if (!active) {
-          return;
-        }
-
+        const apiParams = buildApiFilters(committedFilters!, committedFilters!.search.trim());
+        const response = await getRankingData({ ...apiParams, page: committedPage, limit });
+        if (!active) return;
         const nextMeta = (response.data.meta || response.meta || {}) as PaginationMeta;
         setPlayers(Array.isArray(response.data.players) ? response.data.players : []);
         setMeta(nextMeta);
         setFilterOptions(response.data.filterOptions ?? EMPTY_FILTER_OPTIONS);
         setError(null);
       } catch (fetchError) {
-        if (!active) {
-          return;
-        }
-
+        if (!active) return;
         setPlayers([]);
         setMeta({});
         setError(fetchError instanceof Error ? fetchError.message : "Erro ao carregar jogadores");
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
 
     loadPlayers();
-
-    return () => {
-      active = false;
-    };
-  }, [apiFilters, limit, page]);
+    return () => { active = false; };
+  }, [committedFilters, committedPage, limit]);
 
   useEffect(() => {
+    if (!committedFilters) return;
+    const f = committedFilters;
     const nextParams = new URLSearchParams();
 
-    if (filters.search.trim()) nextParams.set("search", filters.search.trim());
-    if (filters.positions.length > 0) nextParams.set("positions", filters.positions.join(","));
-    if (filters.nationality) nextParams.set("nationality", filters.nationality);
-    if (filters.team) nextParams.set("team", filters.team);
-    if (filters.league) nextParams.set("league", filters.league);
-    if (filters.source) nextParams.set("source", filters.source);
-    if (filters.minAge) nextParams.set("minAge", filters.minAge);
-    if (filters.maxAge) nextParams.set("maxAge", filters.maxAge);
-    if (filters.minOverall) nextParams.set("minOverall", filters.minOverall);
-    if (filters.maxOverall) nextParams.set("maxOverall", filters.maxOverall);
-    if (filters.minPotential) nextParams.set("minPotential", filters.minPotential);
-    if (filters.maxPotential) nextParams.set("maxPotential", filters.maxPotential);
-    if (filters.minValue) nextParams.set("minValue", filters.minValue);
-    if (filters.maxValue) nextParams.set("maxValue", filters.maxValue);
-    if (page > 1) nextParams.set("page", String(page));
+    if (f.search.trim()) nextParams.set("search", f.search.trim());
+    if (f.positions.length > 0) nextParams.set("positions", f.positions.join(","));
+    if (f.nationality) nextParams.set("nationality", f.nationality);
+    if (f.team) nextParams.set("team", f.team);
+    if (f.league) nextParams.set("league", f.league);
+    if (f.source) nextParams.set("source", f.source);
+    if (f.minAge) nextParams.set("minAge", f.minAge);
+    if (f.maxAge) nextParams.set("maxAge", f.maxAge);
+    if (f.minOverall) nextParams.set("minOverall", f.minOverall);
+    if (f.maxOverall) nextParams.set("maxOverall", f.maxOverall);
+    if (f.minPotential) nextParams.set("minPotential", f.minPotential);
+    if (f.maxPotential) nextParams.set("maxPotential", f.maxPotential);
+    if (f.minValue) nextParams.set("minValue", f.minValue);
+    if (f.maxValue) nextParams.set("maxValue", f.maxValue);
+    if (f.level) nextParams.set("level", f.level);
+    if (committedPage > 1) nextParams.set("page", String(committedPage));
     if (sortBy !== "overall") nextParams.set("sortBy", sortBy);
     if (sortOrder !== "desc") nextParams.set("sortOrder", sortOrder);
 
     setUrlSearchParams(nextParams, { replace: true });
-  }, [filters, page, setUrlSearchParams, sortBy, sortOrder]);
+  }, [committedFilters, committedPage, setUrlSearchParams, sortBy, sortOrder]);
 
   const filteredAndSortedPlayers = useMemo(() => {
     const list = [...players];
@@ -281,6 +265,13 @@ export default function PlayersRanking() {
   }, [players, sortBy, sortOrder]);
 
   const activeFiltersCount = useMemo(() => countActiveFilters(filters), [filters]);
+
+  const handleSearch = () => {
+    setCommittedFilters({ ...filters });
+    setCommittedPage(1);
+    setHasSearched(true);
+    setPage(1);
+  };
 
   const getStatColor = (value: number) => {
     if (value >= 85) return "bg-[#00FF9C]/90 text-[#07142A]";
@@ -362,6 +353,10 @@ export default function PlayersRanking() {
   const handleClearFilters = () => {
     setPage(1);
     setFilters(DEFAULT_PLAYERS_FILTERS);
+    setCommittedFilters(null);
+    setHasSearched(false);
+    setPlayers([]);
+    setMeta({});
   };
 
   return (
@@ -374,43 +369,33 @@ export default function PlayersRanking() {
             <section className="relative overflow-hidden rounded-[28px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(135deg,rgba(11,27,53,0.98),rgba(7,20,42,0.94))] px-7 py-7 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
               <div className="absolute -right-20 top-0 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(0,194,255,0.18),transparent_68%)] blur-2xl" />
               <div className="absolute bottom-0 left-0 h-40 w-40 rounded-full bg-[radial-gradient(circle,rgba(122,92,255,0.12),transparent_72%)] blur-2xl" />
-              <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+              <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                 <div className="max-w-3xl">
                   <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#7FDBFF]">
-                    <SlidersHorizontal className="h-3.5 w-3.5" />
-                    Ranking Intelligence
+                    <Crosshair className="h-3.5 w-3.5" />
+                    Scout Intelligence
                   </div>
-                  <h1 className="text-4xl font-semibold text-white">Ranking de Jogadores</h1>
+                  <h1 className="text-4xl font-semibold text-white">Busca de Jogadores</h1>
                   <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400">
-                    Uma camada de filtros analiticos para transformar o ranking em um cockpit real de scouting, sem perder a identidade visual do SoccerMind.
+                    Defina os critérios de scouting e execute a busca. O ranking é gerado a partir dos filtros aplicados.
                   </p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[rgba(0,194,255,0.14)]">
-                        <Users className="h-5 w-5 text-[#00C2FF]" />
+                {hasSearched && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-[#00C2FF]" />
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Encontrados</p>
                       </div>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Jogadores</p>
-                        <p className="text-2xl font-bold text-[#00C2FF]">{meta.total ?? filteredAndSortedPlayers.length}</p>
-                      </div>
+                      <p className="mt-1 text-2xl font-bold text-[#00C2FF]">{meta.total ?? filteredAndSortedPlayers.length}</p>
+                    </div>
+                    <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Filtros ativos</p>
+                      <p className="mt-1 text-2xl font-bold text-[#9BE7FF]">{countActiveFilters(committedFilters ?? filters)}</p>
                     </div>
                   </div>
-
-                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Filtros ativos</p>
-                    <p className="mt-2 text-2xl font-bold text-[#9BE7FF]">{activeFiltersCount}</p>
-                    <p className="mt-1 text-xs text-gray-500">Sincronizados com a URL</p>
-                  </div>
-
-                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4 backdrop-blur-sm">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Atualizacao</p>
-                    <p className="mt-2 text-lg font-semibold text-white">Tempo real</p>
-                    <p className="mt-1 text-xs text-gray-500">Busca com debounce de 300ms</p>
-                  </div>
-                </div>
+                )}
               </div>
             </section>
 
@@ -426,28 +411,32 @@ export default function PlayersRanking() {
               onClearFilters={handleClearFilters}
             />
 
-            <ActivePlayersFilterChips
-              filters={filters}
-              onClearSearch={() => {
-                setPage(1);
-                setFilters((current) => ({ ...current, search: "" }));
-              }}
-              onRemovePosition={(position) => {
-                setPage(1);
-                setFilters((current) => ({
-                  ...current,
-                  positions: current.positions.filter((item) => item !== position),
-                }));
-              }}
-              onClearField={(field) => {
-                setPage(1);
-                setFilters((current) => ({ ...current, [field]: "" }));
-              }}
-              onClearRange={([minField, maxField]) => {
-                setPage(1);
-                setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }));
-              }}
-            />
+            {/* Search CTA */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleSearch}
+                className="inline-flex items-center gap-2.5 rounded-[14px] bg-[#00C2FF] px-7 py-3.5 text-sm font-bold text-[#07142A] shadow-[0_4px_20px_rgba(0,194,255,0.35)] transition-all hover:bg-[#33CFFF] hover:shadow-[0_6px_24px_rgba(0,194,255,0.45)] active:scale-[0.98]"
+              >
+                <Search className="h-4 w-4" />
+                Buscar jogadores
+              </button>
+              {activeFiltersCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="inline-flex items-center gap-2 rounded-[14px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-5 py-3.5 text-sm font-medium text-gray-400 transition-all hover:border-[rgba(255,255,255,0.18)] hover:text-gray-200"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Limpar filtros
+                </button>
+              )}
+              {isDirty && (
+                <span className="rounded-full border border-[rgba(251,191,36,0.3)] bg-[rgba(251,191,36,0.1)] px-3 py-1.5 text-xs font-semibold text-[#fbbf24]">
+                  Filtros modificados — clique em Buscar para atualizar
+                </span>
+              )}
+            </div>
 
             {error && (
               <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
@@ -455,7 +444,7 @@ export default function PlayersRanking() {
               </div>
             )}
 
-            <div className="overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+            {(hasSearched || loading) && <div className="overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
               <div className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-8 py-4">
                 <div className="flex items-center gap-6">
                   <div className="w-10 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">#</div>
@@ -583,38 +572,61 @@ export default function PlayersRanking() {
               </div>
             </div>
 
-            {!loading && filteredAndSortedPlayers.length === 0 && (
+            {!hasSearched && !loading && (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[20px] border border-[rgba(0,194,255,0.15)] bg-[rgba(0,194,255,0.06)]">
+                  <Crosshair className="h-9 w-9 text-[#00C2FF]/60" />
+                </div>
+                <h3 className="mb-2 text-lg font-semibold text-gray-300">Defina os critérios de busca</h3>
+                <p className="max-w-md text-sm leading-relaxed text-gray-600">
+                  Configure os filtros acima — posição, overall, idade, liga, nível, valor de mercado — e clique em{" "}
+                  <span className="font-semibold text-[#00C2FF]">"Buscar jogadores"</span> para gerar o ranking de scouting.
+                </p>
+              </div>
+            )}
+
+            {hasSearched && !loading && filteredAndSortedPlayers.length === 0 && (
               <div className="py-16 text-center">
                 <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.03)]">
                   <Search className="h-7 w-7 text-gray-600" />
                 </div>
-                <p className="text-sm text-gray-500">Nenhum jogador encontrado com os filtros selecionados.</p>
+                <p className="text-sm text-gray-500">Nenhum jogador encontrado com os filtros aplicados.</p>
+                <button
+                  onClick={handleClearFilters}
+                  className="mt-4 text-xs text-[#00C2FF] underline-offset-2 hover:underline"
+                >
+                  Limpar filtros e tentar novamente
+                </button>
               </div>
             )}
 
             <div className="mt-6 flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={page <= 1 || loading}
+                onClick={() => setCommittedPage((current) => Math.max(1, current - 1))}
+                disabled={committedPage <= 1 || loading}
                 className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
                 Anterior
               </button>
               <span className="text-sm text-gray-500">
-                Pagina {meta.page ?? page} de {meta.totalPages ?? 1}
+                Página {meta.page ?? committedPage} de {meta.totalPages ?? 1}
+                {meta.total != null && (
+                  <span className="ml-3 text-[#00C2FF]">{meta.total} jogador{meta.total !== 1 ? "es" : ""}</span>
+                )}
               </span>
               <button
                 type="button"
-                onClick={() => setPage((current) => current + 1)}
-                disabled={loading || (meta.totalPages !== undefined && page >= meta.totalPages)}
+                onClick={() => setCommittedPage((current) => current + 1)}
+                disabled={loading || (meta.totalPages !== undefined && committedPage >= meta.totalPages)}
                 className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
               >
-                Proxima
+                Próxima
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+            </div>}
           </div>
         </main>
       </div>

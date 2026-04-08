@@ -1,6 +1,26 @@
 import type { PlayersFiltersParams } from "../services/players";
 import { positionLabel } from "./positions";
 
+export type PlayerLevel =
+  | ""
+  | "icone"
+  | "elite"
+  | "premium"
+  | "destaque"
+  | "regular"
+  | "basico"
+  | "promessa";
+
+export const LEVEL_OVERALL_RANGES: Record<Exclude<PlayerLevel, "">, { min: number; max?: number }> = {
+  icone:    { min: 90 },
+  elite:    { min: 85, max: 89 },
+  premium:  { min: 80, max: 84 },
+  destaque: { min: 75, max: 79 },
+  regular:  { min: 70, max: 74 },
+  basico:   { min: 65, max: 69 },
+  promessa: { min: 0, max: 64 },
+};
+
 export interface PlayersFiltersState {
   search: string;
   positions: string[];
@@ -16,6 +36,7 @@ export interface PlayersFiltersState {
   maxPotential: string;
   minValue: string;
   maxValue: string;
+  level: PlayerLevel;
 }
 
 export type FilterFieldKey = keyof Omit<PlayersFiltersState, "positions" | "search">;
@@ -44,6 +65,7 @@ export const DEFAULT_PLAYERS_FILTERS: PlayersFiltersState = {
   maxPotential: "",
   minValue: "",
   maxValue: "",
+  level: "",
 };
 
 export function parseFiltersFromSearchParams(searchParams: URLSearchParams): PlayersFiltersState {
@@ -67,6 +89,7 @@ export function parseFiltersFromSearchParams(searchParams: URLSearchParams): Pla
     maxPotential: searchParams.get("maxPotential") ?? "",
     minValue: searchParams.get("minValue") ?? "",
     maxValue: searchParams.get("maxValue") ?? "",
+    level: (searchParams.get("level") ?? "") as PlayerLevel,
   };
 }
 
@@ -74,10 +97,9 @@ export function countActiveFilters(filters: PlayersFiltersState) {
   let count = filters.positions.length;
 
   Object.entries(filters).forEach(([key, value]) => {
-    if (key === "positions") {
-      return;
-    }
-
+    if (key === "positions") return;
+    // When level is set, skip minOverall/maxOverall (they're derived)
+    if (filters.level && (key === "minOverall" || key === "maxOverall")) return;
     if (typeof value === "string" && value.trim()) {
       count += 1;
     }
@@ -87,6 +109,15 @@ export function countActiveFilters(filters: PlayersFiltersState) {
 }
 
 export function buildApiFilters(filters: PlayersFiltersState, debouncedSearch: string): PlayersFiltersParams {
+  // Level filter maps to overall range (overrides manual minOverall/maxOverall when set)
+  let minOverall = filters.minOverall || undefined;
+  let maxOverall = filters.maxOverall || undefined;
+  if (filters.level && filters.level in LEVEL_OVERALL_RANGES) {
+    const range = LEVEL_OVERALL_RANGES[filters.level as Exclude<PlayerLevel, "">];
+    minOverall = String(range.min);
+    maxOverall = range.max != null ? String(range.max) : undefined;
+  }
+
   return {
     search: debouncedSearch || undefined,
     positions: filters.positions.length > 0 ? filters.positions : undefined,
@@ -96,8 +127,8 @@ export function buildApiFilters(filters: PlayersFiltersState, debouncedSearch: s
     source: filters.source || undefined,
     minAge: filters.minAge || undefined,
     maxAge: filters.maxAge || undefined,
-    minOverall: filters.minOverall || undefined,
-    maxOverall: filters.maxOverall || undefined,
+    minOverall,
+    maxOverall,
     minPotential: filters.minPotential || undefined,
     maxPotential: filters.maxPotential || undefined,
     minValue: filters.minValue || undefined,

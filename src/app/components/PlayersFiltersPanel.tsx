@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import type { PlayerFilterOptions } from "../services/players";
-import type { PlayersFiltersState } from "../utils/playerFilters";
+import type { PlayerLevel, PlayersFiltersState } from "../utils/playerFilters";
 import { positionLabel } from "../utils/positions";
 import { cn } from "./ui/utils";
 
@@ -577,6 +577,30 @@ export function PlayersFiltersPanel({
                 onMinChange={(value) => onFieldChange("minValue", value)}
                 onMaxChange={(value) => onFieldChange("maxValue", value)}
               />
+              <FieldShell label="Nível atual" helperText="Tier SoccerMind">
+                <select
+                  value={filters.level}
+                  onChange={(e) => onFieldChange("level", e.target.value)}
+                  className="w-full rounded-[16px] border border-[rgba(255,255,255,0.08)] bg-[linear-gradient(180deg,rgba(9,23,45,0.86),rgba(8,18,35,0.8))] px-4 py-3.5 text-sm text-gray-100 outline-none transition-all focus:border-[rgba(0,194,255,0.28)] appearance-none"
+                >
+                  {(
+                    [
+                      ["", "Todos os níveis"],
+                      ["icone", "Ícone  (90+)"],
+                      ["elite", "Elite  (85–89)"],
+                      ["premium", "Premium  (80–84)"],
+                      ["destaque", "Destaque  (75–79)"],
+                      ["regular", "Regular  (70–74)"],
+                      ["basico", "Básico  (65–69)"],
+                      ["promessa", "Promessa  (< 65)"],
+                    ] as [PlayerLevel, string][]
+                  ).map(([val, label]) => (
+                    <option key={val} value={val} className="bg-[#07152a]">
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </FieldShell>
             </FilterGroup>
           </div>
         </div>
