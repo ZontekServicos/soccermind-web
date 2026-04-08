@@ -98,6 +98,17 @@ const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
   sources: [],
 };
 
+function getPlayerLevel(overall: number | null): { label: string; color: string; bg: string; border: string } {
+  const ovr = overall ?? 0;
+  if (ovr >= 90) return { label: "Ícone",    color: "#FFD700", bg: "rgba(255,215,0,0.14)",    border: "rgba(255,215,0,0.35)" };
+  if (ovr >= 85) return { label: "Elite",    color: "#00FF9C", bg: "rgba(0,255,156,0.12)",    border: "rgba(0,255,156,0.32)" };
+  if (ovr >= 80) return { label: "Premium",  color: "#00C2FF", bg: "rgba(0,194,255,0.12)",    border: "rgba(0,194,255,0.3)" };
+  if (ovr >= 75) return { label: "Destaque", color: "#7A5CFF", bg: "rgba(122,92,255,0.13)",   border: "rgba(122,92,255,0.3)" };
+  if (ovr >= 70) return { label: "Regular",  color: "#FBBF24", bg: "rgba(251,191,36,0.12)",   border: "rgba(251,191,36,0.3)" };
+  if (ovr >= 65) return { label: "Básico",   color: "#94a3b8", bg: "rgba(148,163,184,0.10)",  border: "rgba(148,163,184,0.25)" };
+  return             { label: "Promessa",    color: "#C084FC", bg: "rgba(192,132,252,0.11)",   border: "rgba(192,132,252,0.28)" };
+}
+
 function formatMarketValue(value: number | null) {
   if (value === null) {
     return "N/A";
@@ -462,6 +473,7 @@ export default function PlayersRanking() {
                     Idade
                     <ArrowUpDown className="h-3 w-3" />
                   </div>
+                  <div className="w-24 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Nível</div>
                   <div className="w-28 text-right text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Valor</div>
                   <div className="w-32 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Acao</div>
                 </div>
@@ -524,6 +536,19 @@ export default function PlayersRanking() {
 
                       <div className="w-20 text-center text-sm font-medium tabular-nums text-gray-300">{player.age}</div>
 
+                      <div className="flex w-24 justify-center">
+                        {(() => {
+                          const lvl = getPlayerLevel(player.overall);
+                          return (
+                            <span
+                              className="rounded-[8px] border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
+                              style={{ color: lvl.color, background: lvl.bg, borderColor: lvl.border }}
+                            >
+                              {lvl.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <div className="w-28 text-right text-sm font-semibold tabular-nums text-[#00FF9C]">{formatMarketValue(player.marketValue)}</div>
 
                       <div className="flex w-32 justify-center">

@@ -243,6 +243,7 @@ export default function Squad() {
   const [draggedFromPosition, setDraggedFromPosition] = useState<string | null>(null);
   const [editingPlayer, setEditingPlayer] = useState<SquadPlayer | null>(null);
   const [isAddingPlayer, setIsAddingPlayer] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
 
   // ── Load real squad from API on mount ──────────────────────────────────────
   const refreshSquad = useCallback(async () => {
@@ -382,29 +383,46 @@ export default function Squad() {
   const handleReset = () => setLineup({});
 
   const handleAutoGenerate = () => {
-    const newLineup: Record<string, SquadPlayer> = {};
-    const positionGroups: Record<string, SquadPlayer[]> = {
-      "Goleiro": squad.filter((p) => p.position === "Goleiro"),
-      "Lateral Esquerdo": squad.filter((p) => p.position === "Lateral Esquerdo"),
-      "Lateral Direito": squad.filter((p) => p.position === "Lateral Direito"),
-      "Zagueiro": squad.filter((p) => p.position === "Zagueiro"),
-      "Volante": squad.filter((p) => p.position === "Volante"),
-      "Meia Atacante": squad.filter((p) => p.position === "Meia Atacante"),
-      "Atacante": squad.filter((p) => p.position === "Atacante"),
-    };
+    if (squad.length === 0) return;
 
-    Object.entries(formations[formation].positions).forEach(([fieldPos, data]) => {
-      for (const compatiblePos of data.compatiblePositions) {
-        const available = positionGroups[compatiblePos]?.filter(
-          (p) => !Object.values(newLineup).find((np) => np.id === p.id),
-        );
-        if (available && available.length > 0) {
-          const best = [...available].sort((a, b) => b.overallRating - a.overallRating)[0];
-          newLineup[fieldPos] = best;
-          break;
+    const newLineup: Record<string, SquadPlayer> = {};
+    const usedIds = new Set<string>();
+    const formationPositions = formations[formation].positions;
+
+    // Helper: pick best available player for a position list (in order)
+    const pickBest = (compatiblePositions: string[]) => {
+      for (const pos of compatiblePositions) {
+        const candidates = squad.filter((p) => p.position === pos && !usedIds.has(p.id));
+        if (candidates.length > 0) {
+          return candidates.reduce((best, p) => p.overallRating > best.overallRating ? p : best);
         }
       }
-    });
+      return null;
+    };
+
+    // Pass 1: assign each slot using only its PRIMARY compatible position
+    // (first item in compatiblePositions). This prevents lateral/mid players
+    // from stealing Zagueiro / Volante slots before the "pure" slots are filled.
+    for (const [fieldPos, data] of Object.entries(formationPositions)) {
+      const primaryPos = data.compatiblePositions[0];
+      const candidates = squad.filter((p) => p.position === primaryPos && !usedIds.has(p.id));
+      if (candidates.length > 0) {
+        const best = candidates.reduce((b, p) => p.overallRating > b.overallRating ? p : b);
+        newLineup[fieldPos] = best;
+        usedIds.add(best.id);
+      }
+    }
+
+    // Pass 2: fill remaining empty slots using fallback compatible positions
+    for (const [fieldPos, data] of Object.entries(formationPositions)) {
+      if (newLineup[fieldPos]) continue;          // already filled in pass 1
+      const fallbackPositions = data.compatiblePositions.slice(1);
+      const best = pickBest(fallbackPositions);
+      if (best) {
+        newLineup[fieldPos] = best;
+        usedIds.add(best.id);
+      }
+    }
 
     setLineup(newLineup);
   };
@@ -449,7 +467,8 @@ export default function Squad() {
 
   const handleSaveLineup = () => {
     persistLineup(lineup);
-    alert("✅ Escalação salva com sucesso!");
+    setSaveFeedback("Escalação salva com sucesso!");
+    setTimeout(() => setSaveFeedback(null), 3000);
   };
 
   // ── Shared filter bar (cards + list) ──────────────────────────────────────
@@ -534,6 +553,13 @@ export default function Squad() {
                 <span className="ml-2 hidden sm:inline">Sincronizar</span>
               </Button>
             </div>
+
+            {/* Save feedback toast */}
+            {saveFeedback && (
+              <div className="flex items-center gap-2 rounded-[12px] border border-[rgba(0,255,156,0.25)] bg-[rgba(0,255,156,0.08)] px-4 py-3 text-sm text-[#B6FFD8]">
+                <span className="text-[#00FF9C]">✓</span> {saveFeedback}
+              </div>
+            )}
 
             {/* View mode + actions */}
             <div className="flex justify-between items-center">
@@ -658,9 +684,15 @@ export default function Squad() {
                       <Button
                         onClick={handleAutoGenerate}
                         size="sm"
-                        className="bg-gradient-to-r from-[#7A5CFF] to-[#00C2FF] text-white hover:opacity-90"
+                        disabled={isLoadingSquad || squad.length === 0}
+                        title={isLoadingSquad ? "Aguardando carregamento do elenco…" : squad.length === 0 ? "Elenco vazio" : "Gerar escalação automática"}
+                        className="bg-gradient-to-r from-[#7A5CFF] to-[#00C2FF] text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        <Sparkles className="w-4 h-4 mr-2" />
+                        {isLoadingSquad ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-4 h-4 mr-2" />
+                        )}
                         Auto IA
                       </Button>
                       <Button

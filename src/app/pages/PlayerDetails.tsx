@@ -401,11 +401,29 @@ export default function PlayerDetails() {
                   />
 
                   <div>
-                    <div className="mb-2 flex items-center gap-3">
+                    <div className="mb-2 flex items-center gap-3 flex-wrap">
                       <h1 className="text-4xl font-semibold text-white">{profile.identity.name}</h1>
                       <span className={`${getPositionColor(profile.identity.primaryPosition || "-")} rounded px-3 py-1 text-sm text-white`}>
                         {profile.identity.primaryPosition || "-"}
                       </span>
+                      {(() => {
+                        const ovr = player.overall ?? null;
+                        const tiers: Array<[number, string, string]> = [
+                          [90, "Ícone",    "#FFD700"], [85, "Elite",    "#00FF9C"],
+                          [80, "Premium",  "#00C2FF"], [75, "Destaque", "#7A5CFF"],
+                          [70, "Regular",  "#FBBF24"], [65, "Básico",   "#94a3b8"],
+                          [0,  "Promessa", "#C084FC"],
+                        ];
+                        const [, label, color] = tiers.find(([min]) => (ovr ?? 0) >= min) ?? tiers[tiers.length - 1];
+                        return (
+                          <span
+                            className="rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
+                            style={{ color, borderColor: `${color}55`, background: `${color}12` }}
+                          >
+                            {label}
+                          </span>
+                        );
+                      })()}
                     </div>
                     <div className="flex flex-wrap items-center gap-3 text-sm text-gray-400">
                       <span>{profile.identity.nationality || "-"}</span>

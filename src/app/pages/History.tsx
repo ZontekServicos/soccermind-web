@@ -32,7 +32,7 @@ import {
 
 type FilterType = "all" | AnalysisHistory["type"];
 type FilterStatus = "all" | AnalysisHistory["status"];
-type PeriodType = "7d" | "30d" | "90d" | "custom";
+type PeriodType = "7d" | "30d" | "90d" | "all" | "custom";
 type SortField = "date" | "type" | "user";
 type SortOrder = "asc" | "desc";
 
@@ -48,9 +48,10 @@ const FALLBACK_BADGE_STYLE: BadgeStyle = {
   border: "rgba(148,163,184,0.3)",
 };
 
-const TYPE_BADGE_STYLES: Record<AnalysisHistory["type"], BadgeStyle> = {
+const TYPE_BADGE_STYLES: Record<AnalysisHistory["type"] | string, BadgeStyle> = {
   comparison: { bg: "rgba(122,92,255,0.15)", text: "#7A5CFF", border: "rgba(122,92,255,0.3)" },
   report: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
+  analysis: { bg: "rgba(0,194,255,0.15)", text: "#00C2FF", border: "rgba(0,194,255,0.3)" },
 };
 
 const STATUS_BADGE_STYLES: Record<AnalysisHistory["status"], BadgeStyle> = {
@@ -61,8 +62,8 @@ const STATUS_BADGE_STYLES: Record<AnalysisHistory["status"], BadgeStyle> = {
 
 const TYPE_OPTIONS: Array<{ value: FilterType; label: string }> = [
   { value: "all", label: "Todos os tipos" },
-  { value: "comparison", label: "Comparacao" },
-  { value: "report", label: "Relatorio" },
+  { value: "comparison", label: "Comparação" },
+  { value: "report", label: "Relatório" },
 ];
 
 const STATUS_OPTIONS: Array<{ value: FilterStatus; label: string }> = [
@@ -72,7 +73,7 @@ const STATUS_OPTIONS: Array<{ value: FilterStatus; label: string }> = [
   { value: "archived", label: "Arquivado" },
 ];
 
-const PERIOD_IN_DAYS: Partial<Record<Exclude<PeriodType, "custom">, number>> = {
+const PERIOD_IN_DAYS: Partial<Record<Exclude<PeriodType, "custom" | "all">, number>> = {
   "7d": 7,
   "30d": 30,
   "90d": 90,
@@ -84,7 +85,7 @@ export default function History() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
-  const [filterPeriod, setFilterPeriod] = useState<PeriodType>("30d");
+  const [filterPeriod, setFilterPeriod] = useState<PeriodType>("90d");
   const [filterClub, setFilterClub] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("date");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -168,7 +169,7 @@ export default function History() {
       filtered = filtered.filter((item) => item.club === filterClub);
     }
 
-    if (filterPeriod !== "custom") {
+    if (filterPeriod !== "custom" && filterPeriod !== "all") {
       const periodDays = PERIOD_IN_DAYS[filterPeriod];
       if (periodDays) {
         const cutoff = Date.now() - periodDays * 24 * 60 * 60 * 1000;
@@ -324,8 +325,8 @@ const HeaderSection = memo(({ onCreateAnalysis }: { onCreateAnalysis: () => void
   return (
     <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
       <div>
-        <h1 className="mb-3 text-4xl font-semibold">Analises</h1>
-        <p className="text-sm text-gray-500">Hub de monitoramento estrategico de analises e comparacoes</p>
+        <h1 className="mb-3 text-4xl font-semibold">Histórico</h1>
+        <p className="text-sm text-gray-500">Registro de análises, comparações e relatórios salvos manualmente</p>
       </div>
       <div className="flex items-center gap-3">
         <Button
@@ -530,9 +531,10 @@ const FiltersSection = memo(({
               <SelectValue placeholder="Periodo" />
             </SelectTrigger>
             <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
-              <SelectItem value="7d">Ultimos 7 dias</SelectItem>
-              <SelectItem value="30d">Ultimos 30 dias</SelectItem>
-              <SelectItem value="90d">Ultimos 90 dias</SelectItem>
+              <SelectItem value="all">Todos os períodos</SelectItem>
+              <SelectItem value="7d">Últimos 7 dias</SelectItem>
+              <SelectItem value="30d">Últimos 30 dias</SelectItem>
+              <SelectItem value="90d">Últimos 90 dias</SelectItem>
               <SelectItem value="custom">Personalizado</SelectItem>
             </SelectContent>
           </Select>
@@ -703,7 +705,7 @@ const ActivityRow = memo(({
   onDelete: (item: AnalysisHistory) => void;
 }) => {
   const canDelete = item.canDelete;
-  const canViewReport = item.type === "report" && !item.isLegacy;
+  const canViewReport = !item.isLegacy;
   const deleteLabel = !canDelete
     ? "Remocao indisponivel"
     : item.deleteManagedBy === "scout_report"
@@ -857,12 +859,17 @@ ActionButton.displayName = "ActionButton";
 const EmptyState = memo(() => {
   return (
     <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-16 text-center backdrop-blur-sm">
-      <div className="mx-auto max-w-md">
-        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-[14px] bg-[rgba(0,194,255,0.1)]">
-          <AlertCircle className="h-8 w-8 text-[#00C2FF]" />
+      <div className="mx-auto max-w-sm">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[14px] bg-[rgba(0,194,255,0.08)]">
+          <HistoryIcon className="h-8 w-8 text-[#00C2FF]/60" />
         </div>
-        <h3 className="mb-3 text-xl font-semibold">Nenhuma analise encontrada</h3>
-        <p className="mb-6 text-sm text-gray-500">Ajuste os filtros ou crie uma nova analise para comecar</p>
+        <h3 className="mb-2 text-lg font-semibold text-gray-200">Sem registros no período</h3>
+        <p className="text-sm leading-relaxed text-gray-500">
+          Salve manualmente uma análise, comparação ou relatório para que ela apareça aqui.
+        </p>
+        <p className="mt-3 text-xs text-gray-600">
+          Dica: use o botão <span className="text-[#00C2FF]">"Salvar no histórico"</span> disponível nas páginas de análise e comparação.
+        </p>
       </div>
     </div>
   );
