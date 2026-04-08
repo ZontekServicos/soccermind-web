@@ -28,10 +28,8 @@ import type { PlayerExtended } from "../types/player";
 import { t as translate } from "../../i18n";
 
 type RiskTab = "ALL" | RiskBucket;
-type AssetTierFilter = "ALL" | StrategicAssetTier;
 
 const RISK_PAGE_SIZE = 8;
-const ASSET_PAGE_SIZE = 4;
 
 const TIER_ORDER: StrategicAssetTier[] = [
   "Elite Asset",
@@ -93,10 +91,8 @@ export default function Dashboard() {
   const [error,                setError]                = useState<string | null>(null);
   const [loading,              setLoading]              = useState(true);
 
-  const [riskTab,         setRiskTab]         = useState<RiskTab>("ALL");
-  const [riskPage,        setRiskPage]        = useState(1);
-  const [assetTierFilter, setAssetTierFilter] = useState<AssetTierFilter>("ALL");
-  const [assetPage,       setAssetPage]       = useState(1);
+  const [riskTab,  setRiskTab]  = useState<RiskTab>("ALL");
+  const [riskPage, setRiskPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -138,17 +134,6 @@ export default function Dashboard() {
     [filteredRiskPlayers, riskPage],
   );
 
-  // Asset tier filter
-  const filteredAssets = useMemo(() =>
-    assetTierFilter === "ALL" ? strategicAssets : strategicAssets.filter((a) => a.tier === assetTierFilter),
-    [assetTierFilter, strategicAssets],
-  );
-  const assetTotalPages = Math.max(1, Math.ceil(filteredAssets.length / ASSET_PAGE_SIZE));
-  const pagedAssets = useMemo(
-    () => paginate(filteredAssets, assetPage, ASSET_PAGE_SIZE),
-    [filteredAssets, assetPage],
-  );
-
   // Portfolio tier breakdown
   const tierDistribution = useMemo(() =>
     TIER_ORDER.map((tier) => {
@@ -172,9 +157,7 @@ export default function Dashboard() {
 
   // Sync pages
   useEffect(() => setRiskPage(1), [riskTab]);
-  useEffect(() => setAssetPage(1), [assetTierFilter]);
   useEffect(() => setRiskPage((p) => Math.min(p, riskTotalPages)), [riskTotalPages]);
-  useEffect(() => setAssetPage((p) => Math.min(p, assetTotalPages)), [assetTotalPages]);
 
   return (
     <div className="flex h-screen bg-[var(--background)]" key={language}>
@@ -330,53 +313,6 @@ export default function Dashboard() {
                 </div>
               </section>
             </div>
-
-            {/* ── Strategic Assets ── */}
-            <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-7 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
-              <div className="mb-6 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                <div className="space-y-1.5">
-                  <h2 className="flex items-center gap-2.5 text-lg font-semibold">
-                    <DollarSign className="h-5 w-5 text-[#7A5CFF]" />
-                    {t("dashboard.strategicAssetsTitle")}
-                  </h2>
-                  <p className="text-sm text-gray-400">{t("dashboard.strategicAssetsSubtitle")}</p>
-                </div>
-                <PaginationControls page={assetPage} totalPages={assetTotalPages} onPageChange={setAssetPage} compact />
-              </div>
-
-              {/* Tier filter tabs */}
-              <div className="mb-6 flex flex-wrap gap-2">
-                {(["ALL", ...TIER_ORDER] as const).map((tier) => {
-                  const count = tier === "ALL" ? strategicAssets.length : strategicAssets.filter((a) => a.tier === tier).length;
-                  const color = tier !== "ALL" ? getAssetTierColor(tier) : undefined;
-                  const active = assetTierFilter === tier;
-                  return (
-                    <button
-                      key={tier}
-                      type="button"
-                      onClick={() => { setAssetTierFilter(tier); setAssetPage(1); }}
-                      className="rounded-full border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition-all"
-                      style={{
-                        borderColor: active && color ? `${color}55` : active ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.08)",
-                        background: active && color ? `${color}14` : active ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.03)",
-                        color: active && color ? color : active ? "#fff" : "rgba(148,163,184,0.8)",
-                      }}
-                    >
-                      {tier === "ALL" ? `Todos (${count})` : `${tier.replace(" Asset", "")} (${count})`}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                {pagedAssets.length === 0
-                  ? <EmptyState message={t("dashboard.strategicAssetsEmpty")} />
-                  : pagedAssets.map((asset) => (
-                    <StrategicAssetCard key={`${asset.player.id}-${asset.tier}`} asset={asset} />
-                  ))
-                }
-              </div>
-            </section>
 
             {/* ── Risk Overview ── */}
             <section className="rounded-[20px] bg-[rgba(255,255,255,0.02)] p-7 shadow-[0_8px_32px_rgba(0,0,0,0.3)] backdrop-blur-sm">
@@ -552,62 +488,6 @@ function RiskMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function StrategicAssetCard({ asset }: { asset: StrategicAsset }) {
-  const { player, tier, description, summary, marketValueLabel, liquidityLabel, potentialLabel } = asset;
-  const color = getAssetTierColor(tier);
-  const digest = `Overall ${player.overallRating} · Potencial ${player.potential} · Liquidez ${player.liquidity.score.toFixed(1)} · Revenda ${player.liquidity.resaleWindow}`;
-
-  return (
-    <div
-      className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.26)] transition-all duration-200 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(0,0,0,0.34)]"
-      style={{ boxShadow: `0 12px 32px rgba(0,0,0,0.24), 0 0 0 1px ${color}14` }}
-    >
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div className="min-w-0 space-y-2">
-          <h3 className="truncate text-[1.2rem] font-semibold leading-tight text-white">{player.name}</h3>
-          <p className="text-sm text-gray-400">{player.position} · {player.club}</p>
-          <span
-            className="inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]"
-            style={{ color: color === "#00FF9C" ? "#7DFFD0" : color, borderColor: `${color}40`, background: `${color}12` }}
-          >
-            {summary}
-          </span>
-        </div>
-        <span
-          className="flex-shrink-0 rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color, borderColor: `${color}55`, background: `${color}16` }}
-        >
-          {tier.replace(" Asset", "")}
-        </span>
-      </div>
-
-      <div className="mb-5 grid grid-cols-2 gap-3">
-        <AssetMetric label="Valor de mercado" value={marketValueLabel} />
-        <AssetMetric label="Liquidity Score"  value={liquidityLabel}  highlight="#00FF9C" />
-        <AssetMetric label="Resale Window"    value={player.liquidity.resaleWindow} />
-        <AssetMetric label="Potential"        value={potentialLabel}  highlight="#00C2FF" />
-      </div>
-
-      <div className="mb-3 rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.026)] px-4 py-3.5">
-        <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.22em] text-gray-500">Resumo estratégico</p>
-        <p className="text-sm leading-6 text-gray-200">{description}</p>
-      </div>
-
-      <div className="rounded-[12px] border border-[rgba(255,255,255,0.05)] bg-[rgba(5,12,24,0.42)] px-4 py-2.5">
-        <p className="text-[11px] leading-5 text-gray-500">{digest}</p>
-      </div>
-    </div>
-  );
-}
-
-function AssetMetric({ label, value, highlight }: { label: string; value: string; highlight?: string }) {
-  return (
-    <div className="rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.026)] px-4 py-3">
-      <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-gray-500">{label}</p>
-      <p className="text-base font-semibold leading-none" style={{ color: highlight ?? "#F8FAFC" }}>{value}</p>
-    </div>
-  );
-}
 
 function EmptyState({ message }: { message: string }) {
   return (
