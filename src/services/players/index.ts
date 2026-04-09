@@ -645,3 +645,63 @@ export async function createPlayerNote(id: string, payload: { content: string })
     body: JSON.stringify({ note: payload.content }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Player Videos
+// ---------------------------------------------------------------------------
+
+export interface PlayerVideo {
+  id: string;
+  playerId: string;
+  title: string;
+  description?: string | null;
+  type: string;
+  source: string;
+  url: string;
+  thumbnail?: string | null;
+  duration?: number | null;
+  season?: string | null;
+  tags: string[];
+  addedBy: string;
+  createdAt: string;
+}
+
+export interface AddPlayerVideoPayload {
+  title: string;
+  description?: string;
+  type: string;
+  source: string;
+  url: string;
+  thumbnail?: string;
+  duration?: number;
+  season?: string;
+  tags?: string[];
+  addedBy: string;
+}
+
+export async function getPlayerVideos(
+  playerId: string,
+  type?: string,
+): Promise<ApiEnvelope<PlayerVideo[]>> {
+  const query = type ? `?type=${encodeURIComponent(type)}` : "";
+  return apiFetch<PlayerVideo[]>(`/player/${playerId}/videos${query}`);
+}
+
+export async function addPlayerVideo(
+  playerId: string,
+  video: AddPlayerVideoPayload,
+): Promise<ApiEnvelope<PlayerVideo>> {
+  return apiFetch<PlayerVideo>(`/player/${playerId}/videos`, {
+    method: "POST",
+    body: JSON.stringify(video),
+  });
+}
+
+export async function deletePlayerVideo(
+  playerId: string,
+  videoId: string,
+): Promise<ApiEnvelope<{ message: string }>> {
+  return apiFetch<{ message: string }>(`/player/${playerId}/videos/${videoId}`, {
+    method: "DELETE",
+  });
+}

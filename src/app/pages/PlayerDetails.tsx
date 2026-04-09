@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
 import { AppSidebar } from "../components/AppSidebar";
 import { DNABars } from "../components/player-intelligence/DNABars";
+import { PlayerVideosSection } from "../components/player-intelligence/PlayerVideosSection";
 import { ExecutiveSnapshotCard } from "../components/player-intelligence/ExecutiveSnapshotCard";
 import { SectionCard } from "../components/player-intelligence/SectionCard";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -670,6 +671,11 @@ export default function PlayerDetails() {
                 </div>
               </div>
             </SectionCard>
+
+            <PlayerVideosSection
+              playerId={player.id}
+              analystName={user?.name || "Analista"}
+            />
 
             {similarPlayers.length > 0 ? (
               <SectionCard
