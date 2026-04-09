@@ -17,7 +17,7 @@ export interface AnalysisViewModel {
   date: string;
   playerAId: string | null;
   playerBId: string | null;
-  type: "comparison" | "report";
+  type: "analysis" | "comparison" | "report";
   typeLabel: string;
   players: string[];
   playerDetails: AnalysisPlayerViewModel[];
@@ -102,7 +102,9 @@ function toText(value: unknown, fallback: string) {
 }
 
 function mapType(value: unknown): AnalysisViewModel["type"] {
-  return value === "COMPARISON" || value === "PLAYER_COMPARISON" ? "comparison" : "report";
+  if (value === "COMPARISON" || value === "PLAYER_COMPARISON") return "comparison";
+  if (value === "ANALYSIS" || value === "PLAYER_ANALYSIS") return "analysis";
+  return "report";
 }
 
 function mapStatus(value: unknown): AnalysisViewModel["status"] {

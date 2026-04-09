@@ -1,26 +1,31 @@
-import { AppSidebar } from "../components/AppSidebar";
-import { AppHeader } from "../components/AppHeader";
-import { Button } from "../components/ui/button";
-import { Input } from "../components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { memo, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 import {
   Calendar,
-  ChevronDown,
-  ChevronUp,
   Download,
   Eye,
   FileText,
   Filter,
+  GitCompareArrows,
   History as HistoryIcon,
   Loader2,
-  Plus,
   Search,
+  Sparkles,
   Trash2,
   Users,
   X,
 } from "lucide-react";
-import { memo, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { AppSidebar } from "../components/AppSidebar";
+import { AppHeader } from "../components/AppHeader";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../components/ui/select";
 import {
   deleteAnalysisHubEntry,
   getAnalyses,
@@ -28,99 +33,93 @@ import {
   type AnalysisViewModel as AnalysisHistory,
 } from "../services/analysis";
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 type FilterType = "all" | AnalysisHistory["type"];
 type PeriodType = "7d" | "30d" | "90d" | "all";
-type SortField = "date" | "type" | "user";
-type SortOrder = "asc" | "desc";
+type SortOption = "date_desc" | "date_asc" | "type";
 
-type BadgeStyle = {
-  bg: string;
-  text: string;
-  border: string;
-};
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const FALLBACK_BADGE_STYLE: BadgeStyle = {
-  bg: "rgba(148,163,184,0.15)",
-  text: "#94a3b8",
-  border: "rgba(148,163,184,0.3)",
-};
-
-const TYPE_BADGE_STYLES: Record<AnalysisHistory["type"] | string, BadgeStyle> = {
+const TYPE_BADGE_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   comparison: { bg: "rgba(122,92,255,0.15)", text: "#7A5CFF", border: "rgba(122,92,255,0.3)" },
-  report: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
-  analysis: { bg: "rgba(0,194,255,0.15)", text: "#00C2FF", border: "rgba(0,194,255,0.3)" },
+  report:     { bg: "rgba(0,255,156,0.15)",  text: "#00FF9C", border: "rgba(0,255,156,0.3)"  },
+  analysis:   { bg: "rgba(0,194,255,0.15)",  text: "#00C2FF", border: "rgba(0,194,255,0.3)"  },
 };
 
-const STATUS_BADGE_STYLES: Record<AnalysisHistory["status"], BadgeStyle> = {
-  completed: { bg: "rgba(0,255,156,0.15)", text: "#00FF9C", border: "rgba(0,255,156,0.3)" },
+const FALLBACK_BADGE_STYLE = {
+  bg: "rgba(148,163,184,0.15)", text: "#94a3b8", border: "rgba(148,163,184,0.3)",
+};
+
+const STATUS_BADGE_STYLES: Record<AnalysisHistory["status"], { bg: string; text: string; border: string }> = {
+  completed:   { bg: "rgba(0,255,156,0.15)",  text: "#00FF9C", border: "rgba(0,255,156,0.3)"  },
   in_progress: { bg: "rgba(251,191,36,0.15)", text: "#fbbf24", border: "rgba(251,191,36,0.3)" },
-  archived: { bg: "rgba(148,163,184,0.15)", text: "#94a3b8", border: "rgba(148,163,184,0.3)" },
+  archived:    { bg: "rgba(148,163,184,0.15)", text: "#94a3b8", border: "rgba(148,163,184,0.3)" },
+};
+
+const TYPE_ICONS: Record<string, React.ElementType> = {
+  comparison: GitCompareArrows,
+  report:     FileText,
+  analysis:   Sparkles,
 };
 
 const TYPE_OPTIONS: Array<{ value: FilterType; label: string }> = [
-  { value: "all", label: "Todos os tipos" },
-  { value: "comparison", label: "Comparação" },
-  { value: "report", label: "Relatório" },
+  { value: "all",        label: "Todos os tipos" },
+  { value: "analysis",   label: "Análise"        },
+  { value: "comparison", label: "Comparação"     },
+  { value: "report",     label: "Relatório"      },
 ];
 
-
+const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
+  { value: "date_desc", label: "Mais recente" },
+  { value: "date_asc",  label: "Mais antigo"  },
+  { value: "type",      label: "Por tipo"     },
+];
 
 const PERIOD_IN_DAYS: Partial<Record<Exclude<PeriodType, "all">, number>> = {
-  "7d": 7,
-  "30d": 30,
-  "90d": 90,
+  "7d": 7, "30d": 30, "90d": 90,
 };
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function History() {
   const navigate = useNavigate();
-  const [historyItems, setHistoryItems] = useState<AnalysisHistory[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<FilterType>("all");
-  const [filterPeriod, setFilterPeriod] = useState<PeriodType>("90d");
-  const [sortField, setSortField] = useState<SortField>("date");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
 
+  const [historyItems, setHistoryItems] = useState<AnalysisHistory[]>([]);
+  const [searchQuery, setSearchQuery]   = useState("");
+  const [filterType, setFilterType]     = useState<FilterType>("all");
+  const [filterPeriod, setFilterPeriod] = useState<PeriodType>("all");
+  const [sortOption, setSortOption]     = useState<SortOption>("date_desc");
+  const [isLoading, setIsLoading]       = useState(true);
+  const [loadError, setLoadError]       = useState<string | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [actionError, setActionError]       = useState<string | null>(null);
+  const [deletingId, setDeletingId]         = useState<string | null>(null);
+
+  // ── Load & live-refresh ──────────────────────────────────────────────────
   useEffect(() => {
     let active = true;
 
-    async function loadHistory(options?: { silent?: boolean }) {
-      if (!options?.silent) {
-        setIsLoading(true);
-      }
-
+    async function load(opts?: { silent?: boolean }) {
+      if (!opts?.silent) setIsLoading(true);
       try {
-        const response = await getAnalyses();
-        if (!active) {
-          return;
-        }
-
-        setHistoryItems(Array.isArray(response.data) ? response.data : []);
+        const res = await getAnalyses();
+        if (!active) return;
+        setHistoryItems(Array.isArray(res.data) ? res.data : []);
         setLoadError(null);
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-
+      } catch (err) {
+        if (!active) return;
         setHistoryItems([]);
-        setLoadError(error instanceof Error ? error.message : "Nao foi possivel carregar a central de analises.");
+        setLoadError(err instanceof Error ? err.message : "Não foi possível carregar o histórico.");
       } finally {
-        if (active && !options?.silent) {
-          setIsLoading(false);
-        }
+        if (active && !opts?.silent) setIsLoading(false);
       }
     }
 
-    void loadHistory();
+    void load();
 
     const unsubscribe = subscribeToAnalysisHubUpdates(() => {
-      void loadHistory({ silent: true });
+      void load({ silent: true });
     });
 
     return () => {
@@ -129,162 +128,64 @@ export default function History() {
     };
   }, []);
 
+  // ── Derived data ──────────────────────────────────────────────────────────
   const filteredData = useMemo(() => {
-    let filtered = [...historyItems];
+    let items = [...historyItems];
 
     if (searchQuery) {
-      const normalizedQuery = searchQuery.toLowerCase();
-      filtered = filtered.filter(
+      const q = searchQuery.toLowerCase();
+      items = items.filter(
         (item) =>
-          item.title.toLowerCase().includes(normalizedQuery) ||
-          item.description.toLowerCase().includes(normalizedQuery) ||
-          item.players.some((player) => player.toLowerCase().includes(normalizedQuery)) ||
-          item.user.toLowerCase().includes(normalizedQuery),
+          item.title.toLowerCase().includes(q) ||
+          item.description.toLowerCase().includes(q) ||
+          item.players.some((p) => p.toLowerCase().includes(q)) ||
+          item.user.toLowerCase().includes(q),
       );
     }
 
     if (filterType !== "all") {
-      filtered = filtered.filter((item) => item.type === filterType);
+      items = items.filter((item) => item.type === filterType);
     }
 
     if (filterPeriod !== "all") {
-      const periodDays = PERIOD_IN_DAYS[filterPeriod];
-      if (periodDays) {
-        const cutoff = Date.now() - periodDays * 24 * 60 * 60 * 1000;
-        filtered = filtered.filter((item) => new Date(item.date).getTime() >= cutoff);
+      const days = PERIOD_IN_DAYS[filterPeriod];
+      if (days) {
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        items = items.filter((item) => new Date(item.date).getTime() >= cutoff);
       }
     }
 
-    filtered.sort((a, b) => {
-      let comparison = 0;
-
-      if (sortField === "date") {
-        comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
-      } else if (sortField === "type") {
-        comparison = a.typeLabel.localeCompare(b.typeLabel);
-      } else if (sortField === "user") {
-        comparison = a.user.localeCompare(b.user);
-      }
-
-      return sortOrder === "asc" ? comparison : -comparison;
+    items.sort((a, b) => {
+      if (sortOption === "date_asc") return new Date(a.date).getTime() - new Date(b.date).getTime();
+      if (sortOption === "type")     return a.typeLabel.localeCompare(b.typeLabel);
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
     });
 
-    return filtered;
-  }, [filterPeriod, filterType, historyItems, searchQuery, sortField, sortOrder]);
+    return items;
+  }, [historyItems, searchQuery, filterType, filterPeriod, sortOption]);
 
-  const stats = useMemo(() => {
-    const total = historyItems.length;
-    const comparisons = historyItems.filter((item) => item.type === "comparison").length;
-    const reports = historyItems.filter((item) => item.type === "report").length;
+  const stats = useMemo(() => ({
+    total:       historyItems.length,
+    analyses:    historyItems.filter((i) => i.type === "analysis").length,
+    comparisons: historyItems.filter((i) => i.type === "comparison").length,
+    reports:     historyItems.filter((i) => i.type === "report").length,
+  }), [historyItems]);
 
-    return { total, comparisons, reports };
-  }, [historyItems]);
+  const activeFiltersCount = [filterType !== "all", searchQuery !== ""].filter(Boolean).length;
 
-  const activeFiltersCount = [
-    filterType !== "all",
-    searchQuery !== "",
-  ].filter(Boolean).length;
-
-  const filterTypeLabel =
-    filterType === "all" ? "Todos os tipos" : TYPE_OPTIONS.find((option) => option.value === filterType)?.label ?? filterType;
-
+  // ── Handlers ─────────────────────────────────────────────────────────────
   const handleClearFilters = () => {
     setSearchQuery("");
     setFilterType("all");
-    setFilterPeriod("90d");
-    setSelectedIds(new Set());
+    setFilterPeriod("all");
   };
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder((current) => (current === "asc" ? "desc" : "asc"));
-      return;
-    }
-
-    setSortField(field);
-    setSortOrder("desc");
-  };
-
-  const handleDeleteAnalysis = async (item: AnalysisHistory) => {
-    if (deletingId) {
-      return;
-    }
-
-    const confirmed = window.confirm("Deseja remover esta analise da central?");
-    if (!confirmed) {
-      return;
-    }
-
-    setDeletingId(item.id);
-    setActionFeedback(null);
-    setActionError(null);
-
-    try {
-      await deleteAnalysisHubEntry(item);
-      setHistoryItems((current) => current.filter((entry) => entry.id !== item.id));
-      setActionFeedback(
-        item.deleteManagedBy === "scout_report"
-          ? "ScoutReport removido da central com sucesso."
-          : "Analise removida da central com sucesso.",
-      );
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Nao foi possivel excluir a analise.");
-    } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const handleToggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const handleSelectAll = () => {
-    if (selectedIds.size === filteredData.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredData.map((item) => item.id)));
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    const deletable = filteredData.filter((item) => selectedIds.has(item.id) && item.canDelete);
-    if (deletable.length === 0) return;
-    const confirmed = window.confirm(`Excluir ${deletable.length} analise(s) selecionada(s)?`);
-    if (!confirmed) return;
-
-    setBulkDeleting(true);
-    setActionFeedback(null);
-    setActionError(null);
-
-    const results = await Promise.allSettled(deletable.map((item) => deleteAnalysisHubEntry(item)));
-    const failed = results.filter((r) => r.status === "rejected").length;
-
-    setHistoryItems((current) =>
-      current.filter((entry) => !deletable.some((d) => d.id === entry.id)),
-    );
-    setSelectedIds(new Set());
-    setBulkDeleting(false);
-
-    if (failed > 0) {
-      setActionError(`${failed} exclus${failed > 1 ? "ões" : "ão"} falhou.`);
-    } else {
-      setActionFeedback(`${deletable.length} analise(s) removida(s) com sucesso.`);
-    }
-  };
-
-  const handleBulkDownload = () => {
-    const selected = filteredData.filter((item) => selectedIds.has(item.id));
-    const content = selected
-      .map(
-        (item) =>
-          `ID: ${item.id}\nTipo: ${item.typeLabel}\nTítulo: ${item.title}\nJogadores: ${item.players.join(", ")}\nAnalista: ${item.user}\nData: ${new Date(item.date).toLocaleString("pt-BR")}\nStatus: ${item.statusLabel}\n`,
+  const handleExport = () => {
+    const content = filteredData
+      .map((i) =>
+        `${i.typeLabel} | ${i.title} | ${i.players.join(", ")} | ${new Date(i.date).toLocaleDateString("pt-BR")}`,
       )
-      .join("\n---\n\n");
+      .join("\n");
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -294,6 +195,26 @@ export default function History() {
     URL.revokeObjectURL(url);
   };
 
+  const handleDelete = async (item: AnalysisHistory) => {
+    if (deletingId) return;
+    if (!window.confirm("Remover este registro do histórico?")) return;
+
+    setDeletingId(item.id);
+    setActionFeedback(null);
+    setActionError(null);
+
+    try {
+      await deleteAnalysisHubEntry(item);
+      setHistoryItems((prev) => prev.filter((e) => e.id !== item.id));
+      setActionFeedback("Registro removido do histórico.");
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Não foi possível excluir.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen bg-[#07142A]">
       <AppSidebar />
@@ -301,77 +222,176 @@ export default function History() {
         <AppHeader />
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-[1600px] mx-auto">
-            <HeaderSection onCreateAnalysis={() => navigate("/compare")} />
-            <KPISection stats={stats} onFilterClick={setFilterType} />
-            <FiltersSection
-              searchQuery={searchQuery}
-              setSearchQuery={setSearchQuery}
-              filterType={filterType}
-              setFilterType={setFilterType}
-              filterTypeLabel={filterTypeLabel}
-              filterPeriod={filterPeriod}
-              setFilterPeriod={setFilterPeriod}
-              activeFiltersCount={activeFiltersCount}
-              onClearFilters={handleClearFilters}
-            />
+
+            {/* ── Header ── */}
+            <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h1 className="mb-2 text-4xl font-semibold">Histórico</h1>
+                <p className="text-sm text-gray-500">
+                  Registro de análises, comparações e relatórios salvos manualmente
+                </p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <Button
+                  variant="outline"
+                  onClick={handleExport}
+                  className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] px-5 hover:bg-[rgba(255,255,255,0.04)]"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar
+                </Button>
+                <Button
+                  onClick={() => navigate("/compare")}
+                  className="h-11 rounded-[12px] bg-[#00C2FF]/90 px-6 font-semibold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.25)] hover:bg-[#00C2FF]"
+                >
+                  <GitCompareArrows className="mr-2 h-4 w-4" />
+                  Nova Comparação
+                </Button>
+              </div>
+            </div>
+
+            {/* ── KPIs ── */}
+            <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+              <KPICard
+                icon={HistoryIcon} iconColor="#00C2FF" iconBg="rgba(0,194,255,0.12)"
+                label="Total" value={stats.total}
+                onClick={() => setFilterType("all")}
+              />
+              <KPICard
+                icon={Sparkles} iconColor="#00C2FF" iconBg="rgba(0,194,255,0.08)"
+                label="Análises" value={stats.analyses}
+                onClick={() => setFilterType("analysis")}
+              />
+              <KPICard
+                icon={GitCompareArrows} iconColor="#7A5CFF" iconBg="rgba(122,92,255,0.12)"
+                label="Comparações" value={stats.comparisons}
+                onClick={() => setFilterType("comparison")}
+              />
+              <KPICard
+                icon={FileText} iconColor="#00FF9C" iconBg="rgba(0,255,156,0.12)"
+                label="Relatórios" value={stats.reports}
+                onClick={() => setFilterType("report")}
+              />
+            </div>
+
+            {/* ── Filters ── */}
+            <div className="mb-8 rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-5 backdrop-blur-sm">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
+
+                <div className="relative sm:col-span-2 lg:col-span-5">
+                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar por título, jogador ou analista..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] pl-11 focus:border-[#00C2FF]"
+                  />
+                </div>
+
+                <div className="lg:col-span-3">
+                  <Select value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
+                    <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+                      <Filter className="mr-2 h-4 w-4 text-gray-500" />
+                      <SelectValue placeholder="Tipo" />
+                    </SelectTrigger>
+                    <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
+                      {TYPE_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <Select value={filterPeriod} onValueChange={(v) => setFilterPeriod(v as PeriodType)}>
+                    <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+                      <Calendar className="mr-2 h-4 w-4 text-gray-500" />
+                      <SelectValue placeholder="Período" />
+                    </SelectTrigger>
+                    <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
+                      <SelectItem value="all">Todo período</SelectItem>
+                      <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                      <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                      <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+                    <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
+                      {SORT_OPTIONS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {activeFiltersCount > 0 && (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {filterType !== "all" && (
+                    <FilterChip
+                      label={`Tipo: ${TYPE_OPTIONS.find((o) => o.value === filterType)?.label ?? filterType}`}
+                      onRemove={() => setFilterType("all")}
+                    />
+                  )}
+                  {searchQuery && (
+                    <FilterChip label={`"${searchQuery}"`} onRemove={() => setSearchQuery("")} />
+                  )}
+                  <button
+                    onClick={handleClearFilters}
+                    className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                  >
+                    Limpar filtros
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* ── Feedback toasts ── */}
             {actionFeedback && (
               <div className="mb-6 rounded-[16px] border border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] px-5 py-4 text-sm text-[#9CFFD1]">
                 {actionFeedback}
               </div>
             )}
-            {(loadError || actionError) && (
+            {(loadError ?? actionError) && (
               <div className="mb-6 rounded-[16px] border border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
                 {loadError ?? actionError}
               </div>
             )}
-            {selectedIds.size > 0 && (
-              <div className="mb-4 flex items-center gap-4 rounded-[14px] border border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.07)] px-5 py-3">
-                <span className="text-sm font-semibold text-[#00C2FF]">
-                  {selectedIds.size} selecionada{selectedIds.size > 1 ? "s" : ""}
-                </span>
-                <div className="ml-auto flex items-center gap-2">
-                  <button
-                    onClick={handleBulkDownload}
-                    className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(0,194,255,0.3)] bg-[rgba(0,194,255,0.1)] px-4 py-2 text-xs font-semibold text-[#00C2FF] transition-all hover:bg-[rgba(0,194,255,0.18)]"
-                  >
-                    <Download className="h-3.5 w-3.5" />
-                    Baixar selecionados
-                  </button>
-                  <button
-                    onClick={() => void handleBulkDelete()}
-                    disabled={bulkDeleting}
-                    className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,77,79,0.3)] bg-[rgba(255,77,79,0.1)] px-4 py-2 text-xs font-semibold text-[#FF4D4F] transition-all hover:bg-[rgba(255,77,79,0.18)] disabled:opacity-50"
-                  >
-                    {bulkDeleting ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
-                    )}
-                    {bulkDeleting ? "Excluindo..." : "Excluir selecionados"}
-                  </button>
-                  <button
-                    onClick={() => setSelectedIds(new Set())}
-                    className="rounded-[8px] p-2 text-gray-500 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-gray-300"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+
+            {/* ── Content ── */}
+            {isLoading ? (
+              <LoadingState />
+            ) : filteredData.length === 0 ? (
+              <EmptyState
+                hasFilters={activeFiltersCount > 0 || filterPeriod !== "all"}
+                onClear={handleClearFilters}
+              />
+            ) : (
+              <>
+                <p className="mb-4 text-xs text-gray-600">
+                  {filteredData.length} {filteredData.length === 1 ? "registro" : "registros"}
+                </p>
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  {filteredData.map((item) => (
+                    <HistoryCard
+                      key={item.id}
+                      item={item}
+                      deleting={deletingId === item.id}
+                      onView={() => navigate(`/analysis/${item.id}`)}
+                      onDelete={() => void handleDelete(item)}
+                    />
+                  ))}
                 </div>
-              </div>
+              </>
             )}
-            <ActivityTable
-              data={filteredData}
-              sortField={sortField}
-              sortOrder={sortOrder}
-              onSort={handleSort}
-              isLoading={isLoading}
-              deletingId={deletingId}
-              selectedIds={selectedIds}
-              allSelected={filteredData.length > 0 && selectedIds.size === filteredData.length}
-              onSelectAll={handleSelectAll}
-              onToggleSelect={handleToggleSelect}
-              onViewReport={(item) => navigate(`/analysis/${item.id}`)}
-              onDelete={handleDeleteAnalysis}
-            />
+
           </div>
         </main>
       </div>
@@ -379,493 +399,209 @@ export default function History() {
   );
 }
 
-const HeaderSection = memo(({ onCreateAnalysis }: { onCreateAnalysis: () => void }) => {
-  return (
-    <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-      <div>
-        <h1 className="mb-3 text-4xl font-semibold">Histórico</h1>
-        <p className="text-sm text-gray-500">Registro de análises, comparações e relatórios salvos manualmente</p>
-      </div>
-      <div className="flex items-center gap-3">
-        <Button
-          variant="outline"
-          className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] px-5 hover:bg-[rgba(255,255,255,0.04)]"
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Exportar
-        </Button>
-        <Button
-          onClick={onCreateAnalysis}
-          className="h-11 rounded-[12px] bg-[#00C2FF]/90 px-6 font-semibold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.25)] transition-all hover:bg-[#00C2FF] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)]"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Nova Analise
-        </Button>
-      </div>
-    </div>
-  );
-});
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
 
-HeaderSection.displayName = "HeaderSection";
-
-interface KPISectionProps {
-  stats: { total: number; comparisons: number; reports: number };
-  onFilterClick: (type: FilterType) => void;
-}
-
-const KPISection = memo(({ stats, onFilterClick }: KPISectionProps) => {
-  return (
-    <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
-      <KPICard
-        icon={HistoryIcon}
-        iconColor="#00C2FF"
-        iconBg="rgba(0,194,255,0.15)"
-        label="Total de registros"
-        value={stats.total}
-        subtitle="Itens salvos manualmente"
-        onClick={() => onFilterClick("all")}
-      />
-      <KPICard
-        icon={Users}
-        iconColor="#7A5CFF"
-        iconBg="rgba(122,92,255,0.15)"
-        label="Comparações"
-        value={stats.comparisons}
-        subtitle="Análises comparativas salvas"
-        onClick={() => onFilterClick("comparison")}
-      />
-      <KPICard
-        icon={FileText}
-        iconColor="#00FF9C"
-        iconBg="rgba(0,255,156,0.15)"
-        label="Relatórios"
-        value={stats.reports}
-        subtitle="Relatórios salvos"
-        onClick={() => onFilterClick("report")}
-      />
-    </div>
-  );
-});
-
-KPISection.displayName = "KPISection";
-
-interface KPICardProps {
+const KPICard = memo(({
+  icon: Icon, iconColor, iconBg, label, value, onClick,
+}: {
   icon: React.ElementType;
   iconColor: string;
   iconBg: string;
   label: string;
   value: number;
-  subtitle: string;
   onClick: () => void;
-}
-
-const KPICard = memo(({ icon: Icon, iconColor, iconBg, label, value, subtitle, onClick }: KPICardProps) => {
-  return (
-    <button
-      onClick={onClick}
-      className="group rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 text-left backdrop-blur-sm transition-all hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)]"
-    >
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-[10px]" style={{ background: iconBg }}>
-          <Icon className="h-5 w-5" style={{ color: iconColor }} />
-        </div>
-        <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">{label}</span>
+}) => (
+  <button
+    onClick={onClick}
+    className="group rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-5 text-left transition-all hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)]"
+  >
+    <div className="mb-3 flex items-center gap-2.5">
+      <div className="flex h-9 w-9 items-center justify-center rounded-[9px]" style={{ background: iconBg }}>
+        <Icon className="h-4 w-4" style={{ color: iconColor }} />
       </div>
-      <p className="mb-2 text-4xl font-bold" style={{ color: iconColor }}>
-        {value}
-      </p>
-      <p className="text-xs text-gray-600">{subtitle}</p>
-    </button>
-  );
-});
-
+      <span className="text-[10px] font-medium uppercase tracking-wider text-gray-500">{label}</span>
+    </div>
+    <p className="text-3xl font-bold tabular-nums" style={{ color: iconColor }}>{value}</p>
+  </button>
+));
 KPICard.displayName = "KPICard";
 
-interface FiltersSectionProps {
-  searchQuery: string;
-  setSearchQuery: (value: string) => void;
-  filterType: FilterType;
-  setFilterType: (value: FilterType) => void;
-  filterTypeLabel: string;
-  filterPeriod: PeriodType;
-  setFilterPeriod: (value: PeriodType) => void;
-  activeFiltersCount: number;
-  onClearFilters: () => void;
-}
+// ─── Filter Chip ──────────────────────────────────────────────────────────────
 
-const FiltersSection = memo(({
-  searchQuery,
-  setSearchQuery,
-  filterType,
-  setFilterType,
-  filterTypeLabel,
-  filterPeriod,
-  setFilterPeriod,
-  activeFiltersCount,
-  onClearFilters,
-}: FiltersSectionProps) => {
-  return (
-    <div className="mb-8 rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 backdrop-blur-sm">
-      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="relative lg:col-span-6">
-          <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-          <Input
-            type="text"
-            placeholder="Buscar por título, jogador ou analista..."
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] pl-11 focus:border-[#00C2FF]"
-          />
-        </div>
-
-        <div className="lg:col-span-3">
-          <Select value={filterType} onValueChange={(value) => setFilterType(value as FilterType)}>
-            <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
-              <Filter className="mr-2 h-4 w-4 text-gray-500" />
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
-              {TYPE_OPTIONS.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="lg:col-span-3">
-          <Select value={filterPeriod} onValueChange={(value) => setFilterPeriod(value as PeriodType)}>
-            <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
-              <Calendar className="mr-2 h-4 w-4 text-gray-500" />
-              <SelectValue placeholder="Período" />
-            </SelectTrigger>
-            <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
-              <SelectItem value="all">Todos os períodos</SelectItem>
-              <SelectItem value="7d">Últimos 7 dias</SelectItem>
-              <SelectItem value="30d">Últimos 30 dias</SelectItem>
-              <SelectItem value="90d">Últimos 90 dias</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {activeFiltersCount > 0 && (
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-500">
-            {activeFiltersCount} filtro{activeFiltersCount > 1 ? "s" : ""} ativo{activeFiltersCount > 1 ? "s" : ""}
-          </span>
-          <div className="flex flex-wrap items-center gap-2">
-            {filterType !== "all" && <FilterChip label={`Tipo: ${filterTypeLabel}`} onRemove={() => setFilterType("all")} />}
-            {searchQuery && <FilterChip label={`Busca: "${searchQuery}"`} onRemove={() => setSearchQuery("")} />}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onClearFilters}
-            className="ml-auto rounded-[8px] text-gray-500 hover:bg-[rgba(255,255,255,0.04)] hover:text-gray-300"
-          >
-            Limpar filtros
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-});
-
-FiltersSection.displayName = "FiltersSection";
-
-const FilterChip = memo(({ label, onRemove }: { label: string; onRemove: () => void }) => {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1.5 text-xs text-gray-300">
-      {label}
-      <button onClick={onRemove} className="transition-colors hover:text-white" aria-label={`Remover filtro ${label}`}>
-        <X className="h-3 w-3" />
-      </button>
-    </span>
-  );
-});
-
+const FilterChip = memo(({ label, onRemove }: { label: string; onRemove: () => void }) => (
+  <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs text-gray-300">
+    {label}
+    <button onClick={onRemove} className="transition-colors hover:text-white">
+      <X className="h-3 w-3" />
+    </button>
+  </span>
+));
 FilterChip.displayName = "FilterChip";
 
-interface ActivityTableProps {
-  data: AnalysisHistory[];
-  sortField: SortField;
-  sortOrder: SortOrder;
-  onSort: (field: SortField) => void;
-  isLoading: boolean;
-  deletingId: string | null;
-  selectedIds: Set<string>;
-  allSelected: boolean;
-  onSelectAll: () => void;
-  onToggleSelect: (id: string) => void;
-  onViewReport: (item: AnalysisHistory) => void;
-  onDelete: (item: AnalysisHistory) => void;
-}
+// ─── History Card ─────────────────────────────────────────────────────────────
 
-const ActivityTable = memo(({
-  data,
-  sortField,
-  sortOrder,
-  onSort,
-  isLoading,
-  deletingId,
-  selectedIds,
-  allSelected,
-  onSelectAll,
-  onToggleSelect,
-  onViewReport,
-  onDelete,
-}: ActivityTableProps) => {
-  if (isLoading) {
-    return <LoadingState />;
-  }
-
-  if (data.length === 0) {
-    return <EmptyState />;
-  }
-
-  return (
-    <div className="overflow-hidden rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] backdrop-blur-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[980px]">
-          <thead className="border-b border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)]">
-            <tr>
-              <th className="px-5 py-4 text-left">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={onSelectAll}
-                  className="h-4 w-4 cursor-pointer rounded border-[rgba(255,255,255,0.2)] bg-transparent accent-[#00C2FF]"
-                  title="Selecionar todos"
-                />
-              </th>
-              <TableHeader label="Tipo" field="type" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">Analise</th>
-              <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">Jogadores</th>
-              <TableHeader label="Analista" field="user" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <TableHeader label="Data" field="date" sortField={sortField} sortOrder={sortOrder} onSort={onSort} />
-              <th className="px-5 py-4 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">Status</th>
-              <th className="px-5 py-4 text-center text-[10px] font-medium uppercase tracking-wider text-gray-500">Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((item) => (
-              <ActivityRow
-                key={item.id}
-                item={item}
-                deleting={deletingId === item.id}
-                selected={selectedIds.has(item.id)}
-                onToggleSelect={onToggleSelect}
-                onViewReport={onViewReport}
-                onDelete={onDelete}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-});
-
-ActivityTable.displayName = "ActivityTable";
-
-interface TableHeaderProps {
-  label: string;
-  field: SortField;
-  sortField: SortField;
-  sortOrder: SortOrder;
-  onSort: (field: SortField) => void;
-}
-
-const TableHeader = memo(({ label, field, sortField, sortOrder, onSort }: TableHeaderProps) => {
-  const isActive = sortField === field;
-
-  return (
-    <th className="px-5 py-4 text-left">
-      <button
-        onClick={() => onSort(field)}
-        className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-gray-500 transition-colors hover:text-gray-300"
-      >
-        {label}
-        {isActive &&
-          (sortOrder === "asc" ? (
-            <ChevronUp className="h-3.5 w-3.5 text-[#00C2FF]" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-[#00C2FF]" />
-          ))}
-      </button>
-    </th>
-  );
-});
-
-TableHeader.displayName = "TableHeader";
-
-const ActivityRow = memo(({
-  item,
-  deleting,
-  selected,
-  onToggleSelect,
-  onViewReport,
-  onDelete,
+const HistoryCard = memo(({
+  item, deleting, onView, onDelete,
 }: {
   item: AnalysisHistory;
   deleting: boolean;
-  selected: boolean;
-  onToggleSelect: (id: string) => void;
-  onViewReport: (item: AnalysisHistory) => void;
-  onDelete: (item: AnalysisHistory) => void;
+  onView: () => void;
+  onDelete: () => void;
 }) => {
+  const typeBadge   = TYPE_BADGE_STYLES[item.type]    ?? FALLBACK_BADGE_STYLE;
+  const statusBadge = STATUS_BADGE_STYLES[item.status] ?? FALLBACK_BADGE_STYLE;
+  const TypeIcon    = TYPE_ICONS[item.type] ?? FileText;
+
+  const dateStr = new Date(item.date).toLocaleDateString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+  });
+  const timeStr = new Date(item.date).toLocaleTimeString("pt-BR", {
+    hour: "2-digit", minute: "2-digit",
+  });
+
   return (
-    <tr
-      className={`group transition-colors hover:bg-[rgba(255,255,255,0.02)] ${selected ? "bg-[rgba(0,194,255,0.04)]" : ""}`}
-    >
-      <td className="px-5 py-4">
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={() => onToggleSelect(item.id)}
-          onClick={(e) => e.stopPropagation()}
-          className="h-4 w-4 cursor-pointer rounded border-[rgba(255,255,255,0.2)] bg-transparent accent-[#00C2FF]"
-        />
-      </td>
-      <td className="px-5 py-4">
-        <TypeBadge type={item.type} label={item.typeLabel} />
-      </td>
-      <td className="px-5 py-4">
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-gray-200">{item.title}</p>
-          {item.description && <p className="max-w-[360px] text-xs text-gray-500">{item.description}</p>}
+    <div className="group flex flex-col rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-5 transition-all hover:border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.035)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+
+      {/* Top: type + status + date */}
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-[6px] border px-2 py-1 text-[10px] font-semibold"
+            style={{ backgroundColor: typeBadge.bg, color: typeBadge.text, borderColor: typeBadge.border }}
+          >
+            <TypeIcon className="h-3 w-3" />
+            {item.typeLabel}
+          </span>
+          <span
+            className="inline-flex items-center rounded-[6px] border px-2 py-1 text-[10px] font-semibold"
+            style={{ backgroundColor: statusBadge.bg, color: statusBadge.text, borderColor: statusBadge.border }}
+          >
+            {item.statusLabel}
+          </span>
         </div>
-      </td>
-      <td className="px-5 py-4">
-        <span className="text-sm text-gray-300">{item.players.join(", ")}</span>
-      </td>
-      <td className="px-5 py-4">
-        <span className="text-sm text-[#00C2FF]">{item.user}</span>
-      </td>
-      <td className="px-5 py-4">
-        <span className="tabular-nums text-xs text-gray-500">
-          {new Date(item.date).toLocaleString("pt-BR", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </span>
-      </td>
-      <td className="px-5 py-4">
-        <StatusBadge status={item.status} label={item.statusLabel} />
-      </td>
-      <td className="px-5 py-4">
-        <div className="flex items-center justify-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-          <ActionButton icon={Eye} tooltip="Abrir análise" onClick={() => onViewReport(item)} />
+        <div className="shrink-0 text-right">
+          <p className="text-[11px] font-medium tabular-nums text-gray-400">{dateStr}</p>
+          <p className="text-[10px] tabular-nums text-gray-600">{timeStr}</p>
+        </div>
+      </div>
+
+      {/* Title */}
+      <h3 className="mb-1.5 line-clamp-2 text-sm font-semibold leading-snug text-gray-100">
+        {item.title}
+      </h3>
+
+      {/* Description */}
+      {item.description && (
+        <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-gray-500">
+          {item.description}
+        </p>
+      )}
+
+      {/* Players */}
+      {item.players.length > 0 && (
+        <div className="mb-4 flex items-start gap-1.5">
+          <Users className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-600" />
+          <span className="text-xs text-gray-400 line-clamp-2 leading-relaxed">
+            {item.players.join(", ")}
+          </span>
+        </div>
+      )}
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Footer */}
+      <div className="mt-4 flex items-center justify-between border-t border-[rgba(255,255,255,0.05)] pt-4">
+        <span className="text-[11px] text-[#00C2FF] truncate max-w-[60%]">{item.user}</span>
+        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <ActionButton icon={Eye} tooltip="Ver análise" onClick={onView} />
           <ActionButton
-            icon={Trash2}
+            icon={deleting ? Loader2 : Trash2}
             tooltip={deleting ? "Excluindo..." : "Remover do histórico"}
             variant="danger"
             disabled={deleting || !item.canDelete}
-            onClick={() => onDelete(item)}
+            spinning={deleting}
+            onClick={onDelete}
           />
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 });
+HistoryCard.displayName = "HistoryCard";
 
-ActivityRow.displayName = "ActivityRow";
-
-const TypeBadge = memo(({ type, label }: { type: AnalysisHistory["type"]; label: string }) => {
-  const colors = TYPE_BADGE_STYLES[type] ?? FALLBACK_BADGE_STYLE;
-
-  return (
-    <span
-      className="inline-flex items-center rounded-[6px] border px-2.5 py-1 text-[10px] font-semibold"
-      style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
-    >
-      {label}
-    </span>
-  );
-});
-
-TypeBadge.displayName = "TypeBadge";
-
-const StatusBadge = memo(({ status, label }: { status: AnalysisHistory["status"]; label: string }) => {
-  const colors = STATUS_BADGE_STYLES[status] ?? FALLBACK_BADGE_STYLE;
-
-  return (
-    <span
-      className="inline-flex items-center rounded-[6px] border px-2.5 py-1 text-[10px] font-semibold"
-      style={{ backgroundColor: colors.bg, color: colors.text, borderColor: colors.border }}
-    >
-      {label}
-    </span>
-  );
-});
-
-StatusBadge.displayName = "StatusBadge";
+// ─── Action Button ────────────────────────────────────────────────────────────
 
 const ActionButton = memo(({
-  icon: Icon,
-  tooltip,
-  variant = "default",
-  disabled = false,
-  onClick,
+  icon: Icon, tooltip, variant = "default", disabled = false, spinning = false, onClick,
 }: {
   icon: React.ElementType;
   tooltip: string;
   variant?: "default" | "danger";
   disabled?: boolean;
+  spinning?: boolean;
   onClick?: () => void;
-}) => {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors ${
-        variant === "danger"
-          ? "hover:bg-[rgba(255,77,79,0.15)] hover:text-[#FF4D4F]"
-          : "hover:bg-[rgba(0,194,255,0.15)] hover:text-[#00C2FF]"
-      } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
-      title={tooltip}
-      aria-label={tooltip}
-    >
-      <Icon className="h-4 w-4" />
-    </button>
-  );
-});
-
+}) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    title={tooltip}
+    aria-label={tooltip}
+    className={`flex h-8 w-8 items-center justify-center rounded-[8px] transition-colors
+      ${variant === "danger"
+        ? "hover:bg-[rgba(255,77,79,0.15)] hover:text-[#FF4D4F]"
+        : "hover:bg-[rgba(0,194,255,0.15)] hover:text-[#00C2FF]"
+      }
+      ${disabled ? "cursor-not-allowed opacity-40" : ""}
+    `}
+  >
+    <Icon className={`h-4 w-4 ${spinning ? "animate-spin" : ""}`} />
+  </button>
+));
 ActionButton.displayName = "ActionButton";
 
-const EmptyState = memo(() => {
-  return (
-    <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-16 text-center backdrop-blur-sm">
-      <div className="mx-auto max-w-sm">
-        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[14px] bg-[rgba(0,194,255,0.08)]">
-          <HistoryIcon className="h-8 w-8 text-[#00C2FF]/60" />
-        </div>
-        <h3 className="mb-2 text-lg font-semibold text-gray-200">Sem registros no período</h3>
-        <p className="text-sm leading-relaxed text-gray-500">
-          Salve manualmente uma análise, comparação ou relatório para que ela apareça aqui.
-        </p>
-        <p className="mt-3 text-xs text-gray-600">
-          Dica: use o botão <span className="text-[#00C2FF]">"Salvar no histórico"</span> disponível nas páginas de análise e comparação.
-        </p>
-      </div>
-    </div>
-  );
-});
+// ─── Empty State ──────────────────────────────────────────────────────────────
 
+const EmptyState = memo(({ hasFilters, onClear }: { hasFilters: boolean; onClear: () => void }) => (
+  <div className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-16 text-center backdrop-blur-sm">
+    <div className="mx-auto max-w-sm">
+      <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[14px] bg-[rgba(0,194,255,0.08)]">
+        <HistoryIcon className="h-8 w-8 text-[#00C2FF]/50" />
+      </div>
+      {hasFilters ? (
+        <>
+          <h3 className="mb-2 text-lg font-semibold text-gray-200">Nenhum resultado</h3>
+          <p className="mb-5 text-sm leading-relaxed text-gray-500">
+            Nenhum registro encontrado com os filtros ativos.
+          </p>
+          <button
+            onClick={onClear}
+            className="rounded-[10px] border border-[rgba(0,194,255,0.3)] bg-[rgba(0,194,255,0.1)] px-5 py-2.5 text-sm font-semibold text-[#00C2FF] transition-all hover:bg-[rgba(0,194,255,0.16)]"
+          >
+            Limpar filtros
+          </button>
+        </>
+      ) : (
+        <>
+          <h3 className="mb-2 text-lg font-semibold text-gray-200">Histórico vazio</h3>
+          <p className="text-sm leading-relaxed text-gray-500">
+            Nenhum registro salvo ainda. Use o botão{" "}
+            <span className="font-semibold text-[#00C2FF]">"Salvar no histórico"</span>{" "}
+            nas páginas de análise, comparação ou relatório.
+          </p>
+        </>
+      )}
+    </div>
+  </div>
+));
 EmptyState.displayName = "EmptyState";
 
-const LoadingState = memo(() => {
-  return (
-    <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-16 text-center backdrop-blur-sm">
-      <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-[#00C2FF]" />
-      <p className="text-sm text-gray-500">Carregando analises...</p>
-    </div>
-  );
-});
+// ─── Loading State ────────────────────────────────────────────────────────────
 
+const LoadingState = memo(() => (
+  <div className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-16 text-center backdrop-blur-sm">
+    <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-[#00C2FF]/60" />
+    <p className="text-sm text-gray-500">Carregando histórico...</p>
+  </div>
+));
 LoadingState.displayName = "LoadingState";

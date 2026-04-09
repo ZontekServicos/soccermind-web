@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { ArrowLeft, Star } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, Star } from "lucide-react";
 import { positionLabel } from "../utils/positions";
 import { Link, useNavigate, useParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
@@ -8,9 +8,11 @@ import { DNABars } from "../components/player-intelligence/DNABars";
 import { ExecutiveSnapshotCard } from "../components/player-intelligence/ExecutiveSnapshotCard";
 import { SectionCard } from "../components/player-intelligence/SectionCard";
 import { useLanguage } from "../contexts/LanguageContext";
+import { useAuth } from "../contexts/AuthContext";
 import { getPlayerIntelligenceProfile } from "../services/playerIntelligence";
 import { getPlayer, getPlayerProjection, getSimilarPlayers } from "../services/players";
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
+import { createAnalysisEntry } from "../services/analysis";
 import type {
   FieldIntelligence,
   PlayerIntelligenceProfile,
@@ -225,12 +227,15 @@ export default function PlayerDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [player, setPlayer] = useState<PlayerProfileModel | null>(null);
   const [similarPlayers, setSimilarPlayers] = useState<PlayerCardModel[]>([]);
   const [profile, setProfile] = useState<PlayerIntelligenceProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [savedToHistory, setSavedToHistory] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -339,6 +344,23 @@ export default function PlayerDetails() {
       setIsInWatchlist(true);
     } catch (watchlistError) {
       setError(watchlistError instanceof Error ? watchlistError.message : translate("player.loadError"));
+    }
+  }
+
+  async function handleSaveToHistory() {
+    if (!player || saveLoading || savedToHistory) return;
+    setSaveLoading(true);
+    try {
+      await createAnalysisEntry({
+        playerId: player.id,
+        playerName: profile?.identity.name ?? player.name ?? player.id,
+        title: `Análise — ${profile?.identity.name ?? player.name}`,
+        description: profile?.summary.recommendation ?? "",
+        analyst: user?.name,
+      });
+      setSavedToHistory(true);
+    } finally {
+      setSaveLoading(false);
     }
   }
 
@@ -455,22 +477,38 @@ export default function PlayerDetails() {
                   <InsightCard label={t("player.currentLevel")} value={`${profile.summary.currentLevel.score}`} />
                   <InsightCard label={t("player.expectedPeak")} value={`${profile.projection.expectedPeakOverall}`} tone="green" />
                   <InsightCard label={t("player.marketValue")} value={formatMarketValue(profile.market.currentValue)} tone="amber" />
-                  <button
-                    type="button"
-                    onClick={handleWatchlistToggle}
-                    className={`rounded-[18px] border px-5 py-4 text-left transition-colors ${
-                      isInWatchlist
-                        ? "border-[#fbbf24] bg-[#fbbf24]/12 text-[#fbbf24]"
-                        : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300 hover:border-[#fbbf24]/50"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Star className="h-4 w-4" fill={isInWatchlist ? "currentColor" : "none"} />
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em]">
-                        {isInWatchlist ? t("player.watchlistSaved") : t("player.save")}
-                      </span>
-                    </div>
-                  </button>
+                  {/* Watchlist + Save — stacked in the same 4th column slot */}
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={handleWatchlistToggle}
+                      className={`flex-1 rounded-[18px] border px-5 py-3 text-left transition-colors ${
+                        isInWatchlist
+                          ? "border-[#fbbf24] bg-[#fbbf24]/12 text-[#fbbf24]"
+                          : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300 hover:border-[#fbbf24]/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Star className="h-4 w-4" fill={isInWatchlist ? "currentColor" : "none"} />
+                        <span className="text-xs font-semibold uppercase tracking-[0.18em]">
+                          {isInWatchlist ? t("player.watchlistSaved") : t("player.save")}
+                        </span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveToHistory()}
+                      disabled={saveLoading || savedToHistory}
+                      className={`flex items-center gap-2 rounded-[14px] border px-5 py-3 text-left text-xs font-semibold uppercase tracking-[0.18em] transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                        savedToHistory
+                          ? "border-[rgba(0,255,156,0.3)] bg-[rgba(0,255,156,0.08)] text-[#00FF9C]"
+                          : "border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.08)] text-[#9BE7FF] hover:bg-[rgba(0,194,255,0.14)]"
+                      }`}
+                    >
+                      <BookmarkPlus className="h-4 w-4 shrink-0" />
+                      {savedToHistory ? "Salvo ✓" : saveLoading ? "Salvando..." : "Histórico"}
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>

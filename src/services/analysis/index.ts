@@ -24,6 +24,14 @@ export interface CreateReportAnalysisPayload {
   analyst?: string;
 }
 
+export interface CreateAnalysisEntryPayload {
+  playerId: string;
+  playerName: string;
+  title?: string;
+  description?: string;
+  analyst?: string;
+}
+
 const ANALYSIS_HUB_UPDATED_EVENT = "soccermind:analysis-hub-updated";
 
 type AnalysisHubUpdateDetail = {
@@ -299,6 +307,44 @@ export async function createReportAnalysis(payload: CreateReportAnalysisPayload)
     const analysis = mapAnalysisResponse(response.data);
     addToSessionCache(analysis);
 
+    return { ...response, data: analysis };
+  } catch {
+    addToSessionCache(localEntry);
+    return { success: true, data: localEntry, error: null, meta: { source: "mock" as const } };
+  }
+}
+
+export async function createAnalysisEntry(payload: CreateAnalysisEntryPayload) {
+  const localEntry: AnalysisViewModel = {
+    id: `ANL-${Date.now()}`,
+    title: payload.title ?? `Análise — ${payload.playerName}`,
+    description: payload.description ?? "",
+    date: new Date().toISOString(),
+    type: "analysis",
+    typeLabel: "Análise",
+    players: [payload.playerName],
+    playerDetails: [],
+    playerAId: payload.playerId,
+    playerBId: null,
+    user: payload.analyst ?? "Scout",
+    club: "",
+    status: "completed",
+    statusLabel: "Concluído",
+    canDelete: true,
+    isLegacy: false,
+    sourceOrigin: "analysis",
+    sourceLabel: "Central Analysis",
+    deleteManagedBy: "analysis",
+    deleteHint: "Salvo localmente nesta sessão.",
+  };
+
+  try {
+    const response = await apiFetch<unknown>("/analysis/player", {
+      method: "POST",
+      body: JSON.stringify({ playerId: payload.playerId, title: localEntry.title, description: payload.description, analyst: payload.analyst }),
+    });
+    const analysis = mapAnalysisResponse(response.data);
+    addToSessionCache(analysis);
     return { ...response, data: analysis };
   } catch {
     addToSessionCache(localEntry);
