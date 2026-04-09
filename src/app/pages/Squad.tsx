@@ -178,6 +178,73 @@ function calcCollectiveDna(lineup: SquadLineup): DnaScore | null {
   };
 }
 
+// ─── FilterBar ────────────────────────────────────────────────────────────────
+// Must live OUTSIDE Squad so React sees a stable component reference across renders.
+// Defining it inside Squad causes unmount+remount on every state change, which
+// makes the search Input lose focus after each keystroke.
+
+interface FilterBarProps {
+  searchQuery: string;
+  setSearchQuery: (v: string) => void;
+  positionFilter: string;
+  setPositionFilter: (v: string) => void;
+  ovrFilter: string;
+  setOvrFilter: (v: string) => void;
+  cols?: number;
+}
+
+function FilterBar({
+  searchQuery,
+  setSearchQuery,
+  positionFilter,
+  setPositionFilter,
+  ovrFilter,
+  setOvrFilter,
+  cols = 3,
+}: FilterBarProps) {
+  return (
+    <Card className="bg-[#0A1B35] border-[rgba(0,194,255,0.2)] p-4 mb-6">
+      <div className={`grid grid-cols-${cols} gap-4`}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar jogador..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 bg-[#07142A] border-[rgba(0,194,255,0.3)] text-white"
+          />
+        </div>
+        <Select value={positionFilter} onValueChange={setPositionFilter}>
+          <SelectTrigger className="bg-[#07142A] border-[rgba(0,194,255,0.3)]">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {positions.map((pos) => (
+              <SelectItem key={pos.value} value={pos.value}>
+                {pos.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={ovrFilter} onValueChange={setOvrFilter}>
+          <SelectTrigger className="bg-[#07142A] border-[rgba(0,194,255,0.3)]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {ovrOptions.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </Card>
+  );
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function DnaBar({ label, emoji, value }: { label: string; emoji: string; value: number }) {
@@ -394,6 +461,14 @@ export default function Squad() {
   const handleAutoGenerate = () => {
     if (squad.length === 0) return;
 
+    // Clear any active filters so the bench correctly shows remaining players
+    // after the lineup is generated. Filters only affect display — Auto IA
+    // always draws from the full squad.
+    setSearchQuery("");
+    setPositionFilter("all");
+    setOvrFilter("all");
+    setDnaFilter("all");
+
     const newLineup: Record<string, SquadPlayer> = {};
     const usedIds = new Set<string>();
     const formationPositions = formations[formation].positions;
@@ -479,51 +554,6 @@ export default function Squad() {
     setSaveFeedback("Escalação salva com sucesso!");
     setTimeout(() => setSaveFeedback(null), 3000);
   };
-
-  // ── Shared filter bar (cards + list) ──────────────────────────────────────
-  function FilterBar({ cols = 3 }: { cols?: number }) {
-    return (
-      <Card className="bg-[#0A1B35] border-[rgba(0,194,255,0.2)] p-4 mb-6">
-        <div className={`grid grid-cols-${cols} gap-4`}>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Buscar jogador..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-[#07142A] border-[rgba(0,194,255,0.3)] text-white"
-            />
-          </div>
-          <Select value={positionFilter} onValueChange={setPositionFilter}>
-            <SelectTrigger className="bg-[#07142A] border-[rgba(0,194,255,0.3)]">
-              <Filter className="w-4 h-4 mr-2" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {positions.map((pos) => (
-                <SelectItem key={pos.value} value={pos.value}>
-                  {pos.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={ovrFilter} onValueChange={setOvrFilter}>
-            <SelectTrigger className="bg-[#07142A] border-[rgba(0,194,255,0.3)]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ovrOptions.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </Card>
-    );
-  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -953,7 +983,14 @@ export default function Squad() {
             {/* ════════════════════ CARDS VIEW ════════════════════ */}
             {viewMode === "cards" && (
               <>
-                <FilterBar />
+                <FilterBar
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  positionFilter={positionFilter}
+                  setPositionFilter={setPositionFilter}
+                  ovrFilter={ovrFilter}
+                  setOvrFilter={setOvrFilter}
+                />
                 <div className="space-y-8">
                   {Object.entries(groupedPlayers).map(([positionGroup, players]) => {
                     if (players.length === 0) return null;
@@ -1057,7 +1094,14 @@ export default function Squad() {
             {/* ════════════════════ LIST VIEW ════════════════════ */}
             {viewMode === "list" && (
               <>
-                <FilterBar />
+                <FilterBar
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                  positionFilter={positionFilter}
+                  setPositionFilter={setPositionFilter}
+                  ovrFilter={ovrFilter}
+                  setOvrFilter={setOvrFilter}
+                />
                 <Card className="bg-[#0A1B35] border-[rgba(0,194,255,0.2)]">
                   <div className="overflow-x-auto">
                     <table className="w-full">
