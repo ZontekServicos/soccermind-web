@@ -10,6 +10,7 @@ import {
   Target,
   Activity,
   Headset,
+  Search,
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useState, memo } from "react";
@@ -24,6 +25,7 @@ const navigationGroups = [
     label: "nav.operation",
     items: [
       { name: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { name: "nav.scouting", href: "/scouting", icon: Search },
       { name: "nav.history", href: "/history", icon: History },
     ],
   },

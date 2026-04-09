@@ -19,6 +19,7 @@ import History from "./pages/History";
 import AnalysisDetail from "./pages/AnalysisDetail";
 import Governance from "./pages/Governance";
 import PlayersRanking from "./pages/PlayersRanking";
+import PlayerSearch from "./pages/PlayerSearch";
 import PlayerDetails from "./pages/PlayerDetails";
 import SmartMatch from "./pages/SmartMatch";
 import Profile from "./pages/Profile";
@@ -90,6 +91,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <PlayersRanking />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/scouting",
+        element: (
+          <ProtectedRoute>
+            <PlayerSearch />
           </ProtectedRoute>
         ),
       },

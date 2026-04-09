@@ -6,11 +6,9 @@ import {
   Crosshair,
   RotateCcw,
   Search,
-  SlidersHorizontal,
   Star,
   TrendingUp,
   Users,
-  X,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
@@ -162,14 +160,13 @@ export default function PlayersRanking() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(true);
-  const [hasSearched, setHasSearched] = useState(false);
-  // Committed filters — only updated when user clicks "Buscar"
-  const [committedFilters, setCommittedFilters] = useState<PlayersFiltersState | null>(null);
+  // Committed filters — updated on mount (loads automatically) and when user clicks "Buscar"
+  const [committedFilters, setCommittedFilters] = useState<PlayersFiltersState>(initialFilters);
   const [committedPage, setCommittedPage] = useState(1);
   const limit = 20;
 
-  // Dirty flag: user changed filters after last search
-  const isDirty = hasSearched && JSON.stringify(filters) !== JSON.stringify(committedFilters);
+  // Dirty flag: user changed filters since last fetch
+  const isDirty = JSON.stringify(filters) !== JSON.stringify(committedFilters);
 
   useEffect(() => {
     let active = true;
@@ -197,9 +194,8 @@ export default function PlayersRanking() {
     return () => { active = false; };
   }, []);
 
-  // Fetch only when committed filters change
+  // Fetch whenever committed filters or page change
   useEffect(() => {
-    if (!committedFilters) return;
     let active = true;
 
     async function loadPlayers() {
@@ -228,7 +224,6 @@ export default function PlayersRanking() {
   }, [committedFilters, committedPage, limit]);
 
   useEffect(() => {
-    if (!committedFilters) return;
     const f = committedFilters;
     const nextParams = new URLSearchParams();
 
@@ -269,7 +264,6 @@ export default function PlayersRanking() {
   const handleSearch = () => {
     setCommittedFilters({ ...filters });
     setCommittedPage(1);
-    setHasSearched(true);
     setPage(1);
   };
 
@@ -353,10 +347,8 @@ export default function PlayersRanking() {
   const handleClearFilters = () => {
     setPage(1);
     setFilters(DEFAULT_PLAYERS_FILTERS);
-    setCommittedFilters(null);
-    setHasSearched(false);
-    setPlayers([]);
-    setMeta({});
+    setCommittedFilters(DEFAULT_PLAYERS_FILTERS);
+    setCommittedPage(1);
   };
 
   return (
@@ -375,27 +367,25 @@ export default function PlayersRanking() {
                     <Crosshair className="h-3.5 w-3.5" />
                     Scout Intelligence
                   </div>
-                  <h1 className="text-4xl font-semibold text-white">Busca de Jogadores</h1>
+                  <h1 className="text-4xl font-semibold text-white">Ranking de Jogadores</h1>
                   <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400">
-                    Defina os critérios de scouting e execute a busca. O ranking é gerado a partir dos filtros aplicados.
+                    Jogadores ordenados por overall. Use os filtros para refinar por posição, liga, idade ou valor de mercado.
                   </p>
                 </div>
 
-                {hasSearched && (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-4 w-4 text-[#00C2FF]" />
-                        <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Encontrados</p>
-                      </div>
-                      <p className="mt-1 text-2xl font-bold text-[#00C2FF]">{meta.total ?? filteredAndSortedPlayers.length}</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-[#00C2FF]" />
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Jogadores</p>
                     </div>
-                    <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Filtros ativos</p>
-                      <p className="mt-1 text-2xl font-bold text-[#9BE7FF]">{countActiveFilters(committedFilters ?? filters)}</p>
-                    </div>
+                    <p className="mt-1 text-2xl font-bold text-[#00C2FF]">{meta.total ?? filteredAndSortedPlayers.length}</p>
                   </div>
-                )}
+                  <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Filtros ativos</p>
+                    <p className="mt-1 text-2xl font-bold text-[#9BE7FF]">{countActiveFilters(committedFilters)}</p>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -416,10 +406,11 @@ export default function PlayersRanking() {
               <button
                 type="button"
                 onClick={handleSearch}
-                className="inline-flex items-center gap-2.5 rounded-[14px] bg-[#00C2FF] px-7 py-3.5 text-sm font-bold text-[#07142A] shadow-[0_4px_20px_rgba(0,194,255,0.35)] transition-all hover:bg-[#33CFFF] hover:shadow-[0_6px_24px_rgba(0,194,255,0.45)] active:scale-[0.98]"
+                disabled={!isDirty}
+                className="inline-flex items-center gap-2.5 rounded-[14px] bg-[#00C2FF] px-7 py-3.5 text-sm font-bold text-[#07142A] shadow-[0_4px_20px_rgba(0,194,255,0.35)] transition-all hover:bg-[#33CFFF] hover:shadow-[0_6px_24px_rgba(0,194,255,0.45)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Search className="h-4 w-4" />
-                Buscar jogadores
+                Aplicar filtros
               </button>
               {activeFiltersCount > 0 && (
                 <button
@@ -444,7 +435,7 @@ export default function PlayersRanking() {
               </div>
             )}
 
-            {(hasSearched || loading) && <div className="overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+            <div className="overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
               <div className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-8 py-4">
                 <div className="flex items-center gap-6">
                   <div className="w-10 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">#</div>
@@ -570,22 +561,9 @@ export default function PlayersRanking() {
                     </div>
                   ))}
               </div>
-            </div>}
+            </div>
 
-            {!hasSearched && !loading && (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-[20px] border border-[rgba(0,194,255,0.15)] bg-[rgba(0,194,255,0.06)]">
-                  <Crosshair className="h-9 w-9 text-[#00C2FF]/60" />
-                </div>
-                <h3 className="mb-2 text-lg font-semibold text-gray-300">Defina os critérios de busca</h3>
-                <p className="max-w-md text-sm leading-relaxed text-gray-600">
-                  Configure os filtros acima — posição, overall, idade, liga, nível, valor de mercado — e clique em{" "}
-                  <span className="font-semibold text-[#00C2FF]">"Buscar jogadores"</span> para gerar o ranking de scouting.
-                </p>
-              </div>
-            )}
-
-            {hasSearched && !loading && filteredAndSortedPlayers.length === 0 && (
+            {!loading && filteredAndSortedPlayers.length === 0 && (
               <div className="py-16 text-center">
                 <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.03)]">
                   <Search className="h-7 w-7 text-gray-600" />
