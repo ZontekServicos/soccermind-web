@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
 import { AppSidebar } from "../components/AppSidebar";
 import { DNABars } from "../components/player-intelligence/DNABars";
+import { HeatmapField } from "../components/player-intelligence/HeatmapField";
 import { PlayerVideosSection } from "../components/player-intelligence/PlayerVideosSection";
 import { ExecutiveSnapshotCard } from "../components/player-intelligence/ExecutiveSnapshotCard";
 import { SectionCard } from "../components/player-intelligence/SectionCard";
@@ -540,6 +541,15 @@ export default function PlayerDetails() {
                   ))}
                 </div>
               </div>
+            </SectionCard>
+
+            <SectionCard
+              eyebrow="Mapa de Atuação"
+              title="Posicionamento em campo"
+              description="Distribuição espacial do jogador baseada em eventos reais ingeridos do Sportmonks."
+              accent="cyan"
+            >
+              <HeatmapField playerId={player.id} />
             </SectionCard>
 
             <SectionCard
