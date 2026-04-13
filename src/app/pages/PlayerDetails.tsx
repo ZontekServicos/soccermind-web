@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, BookmarkPlus, Star } from "lucide-react";
 import { positionLabel } from "../utils/positions";
 import { Link, useNavigate, useParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
 import { AppSidebar } from "../components/AppSidebar";
 import { DNABars } from "../components/player-intelligence/DNABars";
-import { HeatmapField } from "../components/player-intelligence/HeatmapField";
+import { FieldMapsModule } from "../components/player-intelligence/FieldMapsModule";
 import { PlayerVideosSection } from "../components/player-intelligence/PlayerVideosSection";
 import { ExecutiveSnapshotCard } from "../components/player-intelligence/ExecutiveSnapshotCard";
 import { SectionCard } from "../components/player-intelligence/SectionCard";
@@ -18,8 +18,6 @@ import { createAnalysisEntry } from "../services/analysis";
 import type {
   FieldIntelligence,
   PlayerIntelligenceProfile,
-  SpatialEventPoint,
-  SpatialZone,
 } from "../types/player-intelligence";
 import { normalizePlayerIntelligenceProfile } from "../types/player-intelligence";
 import type { PlayerCardModel, PlayerProfileModel } from "../mappers/player.mapper";
@@ -95,97 +93,6 @@ function MetricBar({ label, value, inverse = false }: { label: string; value: nu
           style={{ width: `${width}%` }}
         />
       </div>
-    </div>
-  );
-}
-
-function PitchBase({ children }: { children: ReactNode }) {
-  return (
-    <div className="overflow-hidden rounded-[18px] border border-[rgba(0,255,156,0.10)] bg-[radial-gradient(circle_at_center,rgba(0,255,156,0.08),transparent_55%),linear-gradient(180deg,#0B2A23,#07142A)]">
-      <svg viewBox="0 0 100 100" className="aspect-[4/5] w-full">
-        <rect x="1" y="1" width="98" height="98" rx="2" fill="transparent" stroke="rgba(255,255,255,0.55)" strokeWidth="0.7" />
-        <line x1="50" y1="1" x2="50" y2="99" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" />
-        <circle cx="50" cy="50" r="10" fill="transparent" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" />
-        <rect x="1" y="21" width="16" height="58" fill="transparent" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
-        <rect x="83" y="21" width="16" height="58" fill="transparent" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
-        {children}
-      </svg>
-    </div>
-  );
-}
-
-function HeatmapPitch({ zones }: { zones: SpatialZone[] }) {
-  return (
-    <PitchBase>
-      {zones.slice(0, 24).map((zone, index) => (
-        <rect
-          key={`${zone.x}-${zone.y}-${index}`}
-          x={zone.x + 0.6}
-          y={zone.y + 0.6}
-          width={Math.max(zone.width - 1.2, 0)}
-          height={Math.max(zone.height - 1.2, 0)}
-          fill={`rgba(0,194,255,${Math.max(zone.intensity / 120, 0.12)})`}
-        />
-      ))}
-    </PitchBase>
-  );
-}
-
-function PassMapPitch({ passes }: { passes: SpatialEventPoint[] }) {
-  return (
-    <PitchBase>
-      {passes.slice(0, 18).map((pass, index) => (
-        <g key={`${pass.x}-${pass.y}-${index}`}>
-          <line
-            x1={pass.x}
-            y1={pass.y}
-            x2={pass.endX ?? pass.x}
-            y2={pass.endY ?? pass.y}
-            stroke={pass.outcome === "success" ? "rgba(0,255,156,0.72)" : "rgba(255,77,79,0.65)"}
-            strokeWidth="1.1"
-            strokeLinecap="round"
-          />
-        </g>
-      ))}
-    </PitchBase>
-  );
-}
-
-function ShotMapPitch({ shots }: { shots: SpatialEventPoint[] }) {
-  return (
-    <PitchBase>
-      {shots.slice(0, 16).map((shot, index) => (
-        <circle
-          key={`${shot.x}-${shot.y}-${index}`}
-          cx={shot.x}
-          cy={shot.y}
-          r={Math.max(1.6, (shot.value ?? 0.1) * 7)}
-          fill={shot.outcome === "goal" ? "#00FF9C" : shot.outcome === "saved" ? "#00C2FF" : "#FF7B7D"}
-          fillOpacity="0.75"
-          stroke="rgba(255,255,255,0.85)"
-          strokeWidth="0.35"
-        />
-      ))}
-    </PitchBase>
-  );
-}
-
-function FieldFrame({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
-      <div className="mb-4">
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{subtitle}</p>
-      </div>
-      {children}
     </div>
   );
 }
@@ -544,15 +451,6 @@ export default function PlayerDetails() {
             </SectionCard>
 
             <SectionCard
-              eyebrow="Mapa de Atuação"
-              title="Posicionamento em campo"
-              description="Distribuição espacial do jogador baseada em eventos reais ingeridos do Sportmonks."
-              accent="cyan"
-            >
-              <HeatmapField playerId={player.id} />
-            </SectionCard>
-
-            <SectionCard
               eyebrow={t("player.marketRiskEyebrow")}
               title={t("player.marketRiskTitle")}
               description={t("player.marketRiskDescription")}
@@ -572,26 +470,7 @@ export default function PlayerDetails() {
               </div>
             </SectionCard>
 
-            {fieldIntelligence ? (
-              <SectionCard
-                eyebrow={t("player.fieldIntelligenceEyebrow")}
-                title={t("player.fieldIntelligenceTitle")}
-                description={t("player.fieldIntelligenceDescription")}
-                accent="green"
-              >
-                <div className="grid gap-4 xl:grid-cols-3">
-                  <FieldFrame title={t("player.heatmap")} subtitle={t("player.heatmapSubtitle")}>
-                    <HeatmapPitch zones={fieldIntelligence.heatmap} />
-                  </FieldFrame>
-                  <FieldFrame title={t("player.passes")} subtitle={t("player.passesSubtitle")}>
-                    <PassMapPitch passes={fieldIntelligence.passes} />
-                  </FieldFrame>
-                  <FieldFrame title={t("player.shots")} subtitle={t("player.shotsSubtitle")}>
-                    <ShotMapPitch shots={fieldIntelligence.shots} />
-                  </FieldFrame>
-                </div>
-              </SectionCard>
-            ) : null}
+            <FieldMapsModule playerId={player.id} fieldIntelligence={fieldIntelligence} />
 
             <SectionCard
               eyebrow={t("player.projectionEyebrow")}
