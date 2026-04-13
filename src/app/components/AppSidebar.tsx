@@ -25,7 +25,7 @@ const navigationGroups = [
     label: "nav.operation",
     items: [
       { name: "nav.dashboard", href: "/dashboard", icon: LayoutDashboard },
-      { name: "nav.scouting", href: "/scouting", icon: Search },
+      { name: "nav.scouting", href: "/player-search", icon: Search },
       { name: "nav.history", href: "/history", icon: History },
     ],
   },

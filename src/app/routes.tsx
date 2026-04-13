@@ -23,6 +23,7 @@ import PlayerSearch from "./pages/PlayerSearch";
 import PlayerDetails from "./pages/PlayerDetails";
 import SmartMatch from "./pages/SmartMatch";
 import Profile from "./pages/Profile";
+import PlayerSearchPage from "./pages/PlayerSearchPage";
 import Squad from "./pages/Squad";
 import HealthAnalytics from "./pages/HealthAnalytics";
 import ServiceDesk from "./pages/ServiceDesk";
@@ -99,6 +100,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <PlayerSearch />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/player-search",
+        element: (
+          <ProtectedRoute>
+            <PlayerSearchPage />
           </ProtectedRoute>
         ),
       },
