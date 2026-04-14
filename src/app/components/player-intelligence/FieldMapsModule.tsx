@@ -9,11 +9,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { apiFetch } from "../../services/api";
-import type { FieldIntelligence, SpatialEventPoint } from "../../types/player-intelligence";
 import { SectionCard } from "./SectionCard";
 
 // ---------------------------------------------------------------------------
-// API types
+// API types  (mirrors scout-engine player-maps.service response)
 // ---------------------------------------------------------------------------
 
 interface HeatmapCell {
@@ -40,6 +39,21 @@ interface HeatmapData {
   dominantZones: string[];
   actionBreakdown: ActionBreakdown;
   seasons: string[];
+}
+
+/** Spatial event as returned by GET /players/:id/events (outcome lowercase) */
+interface MapEventFE {
+  x: number;
+  y: number;
+  endX: number | null;
+  endY: number | null;
+  outcome: string | null;
+}
+
+interface PlayerEvents {
+  heatmap: HeatmapData;
+  passes:  MapEventFE[];
+  shots:   MapEventFE[];
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +364,7 @@ function PitchBase({ children }: { children: ReactNode }) {
 // Pass & Shot map SVG components
 // ---------------------------------------------------------------------------
 
-function PassMapPitch({ passes }: { passes: SpatialEventPoint[] }) {
+function PassMapPitch({ passes }: { passes: MapEventFE[] }) {
   return (
     <PitchBase>
       {passes.slice(0, 18).map((pass, i) => {
@@ -371,7 +385,7 @@ function PassMapPitch({ passes }: { passes: SpatialEventPoint[] }) {
   );
 }
 
-function ShotMapPitch({ shots }: { shots: SpatialEventPoint[] }) {
+function ShotMapPitch({ shots }: { shots: MapEventFE[] }) {
   return (
     <PitchBase>
       {shots.slice(0, 16).map((shot, i) => (
@@ -379,7 +393,7 @@ function ShotMapPitch({ shots }: { shots: SpatialEventPoint[] }) {
           key={`${shot.x}-${shot.y}-${i}`}
           cx={shot.x}
           cy={shot.y}
-          r={Math.max(1.6, (shot.value ?? 0.1) * 7)}
+          r={1.8}
           fill={shot.outcome === "goal" ? "#00FF9C" : shot.outcome === "saved" ? "#00C2FF" : "#FF7B7D"}
           fillOpacity="0.75"
           stroke="rgba(255,255,255,0.85)"
@@ -479,28 +493,36 @@ const SHOT_LEGEND = [
 
 interface FieldMapsModuleProps {
   playerId: string;
-  fieldIntelligence: FieldIntelligence | null;
 }
 
-export function FieldMapsModule({ playerId, fieldIntelligence }: FieldMapsModuleProps) {
-  const [data,    setData]    = useState<HeatmapData | null>(null);
+export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
+  const [events,  setEvents]  = useState<PlayerEvents | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!playerId) return;
+    let cancelled = false;
     setLoading(true);
-    apiFetch<HeatmapData>(`/maps/heatmap/${playerId}`)
-      .then((res) => setData(res.data))
-      .catch(() => setData(null))
-      .finally(() => setLoading(false));
+
+    apiFetch<PlayerEvents>(`/players/${playerId}/events`)
+      .then((res) => {
+        if (cancelled) return;
+        console.log("[FieldMapsModule] events:", res.data);
+        setEvents(res.data);
+      })
+      .catch(() => { if (!cancelled) setEvents(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
   }, [playerId]);
 
-  const ab      = data?.actionBreakdown;
-  const isEmpty = !data || data.totalEvents === 0;
-  const cells   = data?.grid ?? [];
-  const insight = isEmpty ? null : deriveInsight(cells);
-  const passes  = fieldIntelligence?.passes ?? [];
-  const shots   = fieldIntelligence?.shots  ?? [];
+  const heatmapData = events?.heatmap ?? null;
+  const ab          = heatmapData?.actionBreakdown;
+  const isEmpty     = !heatmapData || heatmapData.totalEvents === 0;
+  const cells       = heatmapData?.grid ?? [];
+  const insight     = isEmpty ? null : deriveInsight(cells);
+  const passes      = events?.passes ?? [];
+  const shots       = events?.shots  ?? [];
 
   return (
     <SectionCard
@@ -516,7 +538,7 @@ export function FieldMapsModule({ playerId, fieldIntelligence }: FieldMapsModule
           <MapPanel
             title="Mapa de Calor"
             subtitle="densidade de atuação"
-            stats={data ? <StatBadge value={data.totalEvents} label="eventos" color="#00C2FF" /> : undefined}
+            stats={heatmapData ? <StatBadge value={heatmapData.totalEvents} label="eventos" color="#00C2FF" /> : undefined}
           >
             <HeatmapCanvas cells={cells} isEmpty={isEmpty} />
 
@@ -528,9 +550,9 @@ export function FieldMapsModule({ playerId, fieldIntelligence }: FieldMapsModule
             )}
 
             {/* Dominant zones */}
-            {data?.dominantZones && data.dominantZones.length > 0 && (
+            {heatmapData?.dominantZones && heatmapData.dominantZones.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {data.dominantZones.slice(0, 3).map((zone) => (
+                {heatmapData.dominantZones.slice(0, 3).map((zone) => (
                   <span
                     key={zone}
                     className="rounded-full border border-[rgba(0,194,255,0.25)] bg-[rgba(0,194,255,0.06)] px-2 py-0.5 text-[9px] font-semibold text-[#9BE7FF]"

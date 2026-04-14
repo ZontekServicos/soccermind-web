@@ -16,7 +16,6 @@ import { getPlayer, getPlayerProjection, getSimilarPlayers } from "../services/p
 import { addToWatchlist, getWatchlist, removeFromWatchlist } from "../services/watchlist";
 import { createAnalysisEntry } from "../services/analysis";
 import type {
-  FieldIntelligence,
   PlayerIntelligenceProfile,
 } from "../types/player-intelligence";
 import { normalizePlayerIntelligenceProfile } from "../types/player-intelligence";
@@ -210,7 +209,6 @@ export default function PlayerDetails() {
     };
   }, [id]);
 
-  const fieldIntelligence: FieldIntelligence | null = profile?.fieldIntelligence ?? null;
   const dnaTraits = useMemo(() => (profile ? [...profile.dna.traits].slice(0, 5) : []), [profile]);
   const technicalMetrics = useMemo(
     () =>
@@ -470,7 +468,7 @@ export default function PlayerDetails() {
               </div>
             </SectionCard>
 
-            <FieldMapsModule playerId={player.id} fieldIntelligence={fieldIntelligence} />
+            <FieldMapsModule playerId={player.id} />
 
             <SectionCard
               eyebrow={t("player.projectionEyebrow")}
