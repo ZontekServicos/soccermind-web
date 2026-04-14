@@ -436,27 +436,25 @@ export default function PlayersRanking() {
             )}
 
             <div className="overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-              <div className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-8 py-4">
-                <div className="flex items-center gap-6">
-                  <div className="w-10 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">#</div>
-                  <div className="min-w-[240px] flex-1 text-[10px] font-medium uppercase tracking-[0.24em] text-gray-400">Jogador</div>
-                  <div className="w-20 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Posicao</div>
-                  <div className="w-32 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Clube</div>
-                  <div className="flex w-24 cursor-pointer items-center justify-center gap-1.5 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("overall")}>
-                    Overall
-                    <ArrowUpDown className="h-3 w-3" />
+              {/* ── Header ── */}
+              <div className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-6 py-4">
+                <div className="grid items-center gap-3" style={{ gridTemplateColumns: "2.5rem 1fr 7.5rem 8rem 5.5rem 6.5rem 4.5rem 5.5rem 7.5rem 8rem" }}>
+                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">#</div>
+                  <div className="text-[10px] font-medium uppercase tracking-[0.24em] text-gray-400">Jogador</div>
+                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Posição</div>
+                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Clube</div>
+                  <div className="flex cursor-pointer items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("overall")}>
+                    Overall <ArrowUpDown className="h-3 w-3 shrink-0" />
                   </div>
-                  <div className="flex w-24 cursor-pointer items-center justify-center gap-1.5 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("potential")}>
-                    Potential
-                    <ArrowUpDown className="h-3 w-3" />
+                  <div className="flex cursor-pointer items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("potential")}>
+                    Potential <ArrowUpDown className="h-3 w-3 shrink-0" />
                   </div>
-                  <div className="flex w-20 cursor-pointer items-center justify-center gap-1.5 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("age")}>
-                    Idade
-                    <ArrowUpDown className="h-3 w-3" />
+                  <div className="flex cursor-pointer items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("age")}>
+                    Idade <ArrowUpDown className="h-3 w-3 shrink-0" />
                   </div>
-                  <div className="w-24 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Nível</div>
-                  <div className="w-28 text-right text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Valor</div>
-                  <div className="w-32 text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Acao</div>
+                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Nível</div>
+                  <div className="text-right text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Valor</div>
+                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Ação</div>
                 </div>
               </div>
 
@@ -467,96 +465,105 @@ export default function PlayersRanking() {
                   filteredAndSortedPlayers.map((player, index) => (
                     <div
                       key={`${player.id ?? player.name ?? "item"}-${index}`}
-                      className={`group flex cursor-pointer items-center gap-6 border-b border-[rgba(255,255,255,0.04)] px-8 py-5 transition-all duration-200 last:border-b-0 ${
+                      className={`group cursor-pointer border-b border-[rgba(255,255,255,0.04)] px-6 py-4 transition-all duration-200 last:border-b-0 ${
                         index % 2 === 0 ? "bg-[rgba(255,255,255,0.01)]" : "bg-transparent"
                       } hover:border-[rgba(0,194,255,0.15)] hover:bg-[rgba(0,194,255,0.05)]`}
                       onClick={() => navigate(`/players/${player.id}`)}
                     >
-                      <div className="w-10 text-center">
-                        <span className="text-base font-medium text-gray-400">#{(page - 1) * limit + index + 1}</span>
-                      </div>
+                      <div className="grid items-center gap-3" style={{ gridTemplateColumns: "2.5rem 1fr 7.5rem 8rem 5.5rem 6.5rem 4.5rem 5.5rem 7.5rem 8rem" }}>
 
-                      <div className="min-w-[240px] flex-1">
-                        <div className="flex items-center gap-4">
-                          <RankingAvatar
-                            name={player.name}
-                            image={player.image}
-                            overall={player.overall}
-                          />
-                          <div>
-                            <p className="mb-0.5 font-semibold text-gray-100 transition-colors group-hover:text-[#00C2FF]">{player.name}</p>
-                            <p className="text-xs text-gray-600">{player.nationality}</p>
+                        {/* # */}
+                        <div className="text-center text-sm font-medium text-gray-500">
+                          #{(page - 1) * limit + index + 1}
+                        </div>
+
+                        {/* Jogador */}
+                        <div className="flex min-w-0 items-center gap-3">
+                          <RankingAvatar name={player.name} image={player.image} overall={player.overall} />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-gray-100 transition-colors group-hover:text-[#00C2FF]">
+                              {player.name}
+                            </p>
+                            <p className="truncate text-xs text-gray-600">{player.nationality}</p>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex w-20 justify-center">
-                        <span className={`${getPositionColor(player.position || "-")} rounded-[8px] border px-2.5 py-1 text-[11px] font-semibold tracking-wide`}>
-                          {player.position ? positionLabel(player.position) : "-"}
-                        </span>
-                      </div>
+                        {/* Posição */}
+                        <div className="flex justify-center">
+                          <span className={`${getPositionColor(player.position || "-")} rounded-[8px] border px-2 py-1 text-[10px] font-semibold tracking-wide`}>
+                            {player.position ? positionLabel(player.position) : "-"}
+                          </span>
+                        </div>
 
-                      <div className="w-32 text-center text-sm text-gray-400">{player.team || "-"}</div>
+                        {/* Clube */}
+                        <div className="truncate text-center text-sm text-gray-400" title={player.team || "-"}>
+                          {player.team || "-"}
+                        </div>
 
-                      <div className="flex w-24 justify-center">
-                        <span className={`${getStatColor(player.overall ?? 0)} min-w-[52px] rounded-[8px] px-3 py-1.5 text-center text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
-                          {formatStatValue(player.overall)}
-                        </span>
-                      </div>
+                        {/* Overall */}
+                        <div className="flex justify-center">
+                          <span className={`${getStatColor(player.overall ?? 0)} w-12 rounded-[8px] py-1.5 text-center text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
+                            {formatStatValue(player.overall)}
+                          </span>
+                        </div>
 
-                      <div className="flex w-24 justify-center">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`${getStatColor(player.potential ?? 0)} min-w-[52px] rounded-[8px] px-3 py-1.5 text-center text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
+                        {/* Potential */}
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className={`${getStatColor(player.potential ?? 0)} w-12 rounded-[8px] py-1.5 text-center text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
                             {formatStatValue(player.potential)}
                           </span>
                           {player.potential !== null && player.overall !== null && player.potential > player.overall + 5 && (
-                            <TrendingUp className="h-3.5 w-3.5 text-[#00FF9C]/70" />
+                            <TrendingUp className="h-3.5 w-3.5 shrink-0 text-[#00FF9C]/70" />
                           )}
                         </div>
-                      </div>
 
-                      <div className="w-20 text-center text-sm font-medium tabular-nums text-gray-300">{player.age}</div>
-
-                      <div className="flex w-24 justify-center">
-                        {(() => {
-                          const lvl = getPlayerLevel(player.overall);
-                          return (
-                            <span
-                              className="rounded-[8px] border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
-                              style={{ color: lvl.color, background: lvl.bg, borderColor: lvl.border }}
-                            >
-                              {lvl.label}
-                            </span>
-                          );
-                        })()}
-                      </div>
-                      <div className="w-28 text-right text-sm font-semibold tabular-nums text-[#00FF9C]">{formatMarketValue(player.marketValue)}</div>
-
-                      <div className="flex w-32 justify-center">
-                        <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                          <button
-                            className={`inline-flex h-9 w-9 items-center justify-center rounded-[10px] border transition-all ${
-                              watchlistIds.has(player.id)
-                                ? "border-[#fbbf24] bg-[#fbbf24]/15 text-[#fbbf24]"
-                                : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300"
-                            }`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleWatchlistToggle(player);
-                            }}
-                          >
-                            <Star className="h-4 w-4" fill={watchlistIds.has(player.id) ? "currentColor" : "none"} />
-                          </button>
-                          <button
-                            className="rounded-[10px] bg-[#00C2FF]/90 px-4 py-2 text-xs font-semibold text-[#07142A] shadow-[0_2px_8px_rgba(0,194,255,0.3)] transition-all hover:bg-[#00C2FF] hover:shadow-[0_4px_12px_rgba(0,194,255,0.4)]"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              navigate(`/players/${player.id}`);
-                            }}
-                          >
-                            Ver Detalhes
-                          </button>
+                        {/* Idade */}
+                        <div className="text-center text-sm font-medium tabular-nums text-gray-300">
+                          {player.age ?? "-"}
                         </div>
+
+                        {/* Nível */}
+                        <div className="flex justify-center">
+                          {(() => {
+                            const lvl = getPlayerLevel(player.overall);
+                            return (
+                              <span
+                                className="rounded-[8px] border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide"
+                                style={{ color: lvl.color, background: lvl.bg, borderColor: lvl.border }}
+                              >
+                                {lvl.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Valor */}
+                        <div className="text-right text-sm font-semibold tabular-nums text-[#00FF9C]">
+                          {formatMarketValue(player.marketValue)}
+                        </div>
+
+                        {/* Ação */}
+                        <div className="flex justify-center">
+                          <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button
+                              className={`inline-flex h-8 w-8 items-center justify-center rounded-[10px] border transition-all ${
+                                watchlistIds.has(player.id)
+                                  ? "border-[#fbbf24] bg-[#fbbf24]/15 text-[#fbbf24]"
+                                  : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300"
+                              }`}
+                              onClick={(e) => { e.stopPropagation(); void handleWatchlistToggle(player); }}
+                            >
+                              <Star className="h-3.5 w-3.5" fill={watchlistIds.has(player.id) ? "currentColor" : "none"} />
+                            </button>
+                            <button
+                              className="rounded-[10px] bg-[#00C2FF]/90 px-3 py-1.5 text-xs font-semibold text-[#07142A] shadow-[0_2px_8px_rgba(0,194,255,0.3)] transition-all hover:bg-[#00C2FF]"
+                              onClick={(e) => { e.stopPropagation(); navigate(`/players/${player.id}`); }}
+                            >
+                              Ver
+                            </button>
+                          </div>
+                        </div>
+
                       </div>
                     </div>
                   ))}
