@@ -168,6 +168,7 @@ export default function Compare() {
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [saveTone, setSaveTone] = useState<"success" | "error">("success");
+  const [savedAnalysisId, setSavedAnalysisId] = useState<string | null>(null);
 
   const activeFiltersCount = useMemo(() => countActiveFilters(filters), [filters]);
   const apiFilters = useMemo(() => buildApiFilters(filters, filters.search.trim()), [filters]);
@@ -290,7 +291,7 @@ export default function Compare() {
   const confidence = winner === "A" ? profileA?.summary.confidence ?? 0 : winner === "B" ? profileB?.summary.confidence ?? 0 : Math.round(average([profileA?.summary.confidence ?? 0, profileB?.summary.confidence ?? 0]));
 
   async function saveAnalysis() {
-    if (!playerA.id || !playerB.id || playerA.id === playerB.id) return;
+    if (!playerA.id || !playerB.id || playerA.id === playerB.id || savedAnalysisId) return;
     setSaveLoading(true);
     try {
       const response = await createComparisonAnalysis({
@@ -299,6 +300,7 @@ export default function Compare() {
         description: analysisDescription.trim() || undefined,
         analyst: user?.name,
       });
+      setSavedAnalysisId(response.data.id);
       setSaveTone("success");
       setSaveFeedback(t("comparison.saveSuccess", { title: response.data.title }));
       setAnalysisTitle("");
@@ -310,6 +312,12 @@ export default function Compare() {
       setSaveLoading(false);
     }
   }
+
+  // Reset saved state when players change
+  useEffect(() => {
+    setSavedAnalysisId(null);
+    setSaveFeedback(null);
+  }, [playerA.id, playerB.id]);
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -388,13 +396,57 @@ export default function Compare() {
 
             <FinalDecisionPanel playerAName={displayA.name} playerBName={displayB.name} finalDecision={finalDecision} confidence={confidence} insights={insights} summary={t("comparison.finalSummary")} />
 
+            {/* ── Salvar análise ── */}
             <div className="rounded-[26px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-5">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">{t("comparison.saveTitle")}</p>
-              <div className="mt-4 grid gap-3">
-                <Input value={analysisTitle} onChange={(event) => setAnalysisTitle(event.target.value)} maxLength={160} placeholder={t("comparison.savePlaceholder", { playerA: displayA.name, playerB: displayB.name })} className="h-10 rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500" />
-                <Textarea value={analysisDescription} onChange={(event) => setAnalysisDescription(event.target.value)} maxLength={1000} placeholder={t("comparison.saveDescriptionPlaceholder")} className="min-h-[86px] rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500" />
-                <Button type="button" onClick={saveAnalysis} disabled={saveLoading || !playerA.id || !playerB.id || playerA.id === playerB.id} className="h-10 rounded-[12px] border border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.12)] px-5 font-semibold text-[#9BE7FF] hover:bg-[rgba(0,194,255,0.18)]">{saveLoading ? t("comparison.saving") : t("comparison.saveButton")}</Button>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">{t("comparison.saveTitle")}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">A análise só é registrada no histórico quando você salvar explicitamente.</p>
+                </div>
+                {savedAnalysisId && (
+                  <a
+                    href={`/analysis/${savedAnalysisId}`}
+                    className="inline-flex items-center gap-1.5 rounded-[10px] border border-[rgba(0,255,156,0.25)] bg-[rgba(0,255,156,0.06)] px-3 py-1.5 text-[11px] font-semibold text-[#00FF9C] hover:bg-[rgba(0,255,156,0.12)] transition-colors"
+                  >
+                    Ver no Histórico →
+                  </a>
+                )}
               </div>
+
+              {savedAnalysisId ? (
+                <div className="flex items-center gap-3 rounded-[14px] border border-[rgba(0,255,156,0.2)] bg-[rgba(0,255,156,0.06)] px-4 py-3">
+                  <span className="text-lg">✓</span>
+                  <div>
+                    <p className="text-sm font-semibold text-[#00FF9C]">Análise salva no histórico</p>
+                    <p className="text-xs text-gray-500">Selecione novos jogadores para iniciar outra análise.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  <Input
+                    value={analysisTitle}
+                    onChange={(e) => setAnalysisTitle(e.target.value)}
+                    maxLength={160}
+                    placeholder={t("comparison.savePlaceholder", { playerA: displayA.name, playerB: displayB.name })}
+                    className="h-10 rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500"
+                  />
+                  <Textarea
+                    value={analysisDescription}
+                    onChange={(e) => setAnalysisDescription(e.target.value)}
+                    maxLength={1000}
+                    placeholder={t("comparison.saveDescriptionPlaceholder")}
+                    className="min-h-[86px] rounded-[12px] border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.02)] text-sm text-gray-100 placeholder:text-gray-500"
+                  />
+                  <Button
+                    type="button"
+                    onClick={saveAnalysis}
+                    disabled={saveLoading || !playerA.id || !playerB.id || playerA.id === playerB.id}
+                    className="h-10 rounded-[12px] bg-[#00C2FF] px-5 font-semibold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.3)] hover:bg-[#33CFFF] disabled:opacity-40"
+                  >
+                    {saveLoading ? "Salvando..." : "Salvar análise"}
+                  </Button>
+                </div>
+              )}
             </div>
 
             <SectionCard eyebrow={t("comparison.casesEyebrow")} title={`${displayA.name} vs ${displayB.name}`} description={t("comparison.casesDescription")} accent="purple" aside={<WinnerBadge winner={winner} nameA={displayA.name} nameB={displayB.name} label={t("comparison.recommended")} />}>
