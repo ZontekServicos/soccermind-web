@@ -85,9 +85,6 @@ const GOAL_D = 10;                 // goal depth (px)
 const API_COLS = 10;
 const API_ROWS = 7;
 
-// Working grid for heatmap (upsampled 20×20)
-const GRID = 20;
-
 // ---------------------------------------------------------------------------
 // Wyscout colour scale  (cyan → green → yellow → orange → red)
 // ---------------------------------------------------------------------------
@@ -103,51 +100,27 @@ function getHeatColor(v: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Grid helpers
+// Coordinate helpers
 // ---------------------------------------------------------------------------
 
-/** Upsample API 10×7 cells to a GRID×GRID float array. */
-function buildGrid(cells: HeatmapCell[]): number[][] {
-  const g: number[][] = Array.from({ length: GRID }, () => Array(GRID).fill(0));
-  for (const cell of cells) {
-    // Map API col (0-9) and row (0-6) to 20×20 space using nearest-neighbour
-    const gx = Math.round((cell.col / (API_COLS - 1)) * (GRID - 1));
-    const gy = Math.round((cell.row / (API_ROWS - 1)) * (GRID - 1));
-    if (g[gy] !== undefined) g[gy][gx] = Math.max(g[gy][gx], cell.intensity);
-  }
-  return g;
+/**
+ * Convert a grid cell (col 0–9, row 0–6) to canvas pixel coordinates.
+ *
+ * Y is inverted: row=0 maps to the BOTTOM of the field (football convention
+ * where y=0 is the bottom touchline), row=max maps to the TOP.
+ */
+function toCanvasPx(col: number, row: number): { xPx: number; yPx: number } {
+  const xPx = FX + (col / (API_COLS - 1)) * FW;
+  const yPx = FY + FH - (row / (API_ROWS - 1)) * FH;
+  return { xPx, yPx };
 }
 
-/** Weighted 3×3 box-blur — 2 passes for smoother gradient. */
-function smoothGrid(src: number[][]): number[][] {
-  let grid = src;
-  for (let pass = 0; pass < 2; pass++) {
-    const tmp = grid.map(r => [...r]);
-    for (let y = 0; y < GRID; y++) {
-      for (let x = 0; x < GRID; x++) {
-        let sum = 0, wt = 0;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const ny = y + dy, nx = x + dx;
-            if (ny >= 0 && ny < GRID && nx >= 0 && nx < GRID) {
-              const w = dy === 0 && dx === 0 ? 4 : 1;
-              sum += grid[ny][nx] * w;
-              wt  += w;
-            }
-          }
-        }
-        tmp[y][x] = sum / wt;
-      }
-    }
-    grid = tmp;
-  }
-  return grid;
-}
-
-/** Normalise 0-1 (guard against all-zero). */
-function normalizeGrid(grid: number[][]): number[][] {
-  const max = Math.max(...grid.flat(), 1);
-  return grid.map(row => row.map(v => v / max));
+/**
+ * Invert the Y axis for SVG pass/shot maps.
+ * SVG has y=0 at top; football convention has y=0 at the bottom touchline.
+ */
+function toSVGY(y: number): number {
+  return 100 - y;
 }
 
 // ---------------------------------------------------------------------------
@@ -285,28 +258,30 @@ function HeatmapCanvas({ cells, isEmpty }: HeatmapCanvasProps) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, CV_W, CV_H);
 
-    // — Heatmap cells —
+    // — Heatmap blobs —
+    // Each API cell is rendered as a radial-gradient blob centred at its
+    // canvas pixel position (explicit coordinate → pixel conversion, Y-inverted).
+    // Overlapping blobs naturally blend into a smooth density gradient.
     if (!isEmpty && cells.length > 0) {
-      const raw        = buildGrid(cells);
-      const smoothed   = smoothGrid(raw);
-      const normalized = normalizeGrid(smoothed);
+      const maxIntensity = Math.max(...cells.map(c => c.intensity), 1);
+      // Blob radius = ~1 grid-cell width so adjacent blobs just overlap
+      const blobR = (FW / API_COLS) * 0.92;
 
-      const cellW = FW / GRID;
-      const cellH = FH / GRID;
+      for (const cell of cells) {
+        const v = cell.intensity / maxIntensity;
+        if (v < 0.04) continue;
 
-      for (let row = 0; row < GRID; row++) {
-        for (let col = 0; col < GRID; col++) {
-          const v     = normalized[row][col];
-          const color = getHeatColor(v);
-          if (color === "transparent") continue;
-          ctx.fillStyle = color;
-          ctx.fillRect(
-            FX + col * cellW,
-            FY + row * cellH,
-            cellW + 0.5, // +0.5 to close sub-pixel gaps
-            cellH + 0.5,
-          );
-        }
+        // Convert col (0–9) → xPx, row (0–6) → yPx (Y-inverted)
+        const { xPx, yPx } = toCanvasPx(cell.col, cell.row);
+
+        const color = getHeatColor(v);
+        const grad  = ctx.createRadialGradient(xPx, yPx, 0, xPx, yPx, blobR);
+        grad.addColorStop(0, color);
+        grad.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(xPx, yPx, blobR, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
@@ -368,16 +343,19 @@ function PassMapPitch({ passes }: { passes: MapEventFE[] }) {
   return (
     <PitchBase>
       {passes.slice(0, 18).map((pass, i) => {
-        const color = pass.outcome === "success" ? "rgba(0,255,156,0.72)" : "rgba(255,77,79,0.65)";
+        const color  = pass.outcome === "success" ? "rgba(0,255,156,0.72)" : "rgba(255,77,79,0.65)";
+        const x1     = pass.x;
+        const y1     = toSVGY(pass.y);
+        const x2     = pass.endX  ?? pass.x;
+        const y2     = toSVGY(pass.endY ?? pass.y);
         return (
-          <g key={`${pass.x}-${pass.y}-${i}`}>
+          <g key={`${x1}-${y1}-${i}`}>
             <line
-              x1={pass.x}        y1={pass.y}
-              x2={pass.endX ?? pass.x} y2={pass.endY ?? pass.y}
+              x1={x1} y1={y1} x2={x2} y2={y2}
               stroke={color} strokeWidth="1.1" strokeLinecap="round"
             />
-            <circle cx={pass.x} cy={pass.y} r="0.9" fill="rgba(255,255,255,0.55)" />
-            <circle cx={pass.endX ?? pass.x} cy={pass.endY ?? pass.y} r="0.9" fill={color} />
+            <circle cx={x1} cy={y1} r="0.9" fill="rgba(255,255,255,0.55)" />
+            <circle cx={x2} cy={y2} r="0.9" fill={color} />
           </g>
         );
       })}
@@ -392,7 +370,7 @@ function ShotMapPitch({ shots }: { shots: MapEventFE[] }) {
         <circle
           key={`${shot.x}-${shot.y}-${i}`}
           cx={shot.x}
-          cy={shot.y}
+          cy={toSVGY(shot.y)}
           r={1.8}
           fill={shot.outcome === "goal" ? "#00FF9C" : shot.outcome === "saved" ? "#00C2FF" : "#FF7B7D"}
           fillOpacity="0.75"
