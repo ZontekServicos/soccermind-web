@@ -51,9 +51,11 @@ interface MapEventFE {
 }
 
 interface PlayerEvents {
-  heatmap: HeatmapData;
-  passes:  MapEventFE[];
-  shots:   MapEventFE[];
+  heatmap:       HeatmapData;
+  /** Raw (x,y) points in 0–100 space — used directly by the canvas renderer. */
+  heatmapPoints: { x: number; y: number }[];
+  passes:        MapEventFE[];
+  shots:         MapEventFE[];
 }
 
 // ---------------------------------------------------------------------------
@@ -237,11 +239,11 @@ function drawFieldLines(ctx: CanvasRenderingContext2D) {
 // ---------------------------------------------------------------------------
 
 interface HeatmapCanvasProps {
-  cells: HeatmapCell[];
+  points:  { x: number; y: number }[];  // raw 0–100 coords
   isEmpty: boolean;
 }
 
-function HeatmapCanvas({ cells, isEmpty }: HeatmapCanvasProps) {
+function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -258,24 +260,24 @@ function HeatmapCanvas({ cells, isEmpty }: HeatmapCanvasProps) {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, CV_W, CV_H);
 
-    // — Heatmap blobs —
-    // Each API cell is rendered as a radial-gradient blob centred at its
-    // canvas pixel position (explicit coordinate → pixel conversion, Y-inverted).
-    // Overlapping blobs naturally blend into a smooth density gradient.
-    if (!isEmpty && cells.length > 0) {
-      const maxIntensity = Math.max(...cells.map(c => c.intensity), 1);
-      // Blob radius = ~1 grid-cell width so adjacent blobs just overlap
-      const blobR = (FW / API_COLS) * 0.92;
+    // — Heatmap blobs (direct point rendering, no grid normalization) —
+    //
+    // Each raw (x,y) point is rendered as a radial-gradient blob.
+    // Coordinate conversion: x,y ∈ [0,100] → canvas pixels, Y-inverted
+    // (football convention: y=0 = bottom touchline, y=100 = top touchline).
+    // Overlapping blobs accumulate alpha, naturally showing density.
+    if (!isEmpty && points.length > 0) {
+      const blobR = FH * 0.095;  // radius ≈ 9.5% of field height (~23px)
 
-      for (const cell of cells) {
-        const v = cell.intensity / maxIntensity;
-        if (v < 0.04) continue;
+      for (const pt of points) {
+        const xPx = FX + (pt.x / 100) * FW;
+        const yPx = FY + FH - (pt.y / 100) * FH;  // Y-inverted
 
-        // Convert col (0–9) → xPx, row (0–6) → yPx (Y-inverted)
-        const { xPx, yPx } = toCanvasPx(cell.col, cell.row);
+        // Colour derived from x position: defensive=cyan → attacking=red
+        const hue  = pt.x / 100;
+        const color = getHeatColor(Math.max(0.25, hue));
 
-        const color = getHeatColor(v);
-        const grad  = ctx.createRadialGradient(xPx, yPx, 0, xPx, yPx, blobR);
+        const grad = ctx.createRadialGradient(xPx, yPx, 0, xPx, yPx, blobR);
         grad.addColorStop(0, color);
         grad.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = grad;
@@ -290,13 +292,13 @@ function HeatmapCanvas({ cells, isEmpty }: HeatmapCanvasProps) {
 
     // — Empty state label —
     if (isEmpty) {
-      ctx.fillStyle   = "rgba(255,255,255,0.18)";
-      ctx.font        = "13px system-ui, sans-serif";
-      ctx.textAlign   = "center";
+      ctx.fillStyle    = "rgba(255,255,255,0.18)";
+      ctx.font         = "13px system-ui, sans-serif";
+      ctx.textAlign    = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("sem dados de posicionamento", CV_W / 2, CV_H / 2);
     }
-  }, [cells, isEmpty]);
+  }, [points, isEmpty]);
 
   return (
     <canvas
@@ -494,19 +496,20 @@ export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
     return () => { cancelled = true; };
   }, [playerId]);
 
-  const heatmapData = events?.heatmap ?? null;
-  const ab          = heatmapData?.actionBreakdown;
-  const isEmpty     = !heatmapData || heatmapData.totalEvents === 0;
-  const cells       = heatmapData?.grid ?? [];
-  const insight     = isEmpty ? null : deriveInsight(cells);
-  const passes      = events?.passes ?? [];
-  const shots       = events?.shots  ?? [];
+  const heatmapData   = events?.heatmap ?? null;
+  const ab            = heatmapData?.actionBreakdown;
+  const heatmapPoints = events?.heatmapPoints ?? [];
+  const isEmpty       = heatmapPoints.length === 0;
+  const cells         = heatmapData?.grid ?? [];   // kept for deriveInsight only
+  const insight       = isEmpty ? null : deriveInsight(cells);
+  const passes        = events?.passes ?? [];
+  const shots         = events?.shots  ?? [];
 
   return (
     <SectionCard
       eyebrow="Mapas de Atuação"
       title="Posicionamento em campo"
-      description="Heatmap canvas real (20×20 grid, box-blur) · Rotas e finalizações geradas pelo perfil."
+      description="Heatmap canvas (renderização direta por eventos) · Rotas e finalizações geradas pelo perfil."
       accent="green"
     >
       <div className="grid gap-4 xl:grid-cols-3">
@@ -518,7 +521,7 @@ export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
             subtitle="densidade de atuação"
             stats={heatmapData ? <StatBadge value={heatmapData.totalEvents} label="eventos" color="#00C2FF" /> : undefined}
           >
-            <HeatmapCanvas cells={cells} isEmpty={isEmpty} />
+            <HeatmapCanvas points={heatmapPoints} isEmpty={isEmpty} />
 
             {/* Auto-insight */}
             {insight && (
