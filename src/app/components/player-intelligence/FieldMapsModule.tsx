@@ -233,19 +233,18 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
     ctx.fillStyle = "#071a0e";
     ctx.fillRect(0, 0, W, H);
 
-    // ── Debug: anchor dot — always visible; confirms canvas is reachable ─────
-    ctx.fillStyle = "rgba(255,255,255,0.20)";
-    ctx.beginPath();
-    ctx.arc(W / 2, H / 2, 6, 0, Math.PI * 2);
-    ctx.fill();
-
-    console.log("[HeatmapCanvas] points:", points.length, points.slice(0, 5));
+    console.log("[HeatmapCanvas] points:", points.length, points.slice(0, 3));
 
     // ── Heatmap blobs ────────────────────────────────────────────────────────
-    // xPx = (x / 100) * W          — x=0 left edge, x=100 right edge
-    // yPx = H - (y / 100) * H      — y=0 bottom,     y=100 top  (Y-inverted)
+    // xPx = (x / 100) * W        — x=0 left edge, x=100 right edge
+    // yPx = H - (y / 100) * H    — y=0 bottom, y=100 top (Y-inverted)
+    //
+    // Density by overlap: each blob is semi-transparent; areas where many
+    // blobs stack become brighter.  Amplify when fewer than 20 points so
+    // sparse players still show a visible heatmap.
     if (!isEmpty && points.length > 0) {
-      const blobR = Math.max(W, H) * 0.09;  // generous radius — visible even with few points
+      const radius  = Math.max(W, H) * 0.08;
+      const AMPLIFY = points.length < 20 ? 3 : 1;
 
       for (const pt of points) {
         if (pt.x < 0 || pt.x > 100 || pt.y < 0 || pt.y > 100) continue;
@@ -253,16 +252,16 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
         const xPx = (pt.x / 100) * W;
         const yPx = H - (pt.y / 100) * H;
 
-        const color = getHeatColor(Math.max(0.3, pt.x / 100));
-
-        const grad = ctx.createRadialGradient(xPx, yPx, 0, xPx, yPx, blobR);
-        grad.addColorStop(0,   color);
-        grad.addColorStop(0.5, color);
-        grad.addColorStop(1,   "rgba(0,0,0,0)");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(xPx, yPx, blobR, 0, Math.PI * 2);
-        ctx.fill();
+        for (let i = 0; i < AMPLIFY; i++) {
+          const grad = ctx.createRadialGradient(xPx, yPx, 0, xPx, yPx, radius);
+          grad.addColorStop(0,   "rgba(0,255,255,0.9)");
+          grad.addColorStop(0.4, "rgba(0,255,255,0.6)");
+          grad.addColorStop(1,   "rgba(0,255,255,0)");
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(xPx, yPx, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
