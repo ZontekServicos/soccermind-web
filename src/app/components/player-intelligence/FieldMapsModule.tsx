@@ -58,32 +58,11 @@ interface PlayerEvents {
   shots:         MapEventFE[];
 }
 
-// ---------------------------------------------------------------------------
-// Canvas constants — landscape field (goals left/right), 400×260 px internal
-// ---------------------------------------------------------------------------
-
+// Fallback canvas resolution (used when getBoundingClientRect returns 0)
 const CV_W = 400;
 const CV_H = 260;
-const FX   = 20;           // field left margin (goal depth)
-const FY   = 10;           // field top margin
-const FW   = CV_W - 40;    // 360
-const FH   = CV_H - 20;    // 240
-const CX   = FX + FW / 2;  // 200 — centre x
-const CY   = FY + FH / 2;  // 130 — centre y
 
-// Derived field geometry (proportional to real pitch 105m × 68m)
-const PA_W  = FW * 0.157;          // penalty area depth  ≈ 56px  (16.5m)
-const PA_H  = FH * 0.588;          // penalty area width  ≈ 141px (40.32m)
-const PA_Y  = CY - PA_H / 2;
-const SB_W  = FW * 0.052;          // 6-yard box depth    ≈ 19px  (5.5m)
-const SB_H  = FH * 0.270;          // 6-yard box width    ≈ 65px  (18.32m)
-const SB_Y  = CY - SB_H / 2;
-const CR    = FH * 0.147;          // centre circle r     ≈ 35px  (10m)
-const PSPOT = FW * 0.105;          // penalty spot x dist ≈ 38px  (11m from line)
-const GOAL_H = FH * 0.108;         // goal height         ≈ 26px  (7.32m)
-const GOAL_D = 10;                 // goal depth (px)
-
-// API grid dimensions (source data)
+// API grid dimensions (source data — used by deriveInsight only)
 const API_COLS = 10;
 const API_ROWS = 7;
 
@@ -92,30 +71,18 @@ const API_ROWS = 7;
 // ---------------------------------------------------------------------------
 
 function getHeatColor(v: number): string {
-  if (v < 0.06) return "transparent";
-  const a = (n: number) => Math.min(n, 1).toFixed(3);
-  if (v < 0.22) return `rgba(0,194,255,${a(v * 1.3)})`;
-  if (v < 0.42) return `rgba(0,220,150,${a(0.20 + v * 0.9)})`;
-  if (v < 0.62) return `rgba(255,220,0,${a(0.38 + v * 0.7)})`;
-  if (v < 0.82) return `rgba(255,115,0,${a(0.50 + v * 0.5)})`;
-  return                `rgba(255,25,25,${a(0.60 + v * 0.4)})`;
+  // Alpha floor of 0.55 so even a single blob is clearly visible on the dark field.
+  const a = (n: number) => Math.min(1, Math.max(0.55, n)).toFixed(3);
+  if (v < 0.22) return `rgba(0,194,255,${a(v * 1.8 + 0.3)})`;
+  if (v < 0.42) return `rgba(0,220,150,${a(0.45 + v * 0.8)})`;
+  if (v < 0.62) return `rgba(255,220,0,${a(0.55 + v * 0.6)})`;
+  if (v < 0.82) return `rgba(255,115,0,${a(0.65 + v * 0.4)})`;
+  return                `rgba(255,25,25,${a(0.75 + v * 0.25)})`;
 }
 
 // ---------------------------------------------------------------------------
 // Coordinate helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Convert a grid cell (col 0–9, row 0–6) to canvas pixel coordinates.
- *
- * Y is inverted: row=0 maps to the BOTTOM of the field (football convention
- * where y=0 is the bottom touchline), row=max maps to the TOP.
- */
-function toCanvasPx(col: number, row: number): { xPx: number; yPx: number } {
-  const xPx = FX + (col / (API_COLS - 1)) * FW;
-  const yPx = FY + FH - (row / (API_ROWS - 1)) * FH;
-  return { xPx, yPx };
-}
 
 /**
  * Invert the Y axis for SVG pass/shot maps.
@@ -154,83 +121,85 @@ function deriveInsight(cells: HeatmapCell[]): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Canvas field lines
+// Canvas field lines — all geometry derived from live W×H
 // ---------------------------------------------------------------------------
 
-function drawFieldLines(ctx: CanvasRenderingContext2D) {
-  const line  = (style: string, w = 1) => { ctx.strokeStyle = style; ctx.lineWidth = w; };
-  const dot   = (x: number, y: number, r = 2) => {
+function drawFieldLines(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  // Re-derive geometry from actual canvas dimensions
+  const mg   = W * 0.05;             // 5% margin on each side
+  const fx   = mg;
+  const fy   = H * 0.04;
+  const fw   = W - mg * 2;
+  const fh   = H - fy * 2;
+  const cx   = fx + fw / 2;
+  const cy   = fy + fh / 2;
+  const paW  = fw * 0.157;
+  const paH  = fh * 0.588;
+  const paY  = cy - paH / 2;
+  const sbW  = fw * 0.052;
+  const sbH  = fh * 0.270;
+  const sbY  = cy - sbH / 2;
+  const cr   = fh * 0.147;
+  const psp  = fw * 0.105;
+  const gH   = fh * 0.108;
+  const gD   = W * 0.025;
+
+  const line = (style: string, w = 1) => { ctx.strokeStyle = style; ctx.lineWidth = w; };
+  const dot  = (x: number, y: number, r = 2) => {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   };
 
-  // Field background (radial dark-green gradient)
-  const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.max(FW, FH) * 0.65);
-  bg.addColorStop(0, "rgba(0,55,22,0.0)"); // transparent — heatmap shows through
-  bg.addColorStop(1, "rgba(0,20,8,0.0)");
-  ctx.fillStyle = bg;
-  ctx.fillRect(FX, FY, FW, FH);
-
-  // ── Boundary ──
+  // Boundary
   line("rgba(255,255,255,0.55)");
-  ctx.beginPath(); ctx.roundRect(FX, FY, FW, FH, 3); ctx.stroke();
+  ctx.beginPath(); ctx.roundRect(fx, fy, fw, fh, 3); ctx.stroke();
 
-  // ── Centre line ──
-  ctx.beginPath(); ctx.moveTo(CX, FY); ctx.lineTo(CX, FY + FH); ctx.stroke();
-
-  // ── Centre circle ──
-  ctx.beginPath(); ctx.arc(CX, CY, CR, 0, Math.PI * 2); ctx.stroke();
+  // Centre line + circle
+  ctx.beginPath(); ctx.moveTo(cx, fy); ctx.lineTo(cx, fy + fh); ctx.stroke();
+  ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
   ctx.fillStyle = "rgba(255,255,255,0.7)";
-  dot(CX, CY);
+  dot(cx, cy);
 
   line("rgba(255,255,255,0.42)");
 
-  // ── Left penalty area ──
-  ctx.strokeRect(FX, PA_Y, PA_W, PA_H);
-  // Left 6-yard box
-  ctx.strokeRect(FX, SB_Y, SB_W, SB_H);
-  // Left penalty spot
+  // Left penalty area + box + spot + arc
+  ctx.strokeRect(fx, paY, paW, paH);
+  ctx.strokeRect(fx, sbY, sbW, sbH);
   ctx.fillStyle = "rgba(255,255,255,0.65)";
-  dot(FX + PSPOT, CY);
-  // Left penalty arc (only part outside penalty area)
+  dot(fx + psp, cy);
   ctx.save();
-  ctx.beginPath(); ctx.rect(FX + PA_W, FY - 2, FW + 4, FH + 4); ctx.clip();
-  ctx.beginPath(); ctx.arc(FX + PSPOT, CY, CR, -Math.PI * 0.5, Math.PI * 0.5);
+  ctx.beginPath(); ctx.rect(fx + paW, fy - 2, fw + 4, fh + 4); ctx.clip();
+  ctx.beginPath(); ctx.arc(fx + psp, cy, cr, -Math.PI * 0.5, Math.PI * 0.5);
   line("rgba(255,255,255,0.42)"); ctx.stroke();
   ctx.restore();
-  // Left goal
   line("rgba(255,255,255,0.25)");
-  ctx.strokeRect(FX - GOAL_D, CY - GOAL_H / 2, GOAL_D, GOAL_H);
+  ctx.strokeRect(fx - gD, cy - gH / 2, gD, gH);
 
   line("rgba(255,255,255,0.42)");
 
-  // ── Right penalty area ──
-  ctx.strokeRect(FX + FW - PA_W, PA_Y, PA_W, PA_H);
-  // Right 6-yard box
-  ctx.strokeRect(FX + FW - SB_W, SB_Y, SB_W, SB_H);
-  // Right penalty spot
+  // Right penalty area + box + spot + arc
+  ctx.strokeRect(fx + fw - paW, paY, paW, paH);
+  ctx.strokeRect(fx + fw - sbW, sbY, sbW, sbH);
   ctx.fillStyle = "rgba(255,255,255,0.65)";
-  dot(FX + FW - PSPOT, CY);
-  // Right penalty arc (only part outside penalty area)
+  dot(fx + fw - psp, cy);
   ctx.save();
-  ctx.beginPath(); ctx.rect(FX - 4, FY - 2, FW - PA_W + 4, FH + 4); ctx.clip();
-  ctx.beginPath(); ctx.arc(FX + FW - PSPOT, CY, CR, Math.PI * 0.5, Math.PI * 1.5);
+  ctx.beginPath(); ctx.rect(fx - 4, fy - 2, fw - paW + 4, fh + 4); ctx.clip();
+  ctx.beginPath(); ctx.arc(fx + fw - psp, cy, cr, Math.PI * 0.5, Math.PI * 1.5);
   line("rgba(255,255,255,0.42)"); ctx.stroke();
   ctx.restore();
-  // Right goal
   line("rgba(255,255,255,0.25)");
-  ctx.strokeRect(FX + FW, CY - GOAL_H / 2, GOAL_D, GOAL_H);
+  ctx.strokeRect(fx + fw, cy - gH / 2, gD, gH);
 
-  // ── Corner arcs ──
+  // Corner arcs
   line("rgba(255,255,255,0.35)");
-  const R = 7;
+  const R = W * 0.018;
   const corners: [number, number, number, number][] = [
-    [FX,       FY,      0,             Math.PI / 2],
-    [FX + FW,  FY,      Math.PI / 2,   Math.PI],
-    [FX,       FY + FH, Math.PI * 1.5, Math.PI * 2],
-    [FX + FW,  FY + FH, Math.PI,       Math.PI * 1.5],
+    [fx,      fy,      0,             Math.PI / 2],
+    [fx + fw, fy,      Math.PI / 2,   Math.PI],
+    [fx,      fy + fh, Math.PI * 1.5, Math.PI * 2],
+    [fx + fw, fy + fh, Math.PI,       Math.PI * 1.5],
   ];
-  for (const [cx, cy, s, e] of corners) {
-    ctx.beginPath(); ctx.arc(cx, cy, R, s, e); ctx.stroke();
+  for (const [x, y, s, e] of corners) {
+    ctx.beginPath(); ctx.arc(x, y, R, s, e); ctx.stroke();
   }
 }
 
@@ -252,34 +221,43 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // — Background —
-    ctx.clearRect(0, 0, CV_W, CV_H);
-    const bg = ctx.createRadialGradient(CX, CY, 0, CX, CY, Math.max(FW, FH) * 0.75);
-    bg.addColorStop(0, "rgba(0,55,22,0.92)");
-    bg.addColorStop(1, "rgba(0,22,8,0.97)");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, CV_W, CV_H);
+    // ── Sync canvas resolution to its CSS display size ──────────────────────
+    // Canvas internal resolution defaults to 300×150 regardless of CSS size,
+    // causing all draws to appear in the wrong place or be invisible.
+    // getBoundingClientRect() gives the real painted size.
+    const rect = canvas.getBoundingClientRect();
+    const W = Math.round(rect.width)  || CV_W;
+    const H = Math.round(rect.height) || CV_H;
+    canvas.width  = W;   // always set — clears the canvas too
+    canvas.height = H;
 
-    // — Heatmap blobs (direct point rendering, no grid normalization) —
-    //
-    // Each raw (x,y) point is rendered as a radial-gradient blob.
-    // Coordinate conversion: x,y ∈ [0,100] → canvas pixels, Y-inverted
-    // (football convention: y=0 = bottom touchline, y=100 = top touchline).
-    // Overlapping blobs accumulate alpha, naturally showing density.
+    // ── Background ───────────────────────────────────────────────────────────
+    ctx.fillStyle = "#071a0e";
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Heatmap blobs ────────────────────────────────────────────────────────
+    // Direct coordinate → pixel conversion, NO grid or normalisation.
+    //   xPx = (x / 100) * W          x=0 → left edge,   x=100 → right edge
+    //   yPx = H - (y / 100) * H      y=0 → bottom,       y=100 → top
+    // Overlapping blobs accumulate alpha — dense zones glow brighter.
+    console.log("[HeatmapCanvas] W×H:", W, H, "| points:", points.length, points.slice(0, 3));
+
     if (!isEmpty && points.length > 0) {
-      const blobR = FH * 0.095;  // radius ≈ 9.5% of field height (~23px)
+      const blobR = W * 0.075;  // 7.5% of canvas width
 
       for (const pt of points) {
-        const xPx = FX + (pt.x / 100) * FW;
-        const yPx = FY + FH - (pt.y / 100) * FH;  // Y-inverted
+        if (pt.x < 0 || pt.x > 100 || pt.y < 0 || pt.y > 100) continue;
 
-        // Colour derived from x position: defensive=cyan → attacking=red
-        const hue  = pt.x / 100;
-        const color = getHeatColor(Math.max(0.25, hue));
+        const xPx = (pt.x / 100) * W;
+        const yPx = H - (pt.y / 100) * H;
+
+        // Colour by depth into pitch (x=0 defensive/cyan → x=100 attacking/red)
+        const color = getHeatColor(Math.max(0.3, pt.x / 100));
 
         const grad = ctx.createRadialGradient(xPx, yPx, 0, xPx, yPx, blobR);
-        grad.addColorStop(0, color);
-        grad.addColorStop(1, "rgba(0,0,0,0)");
+        grad.addColorStop(0,   color);              // solid at centre
+        grad.addColorStop(0.5, color);              // hold for inner half
+        grad.addColorStop(1,   "rgba(0,0,0,0)");   // fade to transparent
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(xPx, yPx, blobR, 0, Math.PI * 2);
@@ -287,16 +265,16 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
       }
     }
 
-    // — Field lines on top of heatmap —
-    drawFieldLines(ctx);
+    // ── Field lines (drawn on top of blobs, geometry scaled to W×H) ─────────
+    drawFieldLines(ctx, W, H);
 
-    // — Empty state label —
+    // ── Empty state ──────────────────────────────────────────────────────────
     if (isEmpty) {
-      ctx.fillStyle    = "rgba(255,255,255,0.18)";
-      ctx.font         = "13px system-ui, sans-serif";
+      ctx.fillStyle    = "rgba(255,255,255,0.25)";
+      ctx.font         = `${Math.round(W * 0.034)}px system-ui, sans-serif`;
       ctx.textAlign    = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("sem dados de posicionamento", CV_W / 2, CV_H / 2);
+      ctx.fillText("sem dados de posicionamento", W / 2, H / 2);
     }
   }, [points, isEmpty]);
 
@@ -306,6 +284,7 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
       width={CV_W}
       height={CV_H}
       className="block w-full rounded-[14px]"
+      style={{ display: "block" }}
       aria-label="Heatmap de posicionamento do jogador"
     />
   );
