@@ -58,7 +58,8 @@ interface PlayerEvents {
   shots:         MapEventFE[];
 }
 
-// Fallback canvas resolution (used when getBoundingClientRect returns 0)
+// Internal canvas drawing resolution — React owns the width/height attrs.
+// CSS w-full stretches the display; drawing always uses these coordinates.
 const CV_W = 400;
 const CV_H = 260;
 
@@ -221,29 +222,30 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // ── Sync canvas resolution to its CSS display size ──────────────────────
-    // Canvas internal resolution defaults to 300×150 regardless of CSS size,
-    // causing all draws to appear in the wrong place or be invisible.
-    // getBoundingClientRect() gives the real painted size.
-    const rect = canvas.getBoundingClientRect();
-    const W = Math.round(rect.width)  || CV_W;
-    const H = Math.round(rect.height) || CV_H;
-    canvas.width  = W;   // always set — clears the canvas too
-    canvas.height = H;
+    // Use the fixed internal resolution — React owns width/height attrs so we
+    // must NOT change canvas.width/height here (it would wipe the drawing and
+    // React would reset them on the next reconcile anyway).
+    const W = CV_W;   // 400
+    const H = CV_H;   // 260
 
     // ── Background ───────────────────────────────────────────────────────────
+    ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = "#071a0e";
     ctx.fillRect(0, 0, W, H);
 
-    // ── Heatmap blobs ────────────────────────────────────────────────────────
-    // Direct coordinate → pixel conversion, NO grid or normalisation.
-    //   xPx = (x / 100) * W          x=0 → left edge,   x=100 → right edge
-    //   yPx = H - (y / 100) * H      y=0 → bottom,       y=100 → top
-    // Overlapping blobs accumulate alpha — dense zones glow brighter.
-    console.log("[HeatmapCanvas] W×H:", W, H, "| points:", points.length, points.slice(0, 3));
+    // ── Debug: anchor dot — always visible; confirms canvas is reachable ─────
+    ctx.fillStyle = "rgba(255,255,255,0.20)";
+    ctx.beginPath();
+    ctx.arc(W / 2, H / 2, 6, 0, Math.PI * 2);
+    ctx.fill();
 
+    console.log("[HeatmapCanvas] points:", points.length, points.slice(0, 5));
+
+    // ── Heatmap blobs ────────────────────────────────────────────────────────
+    // xPx = (x / 100) * W          — x=0 left edge, x=100 right edge
+    // yPx = H - (y / 100) * H      — y=0 bottom,     y=100 top  (Y-inverted)
     if (!isEmpty && points.length > 0) {
-      const blobR = W * 0.075;  // 7.5% of canvas width
+      const blobR = Math.max(W, H) * 0.09;  // generous radius — visible even with few points
 
       for (const pt of points) {
         if (pt.x < 0 || pt.x > 100 || pt.y < 0 || pt.y > 100) continue;
@@ -251,13 +253,12 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
         const xPx = (pt.x / 100) * W;
         const yPx = H - (pt.y / 100) * H;
 
-        // Colour by depth into pitch (x=0 defensive/cyan → x=100 attacking/red)
         const color = getHeatColor(Math.max(0.3, pt.x / 100));
 
         const grad = ctx.createRadialGradient(xPx, yPx, 0, xPx, yPx, blobR);
-        grad.addColorStop(0,   color);              // solid at centre
-        grad.addColorStop(0.5, color);              // hold for inner half
-        grad.addColorStop(1,   "rgba(0,0,0,0)");   // fade to transparent
+        grad.addColorStop(0,   color);
+        grad.addColorStop(0.5, color);
+        grad.addColorStop(1,   "rgba(0,0,0,0)");
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(xPx, yPx, blobR, 0, Math.PI * 2);
@@ -265,13 +266,13 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
       }
     }
 
-    // ── Field lines (drawn on top of blobs, geometry scaled to W×H) ─────────
+    // ── Field lines on top ───────────────────────────────────────────────────
     drawFieldLines(ctx, W, H);
 
-    // ── Empty state ──────────────────────────────────────────────────────────
+    // ── Empty state label ────────────────────────────────────────────────────
     if (isEmpty) {
       ctx.fillStyle    = "rgba(255,255,255,0.25)";
-      ctx.font         = `${Math.round(W * 0.034)}px system-ui, sans-serif`;
+      ctx.font         = "13px system-ui, sans-serif";
       ctx.textAlign    = "center";
       ctx.textBaseline = "middle";
       ctx.fillText("sem dados de posicionamento", W / 2, H / 2);
@@ -279,12 +280,13 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
   }, [points, isEmpty]);
 
   return (
+    // width/height attributes set the internal drawing resolution.
+    // CSS w-full stretches the display — drawing coords stay at CV_W × CV_H.
     <canvas
       ref={canvasRef}
       width={CV_W}
       height={CV_H}
       className="block w-full rounded-[14px]"
-      style={{ display: "block" }}
       aria-label="Heatmap de posicionamento do jogador"
     />
   );
