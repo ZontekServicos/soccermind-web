@@ -150,48 +150,49 @@ function drawFieldLines(ctx: CanvasRenderingContext2D, W: number, H: number) {
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   };
 
-  // Boundary
-  line("rgba(255,255,255,0.55)");
+  // Boundary — slightly more visible than secondary lines
+  line("rgba(255,255,255,0.28)", 0.9);
   ctx.beginPath(); ctx.roundRect(fx, fy, fw, fh, 3); ctx.stroke();
 
   // Centre line + circle
+  line("rgba(255,255,255,0.15)", 0.7);
   ctx.beginPath(); ctx.moveTo(cx, fy); ctx.lineTo(cx, fy + fh); ctx.stroke();
   ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2); ctx.stroke();
-  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
   dot(cx, cy);
 
-  line("rgba(255,255,255,0.42)");
+  line("rgba(255,255,255,0.13)", 0.7);
 
   // Left penalty area + box + spot + arc
   ctx.strokeRect(fx, paY, paW, paH);
   ctx.strokeRect(fx, sbY, sbW, sbH);
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
   dot(fx + psp, cy);
   ctx.save();
   ctx.beginPath(); ctx.rect(fx + paW, fy - 2, fw + 4, fh + 4); ctx.clip();
   ctx.beginPath(); ctx.arc(fx + psp, cy, cr, -Math.PI * 0.5, Math.PI * 0.5);
-  line("rgba(255,255,255,0.42)"); ctx.stroke();
+  line("rgba(255,255,255,0.13)", 0.7); ctx.stroke();
   ctx.restore();
-  line("rgba(255,255,255,0.25)");
+  line("rgba(255,255,255,0.10)", 0.7);
   ctx.strokeRect(fx - gD, cy - gH / 2, gD, gH);
 
-  line("rgba(255,255,255,0.42)");
+  line("rgba(255,255,255,0.13)", 0.7);
 
   // Right penalty area + box + spot + arc
   ctx.strokeRect(fx + fw - paW, paY, paW, paH);
   ctx.strokeRect(fx + fw - sbW, sbY, sbW, sbH);
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.fillStyle = "rgba(255,255,255,0.45)";
   dot(fx + fw - psp, cy);
   ctx.save();
   ctx.beginPath(); ctx.rect(fx - 4, fy - 2, fw - paW + 4, fh + 4); ctx.clip();
   ctx.beginPath(); ctx.arc(fx + fw - psp, cy, cr, Math.PI * 0.5, Math.PI * 1.5);
-  line("rgba(255,255,255,0.42)"); ctx.stroke();
+  line("rgba(255,255,255,0.13)", 0.7); ctx.stroke();
   ctx.restore();
-  line("rgba(255,255,255,0.25)");
+  line("rgba(255,255,255,0.10)", 0.7);
   ctx.strokeRect(fx + fw, cy - gH / 2, gD, gH);
 
   // Corner arcs
-  line("rgba(255,255,255,0.35)");
+  line("rgba(255,255,255,0.14)", 0.7);
   const R = W * 0.018;
   const corners: [number, number, number, number][] = [
     [fx,      fy,      0,             Math.PI / 2],
@@ -230,10 +231,14 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
 
     // ── Background ───────────────────────────────────────────────────────────
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#071a0e";
+    ctx.fillStyle = "#060f08";
     ctx.fillRect(0, 0, W, H);
-
-    console.log("[HeatmapCanvas] points:", points.length, points.slice(0, 3));
+    // Ambient field glow — subtle green bloom at centre
+    const ambient = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.65);
+    ambient.addColorStop(0, "rgba(0,80,28,0.45)");
+    ambient.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = ambient;
+    ctx.fillRect(0, 0, W, H);
 
     // ── Heatmap blobs ────────────────────────────────────────────────────────
     // xPx = (x / 100) * W        — x=0 left edge, x=100 right edge
@@ -297,20 +302,27 @@ function HeatmapCanvas({ points, isEmpty }: HeatmapCanvasProps) {
 
 function PitchBase({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-[14px] border border-[rgba(0,255,156,0.10)] bg-[radial-gradient(circle_at_center,rgba(0,255,156,0.08),transparent_55%),linear-gradient(180deg,#0B2A23,#07142A)] h-[185px] flex items-center justify-center">
+    <div className="overflow-hidden rounded-xl border border-white/[0.07] h-[190px] flex items-center justify-center" style={{ background: "linear-gradient(160deg,#0a1f12 0%,#060f1a 100%)" }}>
       <svg viewBox="0 0 100 100" className="h-full w-auto" aria-hidden="true">
-        <rect x="1" y="1" width="98" height="98" rx="2" fill="transparent" stroke="rgba(255,255,255,0.55)" strokeWidth="0.7" />
-        <line x1="50" y1="1" x2="50" y2="99" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" />
-        <circle cx="50" cy="50" r="10" fill="transparent" stroke="rgba(255,255,255,0.5)" strokeWidth="0.5" />
-        <circle cx="50" cy="50" r="0.9" fill="rgba(255,255,255,0.8)" />
-        <rect x="1" y="21" width="16" height="58" fill="transparent" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
-        <rect x="1" y="36" width="5"  height="28" fill="transparent" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
-        <circle cx="12" cy="50" r="0.8" fill="rgba(255,255,255,0.8)" />
-        <path d="M 17 40 A 12 12 0 0 0 17 60" fill="transparent" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
-        <rect x="83" y="21" width="16" height="58" fill="transparent" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
-        <rect x="94" y="36" width="5"  height="28" fill="transparent" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
-        <circle cx="88" cy="50" r="0.8" fill="rgba(255,255,255,0.8)" />
-        <path d="M 83 40 A 12 12 0 0 1 83 60" fill="transparent" stroke="rgba(255,255,255,0.45)" strokeWidth="0.5" />
+        {/* Field bg */}
+        <rect x="0" y="0" width="100" height="100" fill="rgba(0,40,15,0.30)" />
+        {/* Boundary */}
+        <rect x="1" y="1" width="98" height="98" rx="2" fill="transparent" stroke="rgba(255,255,255,0.22)" strokeWidth="0.6" />
+        {/* Centre line */}
+        <line x1="50" y1="1" x2="50" y2="99" stroke="rgba(255,255,255,0.14)" strokeWidth="0.5" />
+        {/* Centre circle */}
+        <circle cx="50" cy="50" r="10" fill="transparent" stroke="rgba(255,255,255,0.14)" strokeWidth="0.5" />
+        <circle cx="50" cy="50" r="0.8" fill="rgba(255,255,255,0.55)" />
+        {/* Left penalty area */}
+        <rect x="1" y="21" width="16" height="58" fill="transparent" stroke="rgba(255,255,255,0.14)" strokeWidth="0.5" />
+        <rect x="1" y="36" width="5"  height="28" fill="transparent" stroke="rgba(255,255,255,0.10)" strokeWidth="0.5" />
+        <circle cx="12" cy="50" r="0.7" fill="rgba(255,255,255,0.45)" />
+        <path d="M 17 40 A 12 12 0 0 0 17 60" fill="transparent" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
+        {/* Right penalty area */}
+        <rect x="83" y="21" width="16" height="58" fill="transparent" stroke="rgba(255,255,255,0.14)" strokeWidth="0.5" />
+        <rect x="94" y="36" width="5"  height="28" fill="transparent" stroke="rgba(255,255,255,0.10)" strokeWidth="0.5" />
+        <circle cx="88" cy="50" r="0.7" fill="rgba(255,255,255,0.45)" />
+        <path d="M 83 40 A 12 12 0 0 1 83 60" fill="transparent" stroke="rgba(255,255,255,0.12)" strokeWidth="0.5" />
         {children}
       </svg>
     </div>
@@ -325,19 +337,20 @@ function PassMapPitch({ passes }: { passes: MapEventFE[] }) {
   return (
     <PitchBase>
       {passes.slice(0, 18).map((pass, i) => {
-        const color  = pass.outcome === "success" ? "rgba(0,255,156,0.72)" : "rgba(255,77,79,0.65)";
-        const x1     = pass.x;
-        const y1     = toSVGY(pass.y);
-        const x2     = pass.endX  ?? pass.x;
-        const y2     = toSVGY(pass.endY ?? pass.y);
+        const isSuccess = pass.outcome === "success";
+        const stroke = isSuccess ? "rgba(0,255,156,0.82)" : "rgba(255,55,55,0.75)";
+        const x1 = pass.x,       y1 = toSVGY(pass.y);
+        const x2 = pass.endX ?? pass.x, y2 = toSVGY(pass.endY ?? pass.y);
         return (
           <g key={`${x1}-${y1}-${i}`}>
-            <line
-              x1={x1} y1={y1} x2={x2} y2={y2}
-              stroke={color} strokeWidth="1.1" strokeLinecap="round"
-            />
-            <circle cx={x1} cy={y1} r="0.9" fill="rgba(255,255,255,0.55)" />
-            <circle cx={x2} cy={y2} r="0.9" fill={color} />
+            {/* depth shadow */}
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(0,0,0,0.35)" strokeWidth="2.2" strokeLinecap="round" />
+            {/* main line */}
+            <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth="1.3" strokeLinecap="round" />
+            {/* origin dot */}
+            <circle cx={x1} cy={y1} r="1.0" fill="rgba(255,255,255,0.45)" />
+            {/* end dot — slightly larger */}
+            <circle cx={x2} cy={y2} r="1.4" fill={stroke} />
           </g>
         );
       })}
@@ -348,18 +361,24 @@ function PassMapPitch({ passes }: { passes: MapEventFE[] }) {
 function ShotMapPitch({ shots }: { shots: MapEventFE[] }) {
   return (
     <PitchBase>
-      {shots.slice(0, 16).map((shot, i) => (
-        <circle
-          key={`${shot.x}-${shot.y}-${i}`}
-          cx={shot.x}
-          cy={toSVGY(shot.y)}
-          r={1.8}
-          fill={shot.outcome === "goal" ? "#00FF9C" : shot.outcome === "saved" ? "#00C2FF" : "#FF7B7D"}
-          fillOpacity="0.75"
-          stroke="rgba(255,255,255,0.85)"
-          strokeWidth="0.35"
-        />
-      ))}
+      {shots.slice(0, 16).map((shot, i) => {
+        // goal=green, saved=yellow, blocked/other=red
+        const color =
+          shot.outcome === "goal"  ? "#00FF9C" :
+          shot.outcome === "saved" ? "#FFD600" : "#FF4040";
+        const cx = shot.x;
+        const cy = toSVGY(shot.y);
+        return (
+          <g key={`${shot.x}-${shot.y}-${i}`}>
+            {/* outer glow ring */}
+            <circle cx={cx} cy={cy} r={4.0} fill={color} fillOpacity="0.12" />
+            {/* mid ring */}
+            <circle cx={cx} cy={cy} r={2.6} fill={color} fillOpacity="0.25" />
+            {/* main dot */}
+            <circle cx={cx} cy={cy} r={1.9} fill={color} fillOpacity="0.90" stroke="rgba(255,255,255,0.70)" strokeWidth="0.4" />
+          </g>
+        );
+      })}
     </PitchBase>
   );
 }
@@ -367,8 +386,10 @@ function ShotMapPitch({ shots }: { shots: MapEventFE[] }) {
 function EmptyPitch() {
   return (
     <PitchBase>
-      <text x="50" y="52" textAnchor="middle" fill="rgba(255,255,255,0.18)" fontSize="5" fontFamily="sans-serif">
-        sem dados
+      <circle cx="50" cy="46" r="7" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="0.8" />
+      <line x1="50" y1="39.5" x2="50" y2="52.5" stroke="rgba(255,255,255,0.10)" strokeWidth="0.8" />
+      <text x="50" y="59" textAnchor="middle" fill="rgba(255,255,255,0.15)" fontSize="4.5" fontFamily="system-ui,sans-serif" letterSpacing="0.5">
+        sem dados disponíveis
       </text>
     </PitchBase>
   );
@@ -380,9 +401,9 @@ function EmptyPitch() {
 
 function StatBadge({ value, label, color }: { value: number; label: string; color: string }) {
   return (
-    <div className="flex flex-col items-end">
-      <span className="text-base font-semibold leading-none" style={{ color }}>{value}</span>
-      <span className="mt-0.5 text-[9px] uppercase tracking-[0.18em] text-gray-500">{label}</span>
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="text-[17px] font-bold leading-none tabular-nums" style={{ color }}>{value}</span>
+      <span className="text-[8.5px] uppercase tracking-[0.20em] text-white/30">{label}</span>
     </div>
   );
 }
@@ -399,11 +420,13 @@ function MapPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col rounded-[20px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] p-4">
+    <div className="group relative flex flex-col rounded-2xl border border-white/[0.08] p-4 shadow-[0_6px_28px_rgba(0,0,0,0.45)] transition-all duration-200 hover:border-white/[0.14] hover:shadow-[0_10px_40px_rgba(0,0,0,0.55)]" style={{ background: "linear-gradient(150deg,rgba(255,255,255,0.045) 0%,rgba(0,0,0,0.18) 100%)" }}>
+      {/* top highlight */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-t-2xl bg-gradient-to-r from-transparent via-white/[0.11] to-transparent" />
       <div className="mb-3 flex items-start justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-white">{title}</p>
-          <p className="text-[10px] uppercase tracking-[0.22em] text-gray-500">{subtitle}</p>
+          <p className="text-[13px] font-semibold leading-tight text-white">{title}</p>
+          <p className="mt-0.5 text-[9.5px] uppercase tracking-[0.24em] text-white/30">{subtitle}</p>
         </div>
         {stats && <div className="flex gap-3">{stats}</div>}
       </div>
@@ -414,15 +437,19 @@ function MapPanel({
 
 function PanelSkeleton() {
   return (
-    <div className="flex flex-col animate-pulse rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-4">
-      <div className="mb-3 flex justify-between">
+    <div className="flex flex-col animate-pulse rounded-2xl border border-white/[0.06] p-4 shadow-[0_6px_28px_rgba(0,0,0,0.35)]" style={{ background: "linear-gradient(150deg,rgba(255,255,255,0.03) 0%,rgba(0,0,0,0.12) 100%)" }}>
+      <div className="mb-3 flex items-start justify-between">
         <div className="space-y-2">
-          <div className="h-3 w-24 rounded bg-[rgba(255,255,255,0.07)]" />
-          <div className="h-2 w-16 rounded bg-[rgba(255,255,255,0.04)]" />
+          <div className="h-3 w-28 rounded-full bg-white/[0.07]" />
+          <div className="h-2 w-16 rounded-full bg-white/[0.04]" />
         </div>
-        <div className="h-6 w-10 rounded bg-[rgba(255,255,255,0.04)]" />
+        <div className="h-7 w-10 rounded-lg bg-white/[0.04]" />
       </div>
-      <div className="h-[185px] rounded-[14px] bg-[rgba(255,255,255,0.04)]" />
+      <div className="h-[190px] rounded-xl bg-white/[0.04]" />
+      <div className="mt-2 grid grid-cols-2 gap-1.5">
+        <div className="h-12 rounded-xl bg-white/[0.03]" />
+        <div className="h-12 rounded-xl bg-white/[0.03]" />
+      </div>
     </div>
   );
 }
@@ -441,10 +468,10 @@ const HEAT_LEGEND = [
 
 const SHOT_LEGEND = [
   { color: "#00FF9C", label: "Gol" },
-  { color: "#00C2FF", label: "Defendido" },
-  { color: "#FF7B7D", label: "Bloqueado" },
-  { color: "#00FF9C", label: "Passe completo", dash: true },
-  { color: "#FF7B7D", label: "Passe incompleto", dash: true },
+  { color: "#FFD600", label: "Defendido" },
+  { color: "#FF4040", label: "Bloqueado" },
+  { color: "#00FF9C", label: "Passe certo", dash: true },
+  { color: "#FF3737", label: "Passe errado", dash: true },
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -467,7 +494,6 @@ export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
     apiFetch<PlayerEvents>(`/players/${playerId}/events`)
       .then((res) => {
         if (cancelled) return;
-        console.log("[FieldMapsModule] events:", res.data);
         setEvents(res.data);
       })
       .catch(() => { if (!cancelled) setEvents(null); })
@@ -505,7 +531,7 @@ export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
 
             {/* Auto-insight */}
             {insight && (
-              <p className="mt-2 rounded-[10px] border border-[rgba(0,194,255,0.15)] bg-[rgba(0,194,255,0.05)] px-3 py-2 text-[11px] text-[#9BE7FF]">
+              <p className="mt-2.5 rounded-xl border border-[rgba(0,194,255,0.18)] bg-[rgba(0,194,255,0.06)] px-3 py-2 text-[11px] leading-snug text-[#7DD9FF]">
                 {insight}
               </p>
             )}
@@ -516,7 +542,7 @@ export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
                 {heatmapData.dominantZones.slice(0, 3).map((zone) => (
                   <span
                     key={zone}
-                    className="rounded-full border border-[rgba(0,194,255,0.25)] bg-[rgba(0,194,255,0.06)] px-2 py-0.5 text-[9px] font-semibold text-[#9BE7FF]"
+                    className="rounded-full border border-[rgba(0,194,255,0.20)] bg-[rgba(0,194,255,0.07)] px-2.5 py-0.5 text-[8.5px] font-semibold uppercase tracking-[0.14em] text-[#7DD9FF]"
                   >
                     {zone}
                   </span>
@@ -535,14 +561,14 @@ export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
           >
             {passes.length > 0 ? <PassMapPitch passes={passes} /> : <EmptyPitch />}
             {ab && (
-              <div className="mt-2 grid grid-cols-2 gap-1.5">
-                <div className="rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-3 py-2 text-center">
-                  <p className="text-sm font-semibold text-[#00FF9C]">{ab.dribbles}</p>
-                  <p className="text-[9px] uppercase tracking-[0.15em] text-gray-500">Dribles</p>
+              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5 text-center">
+                  <p className="text-[15px] font-bold tabular-nums text-[#00FF9C]">{ab.dribbles}</p>
+                  <p className="mt-0.5 text-[8px] uppercase tracking-[0.18em] text-white/30">Dribles</p>
                 </div>
-                <div className="rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-3 py-2 text-center">
-                  <p className="text-sm font-semibold text-[#9BE7FF]">{ab.interceptions}</p>
-                  <p className="text-[9px] uppercase tracking-[0.15em] text-gray-500">Interc.</p>
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5 text-center">
+                  <p className="text-[15px] font-bold tabular-nums text-[#7DD9FF]">{ab.interceptions}</p>
+                  <p className="mt-0.5 text-[8px] uppercase tracking-[0.18em] text-white/30">Interc.</p>
                 </div>
               </div>
             )}
@@ -563,14 +589,14 @@ export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
           >
             {shots.length > 0 ? <ShotMapPitch shots={shots} /> : <EmptyPitch />}
             {ab && (
-              <div className="mt-2 grid grid-cols-2 gap-1.5">
-                <div className="rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-3 py-2 text-center">
-                  <p className="text-sm font-semibold text-[#FBBF24]">{ab.tackles}</p>
-                  <p className="text-[9px] uppercase tracking-[0.15em] text-gray-500">Desarmes</p>
+              <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5 text-center">
+                  <p className="text-[15px] font-bold tabular-nums text-[#FBBF24]">{ab.tackles}</p>
+                  <p className="mt-0.5 text-[8px] uppercase tracking-[0.18em] text-white/30">Desarmes</p>
                 </div>
-                <div className="rounded-[10px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-3 py-2 text-center">
-                  <p className="text-sm font-semibold text-[#A855F7]">{ab.saves}</p>
-                  <p className="text-[9px] uppercase tracking-[0.15em] text-gray-500">Defesas</p>
+                <div className="rounded-xl border border-white/[0.07] bg-white/[0.025] px-3 py-2.5 text-center">
+                  <p className="text-[15px] font-bold tabular-nums text-[#C084FC]">{ab.saves}</p>
+                  <p className="mt-0.5 text-[8px] uppercase tracking-[0.18em] text-white/30">Defesas</p>
                 </div>
               </div>
             )}
@@ -580,27 +606,24 @@ export function FieldMapsModule({ playerId }: FieldMapsModuleProps) {
       </div>
 
       {/* ── Shared legend row ── */}
-      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 px-1">
-        {/* Heat scale */}
+      <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/[0.06] pt-4 px-1">
+        {/* Heat density scale */}
         <div className="flex items-center gap-2">
           {HEAT_LEGEND.map(({ color, label }, i) => (
-            <div key={i} className="flex items-center gap-1">
-              <div className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} />
-              {label && <span className="text-[9px] uppercase tracking-[0.16em] text-gray-500">{label}</span>}
+            <div key={i} className="flex items-center gap-1.5">
+              <div className="h-2 w-2 rounded-sm shadow-sm" style={{ background: color }} />
+              {label && <span className="text-[8.5px] uppercase tracking-[0.18em] text-white/30">{label}</span>}
             </div>
           ))}
         </div>
 
-        <div className="h-3 w-px bg-[rgba(255,255,255,0.12)]" />
+        <div className="h-3 w-px bg-white/[0.10]" />
 
-        {/* Shot / pass colours */}
+        {/* Shot / pass outcomes */}
         {SHOT_LEGEND.map(({ color, label }, i) => (
           <div key={i} className="flex items-center gap-1.5">
-            <div
-              className="h-2 w-2 rounded-full"
-              style={{ background: color, opacity: 0.9 }}
-            />
-            <span className="text-[9px] uppercase tracking-[0.16em] text-gray-500">{label}</span>
+            <div className="h-2 w-2 rounded-full" style={{ background: color, boxShadow: `0 0 4px ${color}66` }} />
+            <span className="text-[8.5px] uppercase tracking-[0.18em] text-white/30">{label}</span>
           </div>
         ))}
       </div>
