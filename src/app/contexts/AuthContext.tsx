@@ -1,7 +1,9 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
+import { supabase } from "../lib/supabase";
 
 // ========================================
-// TYPES
+// TYPES — interface pública preservada para não quebrar consumidores
 // ========================================
 export type UserRole = "admin" | "scout" | "gestor";
 
@@ -18,8 +20,9 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  session: Session | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   updatePassword: (token: string, newPassword: string) => Promise<void>;
 }
@@ -28,128 +31,79 @@ interface AuthContextType {
 // CONTEXT
 // ========================================
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Export context for optional usage
 export { AuthContext };
 
 // ========================================
-// MOCK DATA
+// MAPPER: Supabase User → User interno
 // ========================================
-const MOCK_USERS = [
-  {
-    id: "1",
-    email: "soccermind@adm.com.br",
-    password: "123Senha",
-    name: "Ricardo Santos",
-    role: "admin" as UserRole,
-    clubName: "Sport Club Corinthians",
-  },
-  {
-    id: "2",
-    email: "admin@corinthians.com.br",
-    password: "admin123",
-    name: "Ricardo Santos",
-    role: "admin" as UserRole,
-    clubName: "Sport Club Corinthians",
-  },
-  {
-    id: "3",
-    email: "scout@corinthians.com.br",
-    password: "scout123",
-    name: "Maria Oliveira",
-    role: "scout" as UserRole,
-    clubName: "Sport Club Corinthians",
-  },
-  {
-    id: "4",
-    email: "gestor@corinthians.com.br",
-    password: "gestor123",
-    name: "João Silva",
-    role: "gestor" as UserRole,
-    clubName: "Sport Club Corinthians",
-  },
-];
+function mapSupabaseUser(supaUser: SupabaseUser): User {
+  const meta = supaUser.user_metadata ?? {};
+  return {
+    id: supaUser.id,
+    name: meta.name ?? meta.full_name ?? supaUser.email?.split("@")[0] ?? "Usuário",
+    email: supaUser.email ?? "",
+    // role deve ser salvo em user_metadata ao criar o usuário no Supabase
+    role: (meta.role as UserRole) ?? "scout",
+    clubName: meta.clubName ?? meta.club_name ?? "SoccerMind",
+    clubLogo: meta.clubLogo ?? meta.club_logo,
+  };
+}
 
 // ========================================
 // PROVIDER
 // ========================================
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user from localStorage on mount
   useEffect(() => {
-    const storedUser = localStorage.getItem("soccermind_user");
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (error) {
-        localStorage.removeItem("soccermind_user");
-      }
-    }
-    setIsLoading(false);
+    // Lê sessão existente (localStorage/cookie gerenciado pelo Supabase)
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
+      setUser(s?.user ? mapSupabaseUser(s.user) : null);
+      setIsLoading(false);
+    });
+
+    // Reage a login, logout, refresh de token
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      setUser(s?.user ? mapSupabaseUser(s.user) : null);
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<void> => {
-    setIsLoading(true);
-
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Find user
-    const foundUser = MOCK_USERS.find((u) => u.email === email && u.password === password);
-
-    if (!foundUser) {
-      setIsLoading(false);
-      throw new Error("Email ou senha inválidos");
-    }
-
-    // Create user object (without password)
-    const userToStore: User = {
-      id: foundUser.id,
-      name: foundUser.name,
-      email: foundUser.email,
-      role: foundUser.role,
-      clubName: foundUser.clubName,
-    };
-
-    setUser(userToStore);
-    localStorage.setItem("soccermind_user", JSON.stringify(userToStore));
-    setIsLoading(false);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem("soccermind_user");
+  const logout = async (): Promise<void> => {
+    await supabase.auth.signOut();
   };
 
   const resetPassword = async (email: string): Promise<void> => {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-
-    // Check if user exists
-    const userExists = MOCK_USERS.find((u) => u.email === email);
-
-    if (!userExists) {
-      throw new Error("Email não encontrado");
-    }
-
-    // In production, this would send an email
-    console.log(`Password reset email sent to ${email}`);
+    const redirectTo = `${window.location.origin}/reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) throw new Error(error.message);
   };
 
-  const updatePassword = async (token: string, newPassword: string): Promise<void> => {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // In production, this would validate token and update password
-    console.log(`Password updated with token ${token}`);
+  // O parâmetro token não é mais necessário — o Supabase estabelece a sessão
+  // automaticamente a partir do hash da URL do link de recuperação.
+  const updatePassword = async (_token: string, newPassword: string): Promise<void> => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw new Error(error.message);
   };
 
   const value: AuthContextType = {
     user,
     isAuthenticated: !!user,
     isLoading,
+    session,
     login,
     logout,
     resetPassword,
@@ -171,7 +125,7 @@ export function useAuth() {
 }
 
 // ========================================
-// PERMISSIONS
+// PERMISSIONS — preservadas sem alteração
 // ========================================
 export const ROLE_PERMISSIONS = {
   admin: {
@@ -197,6 +151,9 @@ export const ROLE_PERMISSIONS = {
   },
 };
 
-export function hasPermission(role: UserRole, permission: keyof typeof ROLE_PERMISSIONS.admin): boolean {
+export function hasPermission(
+  role: UserRole,
+  permission: keyof typeof ROLE_PERMISSIONS.admin,
+): boolean {
   return ROLE_PERMISSIONS[role][permission] || false;
 }

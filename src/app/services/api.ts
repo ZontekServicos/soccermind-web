@@ -1,4 +1,5 @@
 import { API_CONFIG } from "../config/api-config";
+import { supabase } from "../lib/supabase";
 
 export interface ApiEnvelope<T> {
   success: boolean;
@@ -48,11 +49,24 @@ function buildApiUrl(baseUrl: string, endpoint: string) {
   return `${baseUrl}${endpoint}`;
 }
 
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      return { Authorization: `Bearer ${session.access_token}` };
+    }
+  } catch {
+    // sem sessão ativa — request sem token
+  }
+  return {};
+}
+
 export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {},
 ): Promise<ApiEnvelope<T>> {
   const candidates = buildApiBaseCandidates();
+  const authHeader = await getAuthHeader();
   let lastError: Error | null = null;
 
   for (const baseUrl of candidates) {
@@ -60,6 +74,7 @@ export async function apiFetch<T>(
       const response = await fetch(buildApiUrl(baseUrl, endpoint), {
         headers: {
           "Content-Type": "application/json",
+          ...authHeader,
           ...(options.headers || {}),
         },
         ...options,
