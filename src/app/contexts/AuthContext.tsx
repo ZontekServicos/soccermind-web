@@ -58,6 +58,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Remove dados do mock auth anterior (migração para Supabase)
+    localStorage.removeItem("soccermind_user");
+
     // Lê sessão existente (localStorage/cookie gerenciado pelo Supabase)
     supabase.auth.getSession().then(({ data: { session: s } }) => {
       setSession(s);

@@ -10,6 +10,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
+  // Aguarda a sessão Supabase ser lida do storage antes de decidir
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-[#07142A]">
@@ -21,8 +22,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
+  // Sem sessão Supabase válida → redireciona para login
   if (!isAuthenticated) {
-    // Redirect to login (/) but save the attempted location
     return <Navigate to="/" state={{ from: location }} replace />;
   }
 
