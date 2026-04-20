@@ -188,11 +188,11 @@ function PlayerCard({ entry, rank }: { entry: ScoutingRankingEntry; rank: number
 
   return (
     <article
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-[20px] border transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-[20px] border transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
       style={{
         background: "linear-gradient(160deg, rgba(10,27,53,0.98) 0%, rgba(7,20,42,0.96) 100%)",
         borderColor: cfg.border,
-        boxShadow: `0 8px_32px_rgba(0,0,0,0.3), inset 0 0 60px ${cfg.glow}`,
+        boxShadow: `0 8px 32px rgba(0,0,0,0.3), inset 0 0 60px ${cfg.glow}`,
       }}
       onClick={() => navigate(`/player/${entry.playerId}`)}
     >
@@ -321,7 +321,7 @@ const DEFAULT_FILTERS: FiltersState = {
 
 export default function ScoutingRanking() {
   const [players, setPlayers] = useState<ScoutingRankingEntry[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState<number | null>(null);
 
@@ -533,8 +533,17 @@ export default function ScoutingRanking() {
 
             {/* ── Error state ───────────────────────────────────────────────── */}
             {error && (
-              <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
-                {error}
+              <div className="flex items-center gap-3 rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4">
+                <Zap className="h-5 w-5 flex-shrink-0 text-[#FF4D4F]" />
+                <p className="flex-1 text-sm text-[#FFB4B5]">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => setCommitted((c) => ({ ...c }))}
+                  className="flex items-center gap-1.5 rounded-[10px] border border-[rgba(255,77,79,0.3)] px-3 py-1.5 text-xs text-[#FF4D4F] transition-all hover:bg-[rgba(255,77,79,0.1)]"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Tentar novamente
+                </button>
               </div>
             )}
 
@@ -562,18 +571,25 @@ export default function ScoutingRanking() {
 
             {/* ── Empty state ───────────────────────────────────────────────── */}
             {!loading && players.length === 0 && !error && (
-              <div className="flex flex-col items-center gap-4 py-20">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.03)]">
-                  <Zap className="h-7 w-7 text-gray-600" />
+              <div className="flex flex-col items-center gap-5 py-24">
+                <div
+                  className="flex h-20 w-20 items-center justify-center rounded-full"
+                  style={{ background: "rgba(0,194,255,0.08)", border: "1.5px solid rgba(0,194,255,0.2)" }}
+                >
+                  <Sparkles className="h-9 w-9 text-[#00C2FF] opacity-50" />
                 </div>
-                <p className="text-sm text-gray-500">
-                  Nenhum jogador encontrado com os filtros aplicados.
-                </p>
+                <div className="text-center">
+                  <p className="text-base font-semibold text-gray-300">Nenhum jogador encontrado</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Tente ajustar ou limpar os filtros para ver mais resultados.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={handleClear}
-                  className="text-xs text-[#00C2FF] underline-offset-2 hover:underline"
+                  className="inline-flex items-center gap-2 rounded-[12px] border border-[rgba(0,194,255,0.25)] bg-[rgba(0,194,255,0.08)] px-4 py-2 text-sm font-medium text-[#00C2FF] transition-all hover:bg-[rgba(0,194,255,0.14)]"
                 >
+                  <RotateCcw className="h-3.5 w-3.5" />
                   Limpar filtros
                 </button>
               </div>

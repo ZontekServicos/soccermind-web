@@ -9,6 +9,7 @@ import {
   Crosshair,
   ExternalLink,
   Minus,
+  RotateCcw,
   Target,
   TrendingDown,
   TrendingUp,
@@ -243,17 +244,18 @@ export default function PlayerProfile() {
   const [data, setData] = useState<PlayerEvolutionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fetchKey, setFetchKey] = useState(0);
 
   useEffect(() => {
     if (!id) return;
     let active = true;
     setLoading(true);
+    setError(null);
 
     getPlayerEvolution(id)
       .then((res) => {
         if (!active) return;
         setData(res.data ?? null);
-        setError(null);
       })
       .catch((err) => {
         if (!active) return;
@@ -264,7 +266,7 @@ export default function PlayerProfile() {
       });
 
     return () => { active = false; };
-  }, [id]);
+  }, [id, fetchKey]);
 
   // Seasons sorted oldest → newest
   const seasons: SeasonPoint[] = (data?.trend.seasons ?? [])
@@ -304,22 +306,95 @@ export default function PlayerProfile() {
               <span className="text-gray-300">{data?.playerName ?? "Jogador"}</span>
             </nav>
 
-            {/* ── Loading / Error ──────────────────────────────────────────── */}
+            {/* ── Loading skeleton ─────────────────────────────────────────── */}
             {loading && (
               <div className="space-y-4">
+                {/* Hero skeleton */}
+                <div className="animate-pulse rounded-[28px] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] p-7">
+                  <div className="flex flex-col gap-4 md:flex-row md:justify-between">
+                    <div className="space-y-3">
+                      <div className="h-5 w-28 rounded-full bg-[rgba(255,255,255,0.05)]" />
+                      <div className="h-8 w-52 rounded-[10px] bg-[rgba(255,255,255,0.06)]" />
+                      <div className="flex gap-2">
+                        <div className="h-6 w-12 rounded-[8px] bg-[rgba(255,255,255,0.05)]" />
+                        <div className="h-6 w-16 rounded-[8px] bg-[rgba(255,255,255,0.04)]" />
+                        <div className="h-6 w-24 rounded-[8px] bg-[rgba(255,255,255,0.04)]" />
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className="h-4 w-16 rounded bg-[rgba(255,255,255,0.04)]" />
+                      <div className="h-14 w-16 rounded-[10px] bg-[rgba(255,255,255,0.06)]" />
+                    </div>
+                  </div>
+                </div>
+                {/* Trend skeleton */}
+                <div className="animate-pulse rounded-[20px] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] p-5">
+                  <div className="flex gap-4">
+                    <div className="h-11 w-11 flex-shrink-0 rounded-[12px] bg-[rgba(255,255,255,0.05)]" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-20 rounded bg-[rgba(255,255,255,0.06)]" />
+                      <div className="h-3 w-48 rounded bg-[rgba(255,255,255,0.04)]" />
+                    </div>
+                    <div className="hidden w-56 space-y-2 md:block">
+                      {[80, 65, 55, 40].map((w, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className="h-2 w-16 rounded bg-[rgba(255,255,255,0.04)]" />
+                          <div className="h-1.5 flex-1 rounded-full bg-[rgba(255,255,255,0.04)]" style={{ maxWidth: `${w}%` }} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {/* Season rows skeleton */}
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="animate-pulse rounded-[20px] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)]"
-                    style={{ height: i === 1 ? 140 : 100 }}
+                    className="animate-pulse rounded-[16px] border border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.02)]"
+                    style={{ height: 90 }}
                   />
                 ))}
               </div>
             )}
 
+            {/* ── Error state ──────────────────────────────────────────────── */}
             {error && (
-              <div className="rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
-                {error}
+              <div className="flex items-center gap-3 rounded-[16px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.08)] px-5 py-4">
+                <Zap className="h-5 w-5 flex-shrink-0 text-[#FF4D4F]" />
+                <p className="flex-1 text-sm text-[#FFB4B5]">{error}</p>
+                <button
+                  type="button"
+                  onClick={() => setFetchKey((k) => k + 1)}
+                  className="flex items-center gap-1.5 rounded-[10px] border border-[rgba(255,77,79,0.3)] px-3 py-1.5 text-xs text-[#FF4D4F] transition-all hover:bg-[rgba(255,77,79,0.1)]"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+
+            {/* ── Not found ────────────────────────────────────────────────── */}
+            {!loading && !error && !data && (
+              <div className="flex flex-col items-center gap-5 py-24">
+                <div
+                  className="flex h-20 w-20 items-center justify-center rounded-full"
+                  style={{ background: "rgba(122,92,255,0.08)", border: "1.5px solid rgba(122,92,255,0.2)" }}
+                >
+                  <Crosshair className="h-9 w-9 text-[#7A5CFF] opacity-50" />
+                </div>
+                <div className="text-center">
+                  <p className="text-base font-semibold text-gray-300">Jogador não encontrado</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    O perfil solicitado não existe ou ainda não foi enriquecido.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  className="inline-flex items-center gap-2 rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-sm font-medium text-gray-300 transition-all hover:border-[rgba(255,255,255,0.2)] hover:text-white"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Voltar
+                </button>
               </div>
             )}
 
@@ -454,9 +529,14 @@ export default function PlayerProfile() {
                   </div>
 
                   {seasons.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 rounded-[16px] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] py-10">
-                      <Zap className="h-6 w-6 text-gray-600" />
-                      <p className="text-sm text-gray-500">Nenhuma temporada registrada ainda.</p>
+                    <div className="flex flex-col items-center gap-3 rounded-[16px] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] py-12">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[rgba(255,255,255,0.04)]">
+                        <Zap className="h-6 w-6 text-gray-600" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-400">Nenhuma temporada registrada</p>
+                        <p className="mt-0.5 text-xs text-gray-600">Execute o enriquecimento para gerar o histórico.</p>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-2">

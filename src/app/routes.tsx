@@ -21,6 +21,7 @@ import Governance from "./pages/Governance";
 import PlayersRanking from "./pages/PlayersRanking";
 import ScoutingRanking from "./pages/ScoutingRanking";
 import PlayerProfile from "./pages/PlayerProfile";
+import HiddenGems from "./pages/HiddenGems";
 import PlayerSearch from "./pages/PlayerSearch";
 import PlayerDetails from "./pages/PlayerDetails";
 import SmartMatch from "./pages/SmartMatch";
@@ -102,6 +103,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ScoutingRanking />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/hidden-gems",
+        element: (
+          <ProtectedRoute>
+            <HiddenGems />
           </ProtectedRoute>
         ),
       },
