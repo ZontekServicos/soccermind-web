@@ -3,7 +3,6 @@ import {
   Users,
   FileText,
   History,
-  Shield,
   ChevronLeft,
   ChevronRight,
   Trophy,
@@ -11,6 +10,7 @@ import {
   Activity,
   Headset,
   Search,
+  Sparkles,
 } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import { useState, memo } from "react";
@@ -33,7 +33,8 @@ const navigationGroups = [
     label: "nav.analysis",
     items: [
       { name: "nav.tactical_fit", href: "/squad", icon: Target },
-      { name: "nav.players_ranking", href: "/players", icon: Trophy },
+      { name: "nav.players_ranking",   href: "/players",          icon: Trophy },
+      { name: "nav.scouting_ranking", href: "/scouting-ranking", icon: Sparkles },
       { name: "nav.player_vs_player", href: "/compare", icon: Users },
       { name: "nav.health_analytics", href: "/health-analytics", icon: Activity },
       { name: "nav.reports", href: "/reports", icon: FileText },

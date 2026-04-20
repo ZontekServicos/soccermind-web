@@ -19,6 +19,8 @@ import History from "./pages/History";
 import AnalysisDetail from "./pages/AnalysisDetail";
 import Governance from "./pages/Governance";
 import PlayersRanking from "./pages/PlayersRanking";
+import ScoutingRanking from "./pages/ScoutingRanking";
+import PlayerProfile from "./pages/PlayerProfile";
 import PlayerSearch from "./pages/PlayerSearch";
 import PlayerDetails from "./pages/PlayerDetails";
 import SmartMatch from "./pages/SmartMatch";
@@ -92,6 +94,22 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <PlayersRanking />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/scouting-ranking",
+        element: (
+          <ProtectedRoute>
+            <ScoutingRanking />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/player/:id",
+        element: (
+          <ProtectedRoute>
+            <PlayerProfile />
           </ProtectedRoute>
         ),
       },
