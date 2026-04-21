@@ -4,21 +4,23 @@ import type { ApiEnvelope } from "../../app/services/api";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface UserProfile {
-  id:        string;
-  name:      string | null;
-  email:     string | null;
-  avatarUrl: string | null;
-  role:      string;
-  plan:      string;
-  clubName:  string | null;
-  createdAt: string;
-  updatedAt: string;
+  id:           string;
+  name:         string | null;
+  email:        string | null;
+  avatarUrl:    string | null;
+  role:         string;
+  plan:         string;
+  clubName:     string | null;
+  clubLogoUrl:  string | null;
+  createdAt:    string;
+  updatedAt:    string;
 }
 
 export interface UpdateProfilePayload {
-  name?:      string;
-  avatarUrl?: string;
-  clubName?:  string;
+  name?:        string;
+  avatarUrl?:   string;
+  clubName?:    string;
+  clubLogoUrl?: string;
 }
 
 // ─── API calls ────────────────────────────────────────────────────────────────

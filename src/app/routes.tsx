@@ -3,6 +3,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ProfileProvider } from "./contexts/ProfileContext";
 
 // Public pages (Authentication only)
 import Login from "./pages/Login";
@@ -36,7 +37,9 @@ function RootLayout() {
   return (
     <LanguageProvider>
       <AuthProvider>
-        <Outlet />
+        <ProfileProvider>
+          <Outlet />
+        </ProfileProvider>
       </AuthProvider>
     </LanguageProvider>
   );

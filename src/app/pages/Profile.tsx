@@ -27,12 +27,13 @@ import {
   Building2,
   User,
   AlertCircle,
+  Image,
 } from "lucide-react";
 import { useEffect, useState, useMemo, memo, useRef } from "react";
 import { getProfileUpsells, type ProfileUpsell } from "../services/profile";
 import { useAuth } from "../contexts/AuthContext";
-import { getUserProfile, updateUserProfile, type UserProfile } from "../../services/userProfile";
-import clubLogo from "../../assets/club-logo.png";
+import { useProfile } from "../contexts/ProfileContext";
+import { updateUserProfile } from "../../services/userProfile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -61,61 +62,36 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function Profile() {
   const { user } = useAuth();
-  const [upsells,       setUpsells]       = useState<Upsell[]>([]);
-  const [filterStatus,  setFilterStatus]  = useState<FilterType>("all");
-  const [sortBy,        setSortBy]        = useState<SortType>("date-desc");
+  const { profile, profileLoading, setProfile } = useProfile();
 
-  // API profile state
-  const [profile,        setProfile]        = useState<UserProfile | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
-
-  // Fetch user profile from API
-  useEffect(() => {
-    let active = true;
-    setProfileLoading(true);
-
-    getUserProfile()
-      .then((res) => { if (active) setProfile(res.data); })
-      .catch(() => {/* silently fall back to auth data */})
-      .finally(() => { if (active) setProfileLoading(false); });
-
-    return () => { active = false; };
-  }, []);
+  const [upsells,      setUpsells]      = useState<Upsell[]>([]);
+  const [filterStatus, setFilterStatus] = useState<FilterType>("all");
+  const [sortBy,       setSortBy]       = useState<SortType>("date-desc");
 
   // Load upsells
   useEffect(() => {
     let active = true;
-
     async function loadUpsells() {
       const response = await getProfileUpsells();
       if (!active) return;
-
       setUpsells(
         response.data.map((upsell) => ({
           ...upsell,
           icon:
-            upsell.iconKey === "dashboard"
-              ? BarChart3
-              : upsell.iconKey === "compare"
-                ? Users
-                : upsell.iconKey === "integration"
-                  ? CheckCircle
-                  : TrendingUp,
+            upsell.iconKey === "dashboard"   ? BarChart3
+            : upsell.iconKey === "compare"   ? Users
+            : upsell.iconKey === "integration" ? CheckCircle
+            : TrendingUp,
         })),
       );
     }
-
     loadUpsells();
     return () => { active = false; };
   }, []);
 
   const filteredUpsells = useMemo(() => {
     let filtered = [...upsells];
-
-    if (filterStatus !== "all") {
-      filtered = filtered.filter((item) => item.status === filterStatus);
-    }
-
+    if (filterStatus !== "all") filtered = filtered.filter((item) => item.status === filterStatus);
     filtered.sort((a, b) => {
       switch (sortBy) {
         case "date-desc": return new Date(b.activatedDate).getTime() - new Date(a.activatedDate).getTime();
@@ -125,24 +101,18 @@ export default function Profile() {
         default:          return 0;
       }
     });
-
     return filtered;
   }, [filterStatus, sortBy, upsells]);
 
-  // Contract calculations
-  const startDate        = new Date("2025-01-01");
-  const endDate          = new Date("2027-12-31");
-  const today            = new Date();
-  const totalDays        = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  const elapsedDays      = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  const remainingDays    = totalDays - elapsedDays;
-  const progressPercent  = Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100)));
-  const remainingMonths  = Math.floor(remainingDays / 30);
-  const contractStatus   = remainingDays > 180 ? "Saudavel" : remainingDays > 60 ? "Atencao" : "Critico";
-
-  const handleProfileSave = (updated: UserProfile) => {
-    setProfile(updated);
-  };
+  const startDate       = new Date("2025-01-01");
+  const endDate         = new Date("2027-12-31");
+  const today           = new Date();
+  const totalDays       = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const elapsedDays     = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const remainingDays   = totalDays - elapsedDays;
+  const progressPercent = Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100)));
+  const remainingMonths = Math.floor(remainingDays / 30);
+  const contractStatus  = remainingDays > 180 ? "Saudavel" : remainingDays > 60 ? "Atencao" : "Critico";
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -156,7 +126,7 @@ export default function Profile() {
               user={user}
               profile={profile}
               profileLoading={profileLoading}
-              onSave={handleProfileSave}
+              onSave={setProfile}
             />
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
@@ -190,49 +160,56 @@ export default function Profile() {
 
 interface ProfileHeaderProps {
   user:           { name: string; email: string; role: string; clubName: string } | null;
-  profile:        UserProfile | null;
+  profile:        import("../../services/userProfile").UserProfile | null;
   profileLoading: boolean;
-  onSave:         (updated: UserProfile) => void;
+  onSave:         (updated: import("../../services/userProfile").UserProfile) => void;
 }
 
 interface EditForm {
-  name:      string;
-  clubName:  string;
-  avatarUrl: string;
+  name:        string;
+  clubName:    string;
+  clubLogoUrl: string;
+  avatarUrl:   string;
 }
 
 const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHeaderProps) => {
   // Merge: API profile takes priority over JWT auth data
-  const displayName   = profile?.name      ?? user?.name      ?? "";
-  const displayEmail  = profile?.email     ?? user?.email     ?? "";
-  const displayClub   = profile?.clubName  ?? user?.clubName  ?? "";
-  const displayAvatar = profile?.avatarUrl ?? null;
-  const displayRole   = profile?.role      ?? user?.role      ?? "scout";
-  const roleLabel     = ROLE_LABELS[displayRole] ?? displayRole;
+  const displayName     = profile?.name        ?? user?.name     ?? "";
+  const displayEmail    = profile?.email        ?? user?.email    ?? "";
+  const displayClub     = profile?.clubName     ?? user?.clubName ?? "";
+  const displayClubLogo = profile?.clubLogoUrl  ?? null;
+  const displayAvatar   = profile?.avatarUrl    ?? null;
+  const displayRole     = profile?.role         ?? user?.role     ?? "scout";
+  const roleLabel       = ROLE_LABELS[displayRole] ?? displayRole;
 
-  const initials = (displayName || displayEmail)
+  const userInitials = (displayName || displayEmail)
     .split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
 
+  const clubInitials = displayClub
+    .split(" ").map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "ORG";
+
   // Edit state
-  const [editing,    setEditing]    = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [saveError,  setSaveError]  = useState<string | null>(null);
-  const [saved,      setSaved]      = useState(false);
+  const [editing,   setEditing]   = useState(false);
+  const [saving,    setSaving]    = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saved,     setSaved]     = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState<EditForm>({
-    name:      displayName,
-    clubName:  displayClub,
-    avatarUrl: displayAvatar ?? "",
+    name:        displayName,
+    clubName:    displayClub,
+    clubLogoUrl: displayClubLogo ?? "",
+    avatarUrl:   displayAvatar   ?? "",
   });
 
   // Keep form in sync when profile loads from API
   useEffect(() => {
     if (!editing) {
       setForm({
-        name:      profile?.name      ?? user?.name      ?? "",
-        clubName:  profile?.clubName  ?? user?.clubName  ?? "",
-        avatarUrl: profile?.avatarUrl ?? "",
+        name:        profile?.name       ?? user?.name     ?? "",
+        clubName:    profile?.clubName   ?? user?.clubName ?? "",
+        clubLogoUrl: profile?.clubLogoUrl ?? "",
+        avatarUrl:   profile?.avatarUrl  ?? "",
       });
     }
   }, [profile, user, editing]);
@@ -244,9 +221,10 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
 
   const handleCancel = () => {
     setForm({
-      name:      profile?.name      ?? user?.name      ?? "",
-      clubName:  profile?.clubName  ?? user?.clubName  ?? "",
-      avatarUrl: profile?.avatarUrl ?? "",
+      name:        profile?.name        ?? user?.name     ?? "",
+      clubName:    profile?.clubName    ?? user?.clubName ?? "",
+      clubLogoUrl: profile?.clubLogoUrl ?? "",
+      avatarUrl:   profile?.avatarUrl   ?? "",
     });
     setSaveError(null);
     setEditing(false);
@@ -257,9 +235,10 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
     setSaveError(null);
     try {
       const payload = {
-        name:      form.name.trim()      || undefined,
-        clubName:  form.clubName.trim()  || undefined,
-        avatarUrl: form.avatarUrl.trim() || undefined,
+        name:        form.name.trim()        || undefined,
+        clubName:    form.clubName.trim()    || undefined,
+        clubLogoUrl: form.clubLogoUrl.trim() || undefined,
+        avatarUrl:   form.avatarUrl.trim()   || undefined,
       };
       const res = await updateUserProfile(payload);
       onSave(res.data);
@@ -274,15 +253,20 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
     }
   };
 
-  // Avatar preview (form.avatarUrl in edit mode, displayAvatar in view mode)
-  const [avatarFailed, setAvatarFailed] = useState(false);
-  const avatarSrc = editing ? form.avatarUrl : displayAvatar;
-  const showAvatar = !!avatarSrc && !avatarFailed;
+  // Live preview failed flags
+  const [avatarFailed,   setAvatarFailed]   = useState(false);
+  const [clubLogoFailed, setClubLogoFailed] = useState(false);
+
+  const avatarSrc   = editing ? form.avatarUrl   : displayAvatar;
+  const clubLogoSrc = editing ? form.clubLogoUrl : displayClubLogo;
+
+  const showAvatar   = !!avatarSrc   && !avatarFailed;
+  const showClubLogo = !!clubLogoSrc && !clubLogoFailed;
 
   return (
     <div className="relative bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-8 mb-8 transition-all duration-200">
 
-      {/* ── Success toast ───────────────────────────────────────────── */}
+      {/* ── Success toast ─────────────────────────────────────────────── */}
       {saved && (
         <div className="mb-6 flex items-center gap-3 rounded-[12px] border border-[rgba(0,255,156,0.25)] bg-[rgba(0,255,156,0.07)] px-4 py-3">
           <Check className="h-4 w-4 flex-shrink-0 text-[#00FF9C]" />
@@ -290,7 +274,7 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
         </div>
       )}
 
-      {/* ── Error banner ────────────────────────────────────────────── */}
+      {/* ── Error banner ──────────────────────────────────────────────── */}
       {saveError && (
         <div className="mb-6 flex items-center gap-3 rounded-[12px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.07)] px-4 py-3">
           <AlertCircle className="h-4 w-4 flex-shrink-0 text-[#FF4D4F]" />
@@ -307,60 +291,124 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
 
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
 
-        {/* ── Left: identity ──────────────────────────────────────────── */}
+        {/* ── Left: identity ────────────────────────────────────────────── */}
         <div className="flex items-start gap-6 flex-1 min-w-0">
 
-          {/* Club logo */}
-          <div className="w-20 h-20 rounded-[14px] overflow-hidden bg-white p-2 flex items-center justify-center flex-shrink-0 ring-2 ring-[rgba(0,194,255,0.2)]">
-            <img src={clubLogo} alt={displayClub} className="w-full h-full object-contain" />
+          {/* Organization logo */}
+          <div className="w-20 h-20 rounded-[14px] overflow-hidden bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.08)] flex items-center justify-center flex-shrink-0">
+            {showClubLogo ? (
+              <img
+                key={clubLogoSrc!}
+                src={clubLogoSrc!}
+                alt={displayClub || "Logo"}
+                className="w-full h-full object-contain p-2"
+                onError={() => setClubLogoFailed(true)}
+                onLoad={() => setClubLogoFailed(false)}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-1">
+                <Building2 className="w-7 h-7 text-gray-600" />
+                {clubInitials && (
+                  <span className="text-[9px] font-bold text-gray-700 tracking-widest">
+                    {clubInitials}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Info block */}
           <div className="min-w-0 flex-1">
             {editing ? (
-              /* ── Edit form ─────────────────────────────────── */
+              /* ── Edit form ─────────────────────────────────────── */
               <div className="space-y-4 pt-1">
 
-                {/* Avatar preview + URL input */}
-                <div className="flex items-center gap-4">
-                  <div className="relative flex-shrink-0">
-                    {showAvatar ? (
-                      <img
-                        key={form.avatarUrl}
-                        src={avatarSrc!}
-                        alt="Avatar"
-                        className="h-14 w-14 rounded-full object-cover object-top border-2 border-[rgba(0,194,255,0.35)]"
-                        onError={() => setAvatarFailed(true)}
-                        onLoad={() => setAvatarFailed(false)}
+                {/* ── Organization section ── */}
+                <div className="rounded-[12px] border border-[rgba(0,194,255,0.1)] bg-[rgba(0,194,255,0.03)] p-4 space-y-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#00C2FF]/60 flex items-center gap-1.5">
+                    <Building2 className="h-3 w-3" />
+                    Organização
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
+                        Nome do clube
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Ex: FC Barcelona"
+                        value={form.clubName}
+                        maxLength={120}
+                        onChange={(e) => setForm((f) => ({ ...f, clubName: e.target.value }))}
+                        className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
                       />
-                    ) : (
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-[rgba(0,194,255,0.35)] bg-[rgba(0,194,255,0.12)] text-base font-bold text-[#00C2FF]">
-                        {initials}
-                      </div>
-                    )}
-                    <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-[rgba(0,0,0,0.4)] bg-[#00C2FF]">
-                      <Camera className="h-2.5 w-2.5 text-[#07142A]" />
                     </div>
-                  </div>
-                  <div className="flex-1">
-                    <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
-                      URL do avatar
-                    </label>
-                    <input
-                      type="url"
-                      placeholder="https://…"
-                      value={form.avatarUrl}
-                      onChange={(e) => {
-                        setAvatarFailed(false);
-                        setForm((f) => ({ ...f, avatarUrl: e.target.value }));
-                      }}
-                      className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
-                    />
+                    <div>
+                      <label className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
+                        <Image className="h-3 w-3" />
+                        URL do logo
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="https://…"
+                        value={form.clubLogoUrl}
+                        onChange={(e) => {
+                          setClubLogoFailed(false);
+                          setForm((f) => ({ ...f, clubLogoUrl: e.target.value }));
+                        }}
+                        className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Name + Club row */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {/* ── User section ── */}
+                <div className="rounded-[12px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-4 space-y-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-gray-600 flex items-center gap-1.5">
+                    <User className="h-3 w-3" />
+                    Usuário
+                  </p>
+
+                  {/* Avatar preview + URL input */}
+                  <div className="flex items-center gap-4">
+                    <div className="relative flex-shrink-0">
+                      {showAvatar ? (
+                        <img
+                          key={form.avatarUrl}
+                          src={avatarSrc!}
+                          alt="Avatar"
+                          className="h-14 w-14 rounded-full object-cover object-top border-2 border-[rgba(0,194,255,0.35)]"
+                          onError={() => setAvatarFailed(true)}
+                          onLoad={() => setAvatarFailed(false)}
+                        />
+                      ) : (
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-[rgba(0,194,255,0.35)] bg-[rgba(0,194,255,0.12)] text-base font-bold text-[#00C2FF]">
+                          {userInitials}
+                        </div>
+                      )}
+                      <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-[rgba(0,0,0,0.4)] bg-[#00C2FF]">
+                        <Camera className="h-2.5 w-2.5 text-[#07142A]" />
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
+                        URL do avatar
+                      </label>
+                      <input
+                        type="url"
+                        placeholder="https://…"
+                        value={form.avatarUrl}
+                        onChange={(e) => {
+                          setAvatarFailed(false);
+                          setForm((f) => ({ ...f, avatarUrl: e.target.value }));
+                        }}
+                        className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Name */}
                   <div>
                     <label className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
                       <User className="h-3 w-3" />
@@ -372,20 +420,6 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
                       value={form.name}
                       maxLength={100}
                       onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                      className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
-                      <Building2 className="h-3 w-3" />
-                      Clube / Organização
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Nome do clube"
-                      value={form.clubName}
-                      maxLength={120}
-                      onChange={(e) => setForm((f) => ({ ...f, clubName: e.target.value }))}
                       className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
                     />
                   </div>
@@ -407,14 +441,21 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
                 </div>
               </div>
             ) : (
-              /* ── View mode ─────────────────────────────────── */
+              /* ── View mode ─────────────────────────────────────── */
               <>
-                <h1 className="text-3xl font-semibold mb-1">
+                {/* Organization name as main heading */}
+                <h1 className="text-3xl font-semibold mb-0.5">
                   {profileLoading
-                    ? <span className="inline-block h-8 w-48 animate-pulse rounded-[8px] bg-[rgba(255,255,255,0.06)]" />
-                    : (displayClub || "—")}
+                    ? <span className="inline-block h-8 w-52 animate-pulse rounded-[8px] bg-[rgba(255,255,255,0.06)]" />
+                    : (displayClub || "Minha Organização")}
                 </h1>
-                <p className="text-base text-gray-400 mb-3">Plano Empresarial Premium</p>
+                <p className="text-xs text-gray-600 mb-4 flex items-center gap-1.5">
+                  <Building2 className="h-3 w-3" />
+                  Organização
+                </p>
+
+                {/* Divider */}
+                <div className="w-12 h-px bg-[rgba(255,255,255,0.06)] mb-4" />
 
                 <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
                   {/* User avatar + name */}
@@ -428,7 +469,7 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
                       />
                     ) : (
                       <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[rgba(0,194,255,0.3)] bg-[rgba(0,194,255,0.1)] text-[9px] font-bold text-[#00C2FF]">
-                        {initials}
+                        {userInitials}
                       </div>
                     )}
                     <Shield className="h-3.5 w-3.5 text-[#00C2FF]" />
@@ -451,7 +492,7 @@ const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHe
           </div>
         </div>
 
-        {/* ── Right: action buttons ───────────────────────────────────── */}
+        {/* ── Right: action buttons ─────────────────────────────────────── */}
         <div className="flex items-center gap-3 flex-shrink-0">
           {editing ? (
             <>
@@ -520,14 +561,13 @@ interface ContractStatusCardProps {
 
 const ContractStatusCard = memo(({ startDate, endDate, remainingMonths, progressPercent, status }: ContractStatusCardProps) => {
   const statusConfig = {
-    Saudavel: { color: "#00FF9C", bg: "rgba(0,255,156,0.12)",  icon: CheckCircle,   label: "Saudável"  },
-    Atencao:  { color: "#fbbf24", bg: "rgba(251,191,36,0.12)", icon: AlertTriangle,  label: "Atenção"   },
-    Critico:  { color: "#FF4D4F", bg: "rgba(255,77,79,0.12)",  icon: AlertTriangle,  label: "Crítico"   },
+    Saudavel: { color: "#00FF9C", bg: "rgba(0,255,156,0.12)",  icon: CheckCircle,  label: "Saudável" },
+    Atencao:  { color: "#fbbf24", bg: "rgba(251,191,36,0.12)", icon: AlertTriangle, label: "Atenção"  },
+    Critico:  { color: "#FF4D4F", bg: "rgba(255,77,79,0.12)",  icon: AlertTriangle, label: "Crítico"  },
   };
 
-  const config     = statusConfig[status as keyof typeof statusConfig] ?? statusConfig.Saudavel;
-  const StatusIcon = config.icon;
-
+  const config      = statusConfig[status as keyof typeof statusConfig] ?? statusConfig.Saudavel;
+  const StatusIcon  = config.icon;
   const progressColor = progressPercent > 80 ? "#FF4D4F" : progressPercent > 60 ? "#fbbf24" : "#00C2FF";
 
   return (
@@ -638,9 +678,7 @@ const UsageStatsCard = memo(() => {
       </div>
 
       <div className="space-y-5">
-        {stats.map((stat) => (
-          <UsageStatItem key={stat.label} stat={stat} />
-        ))}
+        {stats.map((stat) => <UsageStatItem key={stat.label} stat={stat} />)}
       </div>
 
       <div className="mt-6 pt-6 border-t border-[rgba(255,255,255,0.06)]">
@@ -739,9 +777,7 @@ const UpsellsSection = memo(({ upsells, filterStatus, setFilterStatus, sortBy, s
     </div>
 
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {upsells.map((upsell) => (
-        <UpsellCard key={upsell.id} upsell={upsell} />
-      ))}
+      {upsells.map((upsell) => <UpsellCard key={upsell.id} upsell={upsell} />)}
     </div>
 
     {upsells.length === 0 && (
@@ -819,4 +855,3 @@ const UpsellCard = memo(({ upsell }: UpsellCardProps) => {
 });
 
 UpsellCard.displayName = "UpsellCard";
-
