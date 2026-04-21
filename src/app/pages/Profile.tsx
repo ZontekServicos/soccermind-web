@@ -7,7 +7,6 @@ import {
   Package,
   CheckCircle,
   TrendingUp,
-  Settings,
   ExternalLink,
   Eye,
   AlertTriangle,
@@ -21,13 +20,21 @@ import {
   RefreshCw,
   Shield,
   Mail,
+  Pencil,
+  X,
+  Check,
+  Camera,
+  Building2,
+  User,
+  AlertCircle,
 } from "lucide-react";
-import { useEffect, useState, useMemo, memo } from "react";
+import { useEffect, useState, useMemo, memo, useRef } from "react";
 import { getProfileUpsells, type ProfileUpsell } from "../services/profile";
 import { useAuth } from "../contexts/AuthContext";
+import { getUserProfile, updateUserProfile, type UserProfile } from "../../services/userProfile";
 import clubLogo from "../../assets/club-logo.png";
 
-const fallbackImage = "/placeholder.png";
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Upsell extends Omit<ProfileUpsell, "iconKey"> {
   id: string;
@@ -43,12 +50,39 @@ interface Upsell extends Omit<ProfileUpsell, "iconKey"> {
 type FilterType = "all" | "Ativo" | "Inativo" | "Pendente";
 type SortType = "date-desc" | "date-asc" | "name-asc" | "name-desc";
 
+const ROLE_LABELS: Record<string, string> = {
+  admin:  "Administrador",
+  gestor: "Gestor",
+  scout:  "Scout",
+  viewer: "Visualizador",
+};
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function Profile() {
   const { user } = useAuth();
-  const [upsells, setUpsells] = useState<Upsell[]>([]);
-  const [filterStatus, setFilterStatus] = useState<FilterType>("all");
-  const [sortBy, setSortBy] = useState<SortType>("date-desc");
+  const [upsells,       setUpsells]       = useState<Upsell[]>([]);
+  const [filterStatus,  setFilterStatus]  = useState<FilterType>("all");
+  const [sortBy,        setSortBy]        = useState<SortType>("date-desc");
 
+  // API profile state
+  const [profile,        setProfile]        = useState<UserProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+
+  // Fetch user profile from API
+  useEffect(() => {
+    let active = true;
+    setProfileLoading(true);
+
+    getUserProfile()
+      .then((res) => { if (active) setProfile(res.data); })
+      .catch(() => {/* silently fall back to auth data */})
+      .finally(() => { if (active) setProfileLoading(false); });
+
+    return () => { active = false; };
+  }, []);
+
+  // Load upsells
   useEffect(() => {
     let active = true;
 
@@ -95,16 +129,20 @@ export default function Profile() {
     return filtered;
   }, [filterStatus, sortBy, upsells]);
 
-  // Contract calculations (dates will come from API in production)
-  const startDate     = new Date("2025-01-01");
-  const endDate       = new Date("2027-12-31");
-  const today         = new Date();
-  const totalDays     = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  const elapsedDays   = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  const remainingDays = totalDays - elapsedDays;
+  // Contract calculations
+  const startDate        = new Date("2025-01-01");
+  const endDate          = new Date("2027-12-31");
+  const today            = new Date();
+  const totalDays        = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const elapsedDays      = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const remainingDays    = totalDays - elapsedDays;
   const progressPercent  = Math.min(100, Math.max(0, Math.round((elapsedDays / totalDays) * 100)));
   const remainingMonths  = Math.floor(remainingDays / 30);
   const contractStatus   = remainingDays > 180 ? "Saudavel" : remainingDays > 60 ? "Atencao" : "Critico";
+
+  const handleProfileSave = (updated: UserProfile) => {
+    setProfile(updated);
+  };
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -113,7 +151,13 @@ export default function Profile() {
         <AppHeader />
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-[1400px] mx-auto">
-            <ProfileHeader user={user} />
+
+            <ProfileHeader
+              user={user}
+              profile={profile}
+              profileLoading={profileLoading}
+              onSave={handleProfileSave}
+            />
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
               <div className="xl:col-span-2">
@@ -142,89 +186,321 @@ export default function Profile() {
   );
 }
 
-// ========================================
-// PROFILE HEADER
-// ========================================
+// ─── Profile header ───────────────────────────────────────────────────────────
+
 interface ProfileHeaderProps {
-  user: { name: string; email: string; role: string; clubName: string } | null;
+  user:           { name: string; email: string; role: string; clubName: string } | null;
+  profile:        UserProfile | null;
+  profileLoading: boolean;
+  onSave:         (updated: UserProfile) => void;
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  admin:  "Administrador",
-  gestor: "Gestor",
-  scout:  "Scout",
-};
+interface EditForm {
+  name:      string;
+  clubName:  string;
+  avatarUrl: string;
+}
 
-const ProfileHeader = memo(({ user }: ProfileHeaderProps) => {
-  const clubName  = user?.clubName ?? "—";
-  const userName  = user?.name     ?? "—";
-  const userEmail = user?.email    ?? "—";
-  const roleLabel = user?.role ? (ROLE_LABELS[user.role] ?? user.role) : "—";
+const ProfileHeader = memo(({ user, profile, profileLoading, onSave }: ProfileHeaderProps) => {
+  // Merge: API profile takes priority over JWT auth data
+  const displayName   = profile?.name      ?? user?.name      ?? "";
+  const displayEmail  = profile?.email     ?? user?.email     ?? "";
+  const displayClub   = profile?.clubName  ?? user?.clubName  ?? "";
+  const displayAvatar = profile?.avatarUrl ?? null;
+  const displayRole   = profile?.role      ?? user?.role      ?? "scout";
+  const roleLabel     = ROLE_LABELS[displayRole] ?? displayRole;
 
-  // Avatar initials fallback
-  const initials = userName
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const initials = (displayName || displayEmail)
+    .split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+
+  // Edit state
+  const [editing,    setEditing]    = useState(false);
+  const [saving,     setSaving]     = useState(false);
+  const [saveError,  setSaveError]  = useState<string | null>(null);
+  const [saved,      setSaved]      = useState(false);
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [form, setForm] = useState<EditForm>({
+    name:      displayName,
+    clubName:  displayClub,
+    avatarUrl: displayAvatar ?? "",
+  });
+
+  // Keep form in sync when profile loads from API
+  useEffect(() => {
+    if (!editing) {
+      setForm({
+        name:      profile?.name      ?? user?.name      ?? "",
+        clubName:  profile?.clubName  ?? user?.clubName  ?? "",
+        avatarUrl: profile?.avatarUrl ?? "",
+      });
+    }
+  }, [profile, user, editing]);
+
+  const handleEdit = () => {
+    setSaveError(null);
+    setEditing(true);
+  };
+
+  const handleCancel = () => {
+    setForm({
+      name:      profile?.name      ?? user?.name      ?? "",
+      clubName:  profile?.clubName  ?? user?.clubName  ?? "",
+      avatarUrl: profile?.avatarUrl ?? "",
+    });
+    setSaveError(null);
+    setEditing(false);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const payload = {
+        name:      form.name.trim()      || undefined,
+        clubName:  form.clubName.trim()  || undefined,
+        avatarUrl: form.avatarUrl.trim() || undefined,
+      };
+      const res = await updateUserProfile(payload);
+      onSave(res.data);
+      setEditing(false);
+      setSaved(true);
+      if (savedTimer.current) clearTimeout(savedTimer.current);
+      savedTimer.current = setTimeout(() => setSaved(false), 3500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Erro ao salvar perfil");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Avatar preview (form.avatarUrl in edit mode, displayAvatar in view mode)
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const avatarSrc = editing ? form.avatarUrl : displayAvatar;
+  const showAvatar = !!avatarSrc && !avatarFailed;
 
   return (
-    <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-8 mb-8">
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
-        {/* Left: Club + User Info */}
-        <div className="flex items-start gap-6">
-          {/* Club logo with initials fallback */}
-          <div className="w-20 h-20 rounded-[14px] overflow-hidden bg-white p-2 flex items-center justify-center flex-shrink-0 ring-2 ring-[rgba(0,194,255,0.2)]">
-            <img
-              src={clubLogo}
-              alt={clubName}
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-                const parent = e.currentTarget.parentElement;
-                if (parent) {
-                  parent.style.background = "rgba(0,194,255,0.12)";
-                  parent.innerHTML = `<span style="font-size:28px;font-weight:700;color:#00C2FF">${initials}</span>`;
-                }
-              }}
-            />
-          </div>
+    <div className="relative bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-8 mb-8 transition-all duration-200">
 
-          <div>
-            <h1 className="text-3xl font-semibold mb-1">{clubName}</h1>
-            <p className="text-base text-gray-400 mb-3">Plano Empresarial Premium</p>
-
-            {/* User metadata row */}
-            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1.5">
-                <Shield className="w-3.5 h-3.5 text-[#00C2FF]" />
-                <span className="font-medium text-gray-300">{userName}</span>
-                <span className="text-gray-600">·</span>
-                <span>{roleLabel}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-gray-600" />
-                <span className="font-mono">{userEmail}</span>
-              </div>
-            </div>
-          </div>
+      {/* ── Success toast ───────────────────────────────────────────── */}
+      {saved && (
+        <div className="mb-6 flex items-center gap-3 rounded-[12px] border border-[rgba(0,255,156,0.25)] bg-[rgba(0,255,156,0.07)] px-4 py-3">
+          <Check className="h-4 w-4 flex-shrink-0 text-[#00FF9C]" />
+          <p className="text-sm font-medium text-[#00FF9C]">Perfil atualizado com sucesso</p>
         </div>
+      )}
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)] rounded-[12px] h-11 px-5"
+      {/* ── Error banner ────────────────────────────────────────────── */}
+      {saveError && (
+        <div className="mb-6 flex items-center gap-3 rounded-[12px] border border-[rgba(255,77,79,0.25)] bg-[rgba(255,77,79,0.07)] px-4 py-3">
+          <AlertCircle className="h-4 w-4 flex-shrink-0 text-[#FF4D4F]" />
+          <p className="text-sm font-medium text-[#FFB4B5]">{saveError}</p>
+          <button
+            type="button"
+            onClick={() => setSaveError(null)}
+            className="ml-auto text-[#FF4D4F] hover:opacity-70 transition-opacity"
           >
-            <Settings className="w-4 h-4 mr-2" />
-            Configurações
-          </Button>
-          <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold shadow-[0_4px_16px_rgba(0,194,255,0.25)] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)] transition-all">
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Gerenciar Plano
-          </Button>
+            <X className="h-4 w-4" />
+          </button>
         </div>
+      )}
+
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+
+        {/* ── Left: identity ──────────────────────────────────────────── */}
+        <div className="flex items-start gap-6 flex-1 min-w-0">
+
+          {/* Club logo */}
+          <div className="w-20 h-20 rounded-[14px] overflow-hidden bg-white p-2 flex items-center justify-center flex-shrink-0 ring-2 ring-[rgba(0,194,255,0.2)]">
+            <img src={clubLogo} alt={displayClub} className="w-full h-full object-contain" />
+          </div>
+
+          {/* Info block */}
+          <div className="min-w-0 flex-1">
+            {editing ? (
+              /* ── Edit form ─────────────────────────────────── */
+              <div className="space-y-4 pt-1">
+
+                {/* Avatar preview + URL input */}
+                <div className="flex items-center gap-4">
+                  <div className="relative flex-shrink-0">
+                    {showAvatar ? (
+                      <img
+                        key={form.avatarUrl}
+                        src={avatarSrc!}
+                        alt="Avatar"
+                        className="h-14 w-14 rounded-full object-cover object-top border-2 border-[rgba(0,194,255,0.35)]"
+                        onError={() => setAvatarFailed(true)}
+                        onLoad={() => setAvatarFailed(false)}
+                      />
+                    ) : (
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-[rgba(0,194,255,0.35)] bg-[rgba(0,194,255,0.12)] text-base font-bold text-[#00C2FF]">
+                        {initials}
+                      </div>
+                    )}
+                    <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-[rgba(0,0,0,0.4)] bg-[#00C2FF]">
+                      <Camera className="h-2.5 w-2.5 text-[#07142A]" />
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <label className="mb-1 block text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
+                      URL do avatar
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://…"
+                      value={form.avatarUrl}
+                      onChange={(e) => {
+                        setAvatarFailed(false);
+                        setForm((f) => ({ ...f, avatarUrl: e.target.value }));
+                      }}
+                      className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
+                    />
+                  </div>
+                </div>
+
+                {/* Name + Club row */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
+                      <User className="h-3 w-3" />
+                      Nome
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Seu nome"
+                      value={form.name}
+                      maxLength={100}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                      className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-gray-500">
+                      <Building2 className="h-3 w-3" />
+                      Clube / Organização
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Nome do clube"
+                      value={form.clubName}
+                      maxLength={120}
+                      onChange={(e) => setForm((f) => ({ ...f, clubName: e.target.value }))}
+                      className="w-full rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-200 placeholder-gray-600 outline-none transition-colors focus:border-[#00C2FF] focus:bg-[rgba(0,194,255,0.05)]"
+                    />
+                  </div>
+                </div>
+
+                {/* Read-only row */}
+                <div className="flex flex-wrap items-center gap-3 rounded-[10px] border border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.02)] px-3 py-2.5 text-xs text-gray-500">
+                  <span className="flex items-center gap-1.5">
+                    <Mail className="h-3 w-3" />
+                    <span className="font-mono">{displayEmail || "—"}</span>
+                    <span className="ml-1 rounded-full bg-[rgba(255,255,255,0.05)] px-1.5 py-0.5 text-[10px] text-gray-600">
+                      somente leitura
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Shield className="h-3 w-3 text-[#00C2FF]" />
+                    <span>{roleLabel}</span>
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* ── View mode ─────────────────────────────────── */
+              <>
+                <h1 className="text-3xl font-semibold mb-1">
+                  {profileLoading
+                    ? <span className="inline-block h-8 w-48 animate-pulse rounded-[8px] bg-[rgba(255,255,255,0.06)]" />
+                    : (displayClub || "—")}
+                </h1>
+                <p className="text-base text-gray-400 mb-3">Plano Empresarial Premium</p>
+
+                <div className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+                  {/* User avatar + name */}
+                  <div className="flex items-center gap-2">
+                    {showAvatar ? (
+                      <img
+                        src={displayAvatar!}
+                        alt={displayName}
+                        className="h-6 w-6 rounded-full object-cover object-top border border-[rgba(0,194,255,0.3)]"
+                        onError={() => setAvatarFailed(true)}
+                      />
+                    ) : (
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full border border-[rgba(0,194,255,0.3)] bg-[rgba(0,194,255,0.1)] text-[9px] font-bold text-[#00C2FF]">
+                        {initials}
+                      </div>
+                    )}
+                    <Shield className="h-3.5 w-3.5 text-[#00C2FF]" />
+                    <span className="font-medium text-gray-300">
+                      {profileLoading
+                        ? <span className="inline-block h-3 w-24 animate-pulse rounded bg-[rgba(255,255,255,0.06)]" />
+                        : (displayName || "—")}
+                    </span>
+                    <span className="text-gray-600">·</span>
+                    <span>{roleLabel}</span>
+                  </div>
+                  {/* Email */}
+                  <div className="flex items-center gap-1.5">
+                    <Mail className="h-3.5 w-3.5 text-gray-600" />
+                    <span className="font-mono">{displayEmail || "—"}</span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ── Right: action buttons ───────────────────────────────────── */}
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {editing ? (
+            <>
+              <button
+                type="button"
+                onClick={handleCancel}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-[12px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-4 py-2.5 text-sm font-medium text-gray-400 transition-all hover:border-[rgba(255,255,255,0.18)] hover:text-gray-200 disabled:opacity-40"
+              >
+                <X className="h-4 w-4" />
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-[12px] bg-[#00C2FF] px-5 py-2.5 text-sm font-bold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.3)] transition-all hover:bg-[#33CFFF] hover:shadow-[0_6px_20px_rgba(0,194,255,0.4)] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#07142A] border-t-transparent" />
+                    Salvando…
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Salvar
+                  </>
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleEdit}
+                className="bg-[rgba(255,255,255,0.02)] border-[rgba(255,255,255,0.1)] hover:bg-[rgba(255,255,255,0.04)] rounded-[12px] h-11 px-5 gap-2"
+              >
+                <Pencil className="h-4 w-4" />
+                Editar Perfil
+              </Button>
+              <Button className="bg-[#00C2FF]/90 hover:bg-[#00C2FF] text-[#07142A] rounded-[12px] h-11 px-6 font-semibold shadow-[0_4px_16px_rgba(0,194,255,0.25)] hover:shadow-[0_6px_20px_rgba(0,194,255,0.35)] transition-all gap-2">
+                <ExternalLink className="h-4 w-4" />
+                Gerenciar Plano
+              </Button>
+            </>
+          )}
+        </div>
+
       </div>
     </div>
   );
@@ -232,9 +508,8 @@ const ProfileHeader = memo(({ user }: ProfileHeaderProps) => {
 
 ProfileHeader.displayName = "ProfileHeader";
 
-// ========================================
-// CONTRACT STATUS CARD
-// ========================================
+// ─── Contract status card ─────────────────────────────────────────────────────
+
 interface ContractStatusCardProps {
   startDate:       Date;
   endDate:         Date;
@@ -253,15 +528,10 @@ const ContractStatusCard = memo(({ startDate, endDate, remainingMonths, progress
   const config     = statusConfig[status as keyof typeof statusConfig] ?? statusConfig.Saudavel;
   const StatusIcon = config.icon;
 
-  const progressColor = progressPercent > 80
-    ? "#FF4D4F"
-    : progressPercent > 60
-    ? "#fbbf24"
-    : "#00C2FF";
+  const progressColor = progressPercent > 80 ? "#FF4D4F" : progressPercent > 60 ? "#fbbf24" : "#00C2FF";
 
   return (
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-8">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-[10px] bg-[rgba(0,194,255,0.12)] flex items-center justify-center">
@@ -278,14 +548,12 @@ const ContractStatusCard = memo(({ startDate, endDate, remainingMonths, progress
         </div>
       </div>
 
-      {/* Date Grid */}
       <div className="grid grid-cols-3 gap-6 mb-8">
         <MetricBox label="Data de Início"  value={startDate.toLocaleDateString("pt-BR")} icon={Calendar} color="#00C2FF" />
         <MetricBox label="Data de Término" value={endDate.toLocaleDateString("pt-BR")}   icon={Calendar} color="#00C2FF" />
         <MetricBox label="Tempo Restante"  value={`${remainingMonths} meses`}             icon={Clock}    color="#00FF9C" />
       </div>
 
-      {/* Progress Bar */}
       <div className="bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.06)] rounded-[14px] p-6">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm text-gray-400 font-medium">Progresso do Contrato</span>
@@ -296,10 +564,7 @@ const ContractStatusCard = memo(({ startDate, endDate, remainingMonths, progress
         <div className="w-full bg-[rgba(255,255,255,0.04)] rounded-full h-3 overflow-hidden">
           <div
             className="h-full transition-all duration-500 rounded-full"
-            style={{
-              width: `${progressPercent}%`,
-              background: `linear-gradient(to right, #00C2FF, ${progressColor})`,
-            }}
+            style={{ width: `${progressPercent}%`, background: `linear-gradient(to right, #00C2FF, ${progressColor})` }}
           />
         </div>
         <div className="flex items-center justify-between mt-3 text-xs text-gray-600">
@@ -308,7 +573,6 @@ const ContractStatusCard = memo(({ startDate, endDate, remainingMonths, progress
         </div>
       </div>
 
-      {/* Alert */}
       {status !== "Saudavel" && (
         <div
           className="mt-6 flex items-start gap-3 p-4 rounded-[12px] border"
@@ -354,9 +618,8 @@ const MetricBox = memo(({ label, value, icon: Icon, color }: MetricBoxProps) => 
 
 MetricBox.displayName = "MetricBox";
 
-// ========================================
-// USAGE STATS CARD
-// ========================================
+// ─── Usage stats card ─────────────────────────────────────────────────────────
+
 const UsageStatsCard = memo(() => {
   const stats = [
     { label: "Análises",    value: 247, change: +18, icon: BarChart3, color: "#00C2FF" },
@@ -369,10 +632,7 @@ const UsageStatsCard = memo(() => {
     <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-8">
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-xl font-semibold">Estatísticas de Uso</h2>
-        <button
-          className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
-          title="Atualizar"
-        >
+        <button className="text-xs text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors" title="Atualizar">
           <RefreshCw className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -429,9 +689,8 @@ const UsageStatItem = memo(({ stat }: UsageStatItemProps) => {
 
 UsageStatItem.displayName = "UsageStatItem";
 
-// ========================================
-// UPSELLS SECTION
-// ========================================
+// ─── Upsells section ──────────────────────────────────────────────────────────
+
 interface UpsellsSectionProps {
   upsells:         Upsell[];
   filterStatus:    FilterType;
@@ -442,7 +701,6 @@ interface UpsellsSectionProps {
 
 const UpsellsSection = memo(({ upsells, filterStatus, setFilterStatus, sortBy, setSortBy }: UpsellsSectionProps) => (
   <div className="bg-[rgba(255,255,255,0.02)] backdrop-blur-sm rounded-[18px] border border-[rgba(255,255,255,0.06)] p-8">
-    {/* Header */}
     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
       <div className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-[10px] bg-[rgba(122,92,255,0.12)] flex items-center justify-center">
@@ -500,9 +758,8 @@ const UpsellsSection = memo(({ upsells, filterStatus, setFilterStatus, sortBy, s
 
 UpsellsSection.displayName = "UpsellsSection";
 
-// ========================================
-// UPSELL CARD
-// ========================================
+// ─── Upsell card ──────────────────────────────────────────────────────────────
+
 interface UpsellCardProps {
   upsell: Upsell;
 }
@@ -562,3 +819,4 @@ const UpsellCard = memo(({ upsell }: UpsellCardProps) => {
 });
 
 UpsellCard.displayName = "UpsellCard";
+
