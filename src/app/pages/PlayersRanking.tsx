@@ -189,6 +189,9 @@ export default function PlayersRanking() {
   }, [committedFilters, committedPage, setUrlSearchParams, sortBy, sortOrder]);
 
   const filteredAndSortedPlayers = useMemo(() => {
+    // "overall" order comes pre-sorted from the backend (scout composite score).
+    // Only apply client-side sort for explicit potential/age sorting.
+    if (sortBy === "overall" && sortOrder === "desc") return players;
     const list = [...players];
     const getSortableValue = (value: number | null) => value ?? -1;
     list.sort((a, b) => {
