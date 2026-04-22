@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowUpDown,
   ChevronLeft,
   ChevronRight,
   Crosshair,
@@ -12,9 +11,11 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
-import { ActivePlayersFilterChips } from "../components/ActivePlayersFilterChips";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { AppSidebar } from "../components/AppSidebar";
+import { PlayerAvatar } from "../components/scout/PlayerAvatar";
+import { ScorePill } from "../components/scout/ScoreBadge";
+import { PlayerLevelBadge } from "../components/scout/LabelBadge";
 import type { PlayerCardModel } from "../mappers/player.mapper";
 import { getRankingData } from "../services/ranking";
 import { type PlayerFilterOptions, type PlayersResponseMeta } from "../services/players";
@@ -38,59 +39,6 @@ interface PaginationMeta extends PlayersResponseMeta {
   total?: number;
 }
 
-const SPORTMONKS_PLACEHOLDER = "placeholder.png";
-
-function RankingAvatar({
-  name,
-  image,
-  overall,
-}: {
-  name: string;
-  image: string | null;
-  overall: number | null;
-}) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2);
-  const hasRealImage =
-    !!image && !image.includes(SPORTMONKS_PLACEHOLDER) && !imgFailed;
-
-  const ovr = overall ?? 0;
-  const borderColor =
-    ovr >= 80 ? "rgba(0,255,156,0.6)" : ovr >= 70 ? "rgba(251,191,36,0.6)" : "rgba(0,194,255,0.4)";
-
-  if (hasRealImage) {
-    return (
-      <div
-        className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-[12px] shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-        style={{ border: `1.5px solid ${borderColor}` }}
-      >
-        <img
-          src={image!}
-          alt={name}
-          className="h-full w-full object-cover object-top"
-          onError={() => setImgFailed(true)}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-[12px] text-base font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
-      style={{
-        background: "linear-gradient(135deg, rgba(0,194,255,0.25) 0%, rgba(122,92,255,0.25) 100%)",
-        border: `1.5px solid ${borderColor}`,
-      }}
-    >
-      <span className="relative z-10 text-white">{initials}</span>
-    </div>
-  );
-}
-
 const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
   positions: [],
   nationalities: [],
@@ -99,32 +47,23 @@ const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
   sources: [],
 };
 
-function getPlayerLevel(overall: number | null): { label: string; color: string; bg: string; border: string } {
-  const ovr = overall ?? 0;
-  if (ovr >= 90) return { label: "Ícone",    color: "#FFD700", bg: "rgba(255,215,0,0.14)",    border: "rgba(255,215,0,0.35)" };
-  if (ovr >= 85) return { label: "Elite",    color: "#00FF9C", bg: "rgba(0,255,156,0.12)",    border: "rgba(0,255,156,0.32)" };
-  if (ovr >= 80) return { label: "Premium",  color: "#00C2FF", bg: "rgba(0,194,255,0.12)",    border: "rgba(0,194,255,0.3)" };
-  if (ovr >= 75) return { label: "Destaque", color: "#7A5CFF", bg: "rgba(122,92,255,0.13)",   border: "rgba(122,92,255,0.3)" };
-  if (ovr >= 70) return { label: "Regular",  color: "#FBBF24", bg: "rgba(251,191,36,0.12)",   border: "rgba(251,191,36,0.3)" };
-  if (ovr >= 65) return { label: "Básico",   color: "#94a3b8", bg: "rgba(148,163,184,0.10)",  border: "rgba(148,163,184,0.25)" };
-  return             { label: "Promessa",    color: "#C084FC", bg: "rgba(192,132,252,0.11)",   border: "rgba(192,132,252,0.28)" };
-}
-
 function formatMarketValue(value: number | null) {
-  if (value === null) {
-    return "N/A";
-  }
-  if (value >= 1_000_000) {
-    return `EUR ${(value / 1_000_000).toFixed(1)}M`;
-  }
-  if (value >= 1_000) {
-    return `EUR ${(value / 1_000).toFixed(0)}K`;
-  }
-  return `EUR ${value.toFixed(0)}`;
+  if (value === null) return "N/A";
+  if (value >= 1_000_000) return `€${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `€${(value / 1_000).toFixed(0)}K`;
+  return `€${value.toFixed(0)}`;
 }
 
-function formatStatValue(value: number | null) {
-  return value === null ? "-" : value;
+function getPositionColor(position: string): string {
+  const colors: Record<string, string> = {
+    ST: "#FF4D4F", CF: "#FF4D4F",
+    LW: "#7A5CFF", RW: "#7A5CFF",
+    CAM: "#00C2FF", CM: "#00C2FF",
+    CDM: "#00FF9C", CB: "#00FF9C",
+    LB: "#FBBF24", RB: "#FBBF24",
+    GK: "#F97316",
+  };
+  return colors[position] ?? "#94a3b8";
 }
 
 function parsePage(searchParams: URLSearchParams) {
@@ -265,32 +204,6 @@ export default function PlayersRanking() {
     setCommittedFilters({ ...filters });
     setCommittedPage(1);
     setPage(1);
-  };
-
-  const getStatColor = (value: number) => {
-    if (value >= 85) return "bg-[#00FF9C]/90 text-[#07142A]";
-    if (value >= 80) return "bg-[#00C2FF]/90 text-[#07142A]";
-    if (value >= 75) return "bg-[#7A5CFF]/90 text-white";
-    if (value >= 70) return "bg-blue-500/90 text-white";
-    if (value >= 60) return "bg-yellow-500/90 text-[#07142A]";
-    return "bg-[#FF4D4F]/90 text-white";
-  };
-
-  const getPositionColor = (position: string) => {
-    const colors: Record<string, string> = {
-      ST: "bg-[#FF4D4F]/20 text-[#FF4D4F] border-[#FF4D4F]/30",
-      CF: "bg-[#FF4D4F]/20 text-[#FF4D4F] border-[#FF4D4F]/30",
-      LW: "bg-[#7A5CFF]/20 text-[#7A5CFF] border-[#7A5CFF]/30",
-      RW: "bg-[#7A5CFF]/20 text-[#7A5CFF] border-[#7A5CFF]/30",
-      CAM: "bg-[#00C2FF]/20 text-[#00C2FF] border-[#00C2FF]/30",
-      CM: "bg-[#00C2FF]/20 text-[#00C2FF] border-[#00C2FF]/30",
-      CDM: "bg-[#00FF9C]/20 text-[#00FF9C] border-[#00FF9C]/30",
-      LB: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-      RB: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-      CB: "bg-[#00FF9C]/20 text-[#00FF9C] border-[#00FF9C]/30",
-      GK: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-    };
-    return colors[position] || "bg-gray-500/20 text-gray-400 border-gray-500/30";
   };
 
   const handleSort = (field: SortBy) => {
@@ -435,140 +348,157 @@ export default function PlayersRanking() {
               </div>
             )}
 
-            <div className="overflow-hidden rounded-[22px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
-              {/* ── Header ── */}
-              <div className="border-b border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-6 py-4">
-                <div className="grid items-center gap-3" style={{ gridTemplateColumns: "2.5rem 1fr 7.5rem 8rem 5.5rem 6.5rem 4.5rem 5.5rem 7.5rem 8rem" }}>
-                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">#</div>
-                  <div className="text-[10px] font-medium uppercase tracking-[0.24em] text-gray-400">Jogador</div>
-                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Posição</div>
-                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Clube</div>
-                  <div className="flex cursor-pointer items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("overall")}>
-                    Overall <ArrowUpDown className="h-3 w-3 shrink-0" />
-                  </div>
-                  <div className="flex cursor-pointer items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("potential")}>
-                    Potential <ArrowUpDown className="h-3 w-3 shrink-0" />
-                  </div>
-                  <div className="flex cursor-pointer items-center justify-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500 transition-colors hover:text-[#00C2FF]" onClick={() => handleSort("age")}>
-                    Idade <ArrowUpDown className="h-3 w-3 shrink-0" />
-                  </div>
-                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Nível</div>
-                  <div className="text-right text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Valor</div>
-                  <div className="text-center text-[10px] font-medium uppercase tracking-[0.24em] text-gray-500">Ação</div>
-                </div>
+            {/* ── Sort controls ── */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Ordenar por:</span>
+              {(["overall", "potential", "age"] as SortBy[]).map((field) => (
+                <button
+                  key={field}
+                  type="button"
+                  onClick={() => handleSort(field)}
+                  className="rounded-[8px] border px-3 py-1.5 text-[11px] font-semibold transition-all"
+                  style={
+                    sortBy === field
+                      ? { borderColor: "#00C2FF", background: "rgba(0,194,255,0.12)", color: "#00C2FF" }
+                      : { borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#94a3b8" }
+                  }
+                >
+                  {field === "overall" ? "Overall" : field === "potential" ? "Potencial" : "Idade"}
+                  {sortBy === field && (
+                    <span className="ml-1 opacity-70">{sortOrder === "asc" ? "↑" : "↓"}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Loading skeleton ── */}
+            {loading && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="animate-pulse rounded-[20px] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] p-5"
+                    style={{ height: 220 }}
+                  />
+                ))}
               </div>
+            )}
 
-              <div>
-                {loading && <div className="px-8 py-10 text-center text-sm text-gray-500">Carregando jogadores...</div>}
+            {/* ── Cards grid ── */}
+            {!loading && filteredAndSortedPlayers.length > 0 && (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {filteredAndSortedPlayers.map((player, index) => {
+                  const rank = (committedPage - 1) * limit + index + 1;
+                  const posColor = getPositionColor(player.position ?? "");
+                  const isWatchlisted = watchlistIds.has(player.id);
+                  const hasPotentialGrowth =
+                    player.potential !== null && player.overall !== null && player.potential > player.overall + 5;
 
-                {!loading &&
-                  filteredAndSortedPlayers.map((player, index) => (
-                    <div
-                      key={`${player.id ?? player.name ?? "item"}-${index}`}
-                      className={`group cursor-pointer border-b border-[rgba(255,255,255,0.04)] px-6 py-4 transition-all duration-200 last:border-b-0 ${
-                        index % 2 === 0 ? "bg-[rgba(255,255,255,0.01)]" : "bg-transparent"
-                      } hover:border-[rgba(0,194,255,0.15)] hover:bg-[rgba(0,194,255,0.05)]`}
+                  return (
+                    <article
+                      key={`${player.id ?? player.name}-${index}`}
+                      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-[20px] border transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
+                      style={{
+                        background: "linear-gradient(160deg, rgba(10,27,53,0.98) 0%, rgba(7,20,42,0.96) 100%)",
+                        borderColor: "rgba(0,194,255,0.18)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+                      }}
                       onClick={() => navigate(`/players/${player.id}`)}
                     >
-                      <div className="grid items-center gap-3" style={{ gridTemplateColumns: "2.5rem 1fr 7.5rem 8rem 5.5rem 6.5rem 4.5rem 5.5rem 7.5rem 8rem" }}>
+                      {/* Top glow strip */}
+                      <div
+                        className="absolute left-0 right-0 top-0 h-[2px] opacity-60"
+                        style={{ background: "linear-gradient(90deg, transparent, rgba(0,194,255,0.7), transparent)" }}
+                      />
 
-                        {/* # */}
-                        <div className="text-center text-sm font-medium text-gray-500">
-                          #{(page - 1) * limit + index + 1}
+                      <div className="flex flex-col gap-4 p-5">
+                        {/* Row 1 — rank + level + watchlist */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
+                              style={{ background: "rgba(255,255,255,0.06)", color: "#94a3b8" }}
+                            >
+                              {rank}
+                            </span>
+                            <PlayerLevelBadge overall={player.overall} />
+                          </div>
+                          <button
+                            className={`inline-flex h-7 w-7 items-center justify-center rounded-[8px] border transition-all ${
+                              isWatchlisted
+                                ? "border-[#fbbf24] bg-[#fbbf24]/15 text-[#fbbf24]"
+                                : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-500 opacity-0 group-hover:opacity-100"
+                            }`}
+                            onClick={(e) => { e.stopPropagation(); void handleWatchlistToggle(player); }}
+                          >
+                            <Star className="h-3.5 w-3.5" fill={isWatchlisted ? "currentColor" : "none"} />
+                          </button>
                         </div>
 
-                        {/* Jogador */}
-                        <div className="flex min-w-0 items-center gap-3">
-                          <RankingAvatar name={player.name} image={player.image} overall={player.overall} />
-                          <div className="min-w-0">
-                            <p className="truncate font-semibold text-gray-100 transition-colors group-hover:text-[#00C2FF]">
+                        {/* Row 2 — avatar + identity */}
+                        <div className="flex items-start gap-3">
+                          <PlayerAvatar name={player.name} image={player.image} overall={player.overall} size="md" />
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-base font-bold text-white transition-colors group-hover:text-[#00C2FF]">
                               {player.name}
-                            </p>
-                            <p className="truncate text-xs text-gray-600">{player.nationality}</p>
-                          </div>
-                        </div>
-
-                        {/* Posição */}
-                        <div className="flex justify-center">
-                          <span className={`${getPositionColor(player.position || "-")} rounded-[8px] border px-2 py-1 text-[10px] font-semibold tracking-wide`}>
-                            {player.position ? positionLabel(player.position) : "-"}
-                          </span>
-                        </div>
-
-                        {/* Clube */}
-                        <div className="truncate text-center text-sm text-gray-400" title={player.team || "-"}>
-                          {player.team || "-"}
-                        </div>
-
-                        {/* Overall */}
-                        <div className="flex justify-center">
-                          <span className={`${getStatColor(player.overall ?? 0)} w-12 rounded-[8px] py-1.5 text-center text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
-                            {formatStatValue(player.overall)}
-                          </span>
-                        </div>
-
-                        {/* Potential */}
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span className={`${getStatColor(player.potential ?? 0)} w-12 rounded-[8px] py-1.5 text-center text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.2)]`}>
-                            {formatStatValue(player.potential)}
-                          </span>
-                          {player.potential !== null && player.overall !== null && player.potential > player.overall + 5 && (
-                            <TrendingUp className="h-3.5 w-3.5 shrink-0 text-[#00FF9C]/70" />
-                          )}
-                        </div>
-
-                        {/* Idade */}
-                        <div className="text-center text-sm font-medium tabular-nums text-gray-300">
-                          {player.age ?? "-"}
-                        </div>
-
-                        {/* Nível */}
-                        <div className="flex justify-center">
-                          {(() => {
-                            const lvl = getPlayerLevel(player.overall);
-                            return (
+                            </h3>
+                            <p className="mt-0.5 text-xs text-gray-400">
                               <span
-                                className="rounded-[8px] border px-2 py-1 text-[10px] font-semibold uppercase tracking-wide"
-                                style={{ color: lvl.color, background: lvl.bg, borderColor: lvl.border }}
+                                className="mr-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                style={{ background: `${posColor}18`, color: posColor }}
                               >
-                                {lvl.label}
+                                {player.position ? positionLabel(player.position) : "—"}
                               </span>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Valor */}
-                        <div className="text-right text-sm font-semibold tabular-nums text-[#00FF9C]">
-                          {formatMarketValue(player.marketValue)}
-                        </div>
-
-                        {/* Ação */}
-                        <div className="flex justify-center">
-                          <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                            <button
-                              className={`inline-flex h-8 w-8 items-center justify-center rounded-[10px] border transition-all ${
-                                watchlistIds.has(player.id)
-                                  ? "border-[#fbbf24] bg-[#fbbf24]/15 text-[#fbbf24]"
-                                  : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-300"
-                              }`}
-                              onClick={(e) => { e.stopPropagation(); void handleWatchlistToggle(player); }}
-                            >
-                              <Star className="h-3.5 w-3.5" fill={watchlistIds.has(player.id) ? "currentColor" : "none"} />
-                            </button>
-                            <button
-                              className="rounded-[10px] bg-[#00C2FF]/90 px-3 py-1.5 text-xs font-semibold text-[#07142A] shadow-[0_2px_8px_rgba(0,194,255,0.3)] transition-all hover:bg-[#00C2FF]"
-                              onClick={(e) => { e.stopPropagation(); navigate(`/players/${player.id}`); }}
-                            >
-                              Ver
-                            </button>
+                              {player.age != null ? `${player.age} anos` : "—"}
+                              {player.nationality ? ` · ${player.nationality}` : ""}
+                            </p>
+                            {(player.team || player.league) && (
+                              <p className="mt-0.5 truncate text-[11px] text-gray-500">
+                                {[player.team, player.league].filter(Boolean).join(" · ")}
+                              </p>
+                            )}
                           </div>
                         </div>
 
+                        {/* Row 3 — score metrics */}
+                        <div
+                          className="grid grid-cols-3 gap-2 rounded-[12px] px-3 py-3"
+                          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
+                        >
+                          <div className="flex flex-col items-center gap-1">
+                            <ScorePill value={player.overall} />
+                            <span className="text-[9px] uppercase tracking-[0.18em] text-gray-500">Overall</span>
+                          </div>
+                          <div className="relative flex flex-col items-center gap-1 before:absolute before:left-0 before:top-1/2 before:h-8 before:-translate-y-1/2 before:w-px before:bg-[rgba(255,255,255,0.06)] after:absolute after:right-0 after:top-1/2 after:h-8 after:-translate-y-1/2 after:w-px after:bg-[rgba(255,255,255,0.06)]">
+                            <div className="flex items-center gap-1">
+                              <ScorePill value={player.potential} />
+                              {hasPotentialGrowth && <TrendingUp className="h-3 w-3 text-[#00FF9C]" />}
+                            </div>
+                            <span className="text-[9px] uppercase tracking-[0.18em] text-gray-500">Potencial</span>
+                          </div>
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-xl font-bold tabular-nums text-gray-300">
+                              {player.age ?? "—"}
+                            </span>
+                            <span className="text-[9px] uppercase tracking-[0.18em] text-gray-500">Anos</span>
+                          </div>
+                        </div>
+
+                        {/* Row 4 — footer */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-[#00FF9C]">
+                            {formatMarketValue(player.marketValue)}
+                          </span>
+                          <span className="rounded-[8px] bg-[rgba(0,194,255,0.1)] px-2.5 py-1 text-[11px] font-semibold text-[#00C2FF] opacity-0 transition-opacity group-hover:opacity-100">
+                            Ver →
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    </article>
+                  );
+                })}
               </div>
-            </div>
+            )}
 
             {!loading && filteredAndSortedPlayers.length === 0 && (
               <div className="py-16 text-center">

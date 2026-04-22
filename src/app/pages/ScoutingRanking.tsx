@@ -1,24 +1,20 @@
 import { useEffect, useState } from "react";
 import {
-  ArrowDownRight,
-  ArrowRight,
-  ArrowUpRight,
   ChevronDown,
   Crosshair,
-  Gem,
-  Rocket,
   RotateCcw,
   Sparkles,
-  Star,
-  TrendingDown,
   TrendingUp,
-  Trophy,
   Users,
   Zap,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import { AppHeader } from "../components/AppHeader";
 import { AppSidebar } from "../components/AppSidebar";
+import { PlayerAvatar } from "../components/scout/PlayerAvatar";
+import { LABEL_CONFIG, LabelBadge } from "../components/scout/LabelBadge";
+import { TrendBadge } from "../components/scout/TrendIndicator";
+import { scoreColor, ScoreRing } from "../components/scout/ScoreBadge";
 import {
   getScoutingRanking,
   type ScoutingLabel,
@@ -28,59 +24,6 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const POSITIONS = ["GK", "CB", "LB", "RB", "CDM", "CM", "CAM", "LW", "RW", "SS", "CF", "ST"];
-const SPORTMONKS_PLACEHOLDER = "placeholder.png";
-
-const LABEL_CONFIG: Record<
-  ScoutingLabel,
-  { label: string; color: string; bg: string; border: string; glow: string; Icon: React.ElementType }
-> = {
-  ELITE_PROSPECT: {
-    label:  "Elite Prospect",
-    color:  "#FFD700",
-    bg:     "rgba(255,215,0,0.12)",
-    border: "rgba(255,215,0,0.35)",
-    glow:   "rgba(255,215,0,0.15)",
-    Icon:   Trophy,
-  },
-  RISING_STAR: {
-    label:  "Rising Star",
-    color:  "#00C2FF",
-    bg:     "rgba(0,194,255,0.12)",
-    border: "rgba(0,194,255,0.35)",
-    glow:   "rgba(0,194,255,0.12)",
-    Icon:   Rocket,
-  },
-  VALUE_PICK: {
-    label:  "Value Pick",
-    color:  "#7A5CFF",
-    bg:     "rgba(122,92,255,0.14)",
-    border: "rgba(122,92,255,0.35)",
-    glow:   "rgba(122,92,255,0.12)",
-    Icon:   Gem,
-  },
-  STABLE: {
-    label:  "Stable",
-    color:  "#94a3b8",
-    bg:     "rgba(148,163,184,0.08)",
-    border: "rgba(148,163,184,0.22)",
-    glow:   "transparent",
-    Icon:   Star,
-  },
-  DECLINING: {
-    label:  "Declining",
-    color:  "#FF4D4F",
-    bg:     "rgba(255,77,79,0.10)",
-    border: "rgba(255,77,79,0.28)",
-    glow:   "rgba(255,77,79,0.08)",
-    Icon:   TrendingDown,
-  },
-};
-
-const TREND_CONFIG = {
-  rising:   { Icon: ArrowUpRight,   color: "#00FF9C", label: "Em alta" },
-  stable:   { Icon: ArrowRight,     color: "#94a3b8", label: "Estável" },
-  declining:{ Icon: ArrowDownRight, color: "#FF4D4F", label: "Em queda" },
-};
 
 const LABEL_OPTIONS: { value: ScoutingLabel | ""; label: string }[] = [
   { value: "",               label: "Todos os perfis" },
@@ -100,86 +43,7 @@ function formatMarketValue(v: number | null) {
   return `€${v}`;
 }
 
-function scoreColor(score: number): string {
-  if (score >= 75) return "#00FF9C";
-  if (score >= 60) return "#00C2FF";
-  if (score >= 45) return "#7A5CFF";
-  if (score >= 30) return "#FBBF24";
-  return "#FF4D4F";
-}
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function PlayerAvatar({ name, image, overall }: { name: string; image: string | null; overall: number | null }) {
-  const [failed, setFailed] = useState(false);
-  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
-  const hasImage = !!image && !image.includes(SPORTMONKS_PLACEHOLDER) && !failed;
-
-  const ovr = overall ?? 0;
-  const borderColor =
-    ovr >= 80 ? "rgba(0,255,156,0.6)"
-    : ovr >= 70 ? "rgba(251,191,36,0.5)"
-    : "rgba(0,194,255,0.35)";
-
-  if (hasImage) {
-    return (
-      <div
-        className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-[14px] shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
-        style={{ border: `2px solid ${borderColor}` }}
-      >
-        <img src={image!} alt={name} className="h-full w-full object-cover object-top" onError={() => setFailed(true)} />
-      </div>
-    );
-  }
-  return (
-    <div
-      className="flex h-14 w-14 flex-shrink-0 items-center justify-center overflow-hidden rounded-[14px] text-lg font-bold shadow-[0_4px_12px_rgba(0,0,0,0.4)]"
-      style={{
-        background: "linear-gradient(135deg, rgba(0,194,255,0.22) 0%, rgba(122,92,255,0.22) 100%)",
-        border: `2px solid ${borderColor}`,
-      }}
-    >
-      <span className="text-white">{initials}</span>
-    </div>
-  );
-}
-
-function ScoreRing({ value, label, color }: { value: number; label: string; color: string }) {
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="text-2xl font-bold tabular-nums" style={{ color }}>{value}</span>
-      <span className="text-[9px] uppercase tracking-[0.18em] text-gray-500">{label}</span>
-    </div>
-  );
-}
-
-function LabelBadge({ scoutingLabel }: { scoutingLabel: ScoutingLabel }) {
-  const cfg = LABEL_CONFIG[scoutingLabel];
-  const { Icon } = cfg;
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em]"
-      style={{ color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}` }}
-    >
-      <Icon className="h-3 w-3" />
-      {cfg.label}
-    </span>
-  );
-}
-
-function TrendBadge({ direction }: { direction: "rising" | "stable" | "declining" }) {
-  const cfg = TREND_CONFIG[direction] ?? TREND_CONFIG.stable;
-  const { Icon } = cfg;
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-      style={{ color: cfg.color, background: `${cfg.color}14`, border: `1px solid ${cfg.color}33` }}
-    >
-      <Icon className="h-3 w-3" />
-      {cfg.label}
-    </span>
-  );
-}
 
 function PlayerCard({ entry, rank }: { entry: ScoutingRankingEntry; rank: number }) {
   const navigate = useNavigate();
