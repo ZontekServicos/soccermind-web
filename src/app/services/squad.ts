@@ -14,30 +14,67 @@ const SPORTMONKS_PLACEHOLDER = "placeholder.png";
 // arrays defined in the formations object in Squad.tsx.
 
 const API_TO_SQUAD_POSITION: Record<string, string> = {
-  // Full English names (Sportmonks)
-  GOALKEEPER:           "Goleiro",
-  "CENTRE BACK":        "Zagueiro",
-  DEFENDER:             "Zagueiro",
-  "LEFT BACK":          "Lateral Esquerdo",
-  "RIGHT BACK":         "Lateral Direito",
-  "LEFT WING BACK":     "Lateral Esquerdo",
-  "RIGHT WING BACK":    "Lateral Direito",
-  WINGBACK:             "Lateral Esquerdo",
-  "DEFENSIVE MIDFIELD": "Volante",
-  "CENTRAL MIDFIELD":   "Volante",
-  MIDFIELD:             "Volante",
-  "LEFT MIDFIELD":      "Meia Atacante",
-  "RIGHT MIDFIELD":     "Meia Atacante",
-  "ATTACKING MIDFIELD": "Meia Atacante",
-  "LEFT WINGER":        "Atacante",
-  "RIGHT WINGER":       "Atacante",
-  WINGER:               "Atacante",
-  ATTACKER:             "Atacante",
-  FORWARD:              "Atacante",
-  STRIKER:              "Atacante",
-  "CENTRE FORWARD":     "Atacante",
-  "SECOND STRIKER":     "Meia Atacante",
-  // Short codes (FIFA / mock)
+  // ── Generic roles ──────────────────────────────────────────────────────────
+  GOALKEEPER:                   "Goleiro",
+  DEFENDER:                     "Zagueiro",
+  MIDFIELDER:                   "Volante",     // ← Sportmonks generic
+  MIDFIELD:                     "Volante",
+  ATTACKER:                     "Atacante",
+  FORWARD:                      "Atacante",
+  STRIKER:                      "Atacante",
+  WINGER:                       "Atacante",
+
+  // ── Defenders (space variants) ─────────────────────────────────────────────
+  "CENTRE BACK":                "Zagueiro",
+  "CENTER BACK":                "Zagueiro",
+  "CENTRAL DEFENDER":           "Zagueiro",
+  "LEFT BACK":                  "Lateral Esquerdo",
+  "RIGHT BACK":                 "Lateral Direito",
+  "LEFT WING BACK":             "Lateral Esquerdo",
+  "RIGHT WING BACK":            "Lateral Direito",
+  WINGBACK:                     "Lateral Esquerdo",
+
+  // ── Defenders (hyphen variants — Sportmonks returns these) ─────────────────
+  "CENTRE-BACK":                "Zagueiro",
+  "CENTER-BACK":                "Zagueiro",
+  "LEFT-BACK":                  "Lateral Esquerdo",
+  "RIGHT-BACK":                 "Lateral Direito",
+  "LEFT WING-BACK":             "Lateral Esquerdo",
+  "RIGHT WING-BACK":            "Lateral Direito",
+  "WING-BACK":                  "Lateral Esquerdo",
+
+  // ── Midfielders (space + -ER variants) ────────────────────────────────────
+  "DEFENSIVE MIDFIELD":         "Volante",
+  "DEFENSIVE MIDFIELDER":       "Volante",
+  "CENTRAL MIDFIELD":           "Volante",
+  "CENTRAL MIDFIELDER":         "Volante",
+  "CENTRE MIDFIELD":            "Volante",
+  "CENTRE MIDFIELDER":          "Volante",
+  "CENTER MIDFIELD":            "Volante",
+  "CENTER MIDFIELDER":          "Volante",
+  "ATTACKING MIDFIELD":         "Meia Atacante",
+  "ATTACKING MIDFIELDER":       "Meia Atacante",
+  "LEFT MIDFIELD":              "Meia Atacante",
+  "LEFT MIDFIELDER":            "Meia Atacante",
+  "RIGHT MIDFIELD":             "Meia Atacante",
+  "RIGHT MIDFIELDER":           "Meia Atacante",
+
+  // ── Midfielders (hyphen variants) ─────────────────────────────────────────
+  "DEFENSIVE-MIDFIELDER":       "Volante",
+  "CENTRAL-MIDFIELDER":         "Volante",
+  "ATTACKING-MIDFIELDER":       "Meia Atacante",
+
+  // ── Forwards ──────────────────────────────────────────────────────────────
+  "LEFT WINGER":                "Atacante",
+  "RIGHT WINGER":               "Atacante",
+  "LEFT-WINGER":                "Atacante",
+  "RIGHT-WINGER":               "Atacante",
+  "CENTRE FORWARD":             "Atacante",
+  "CENTRE-FORWARD":             "Atacante",
+  "CENTER FORWARD":             "Atacante",
+  "SECOND STRIKER":             "Meia Atacante",
+
+  // ── Short codes ────────────────────────────────────────────────────────────
   GK:  "Goleiro",
   CB:  "Zagueiro",
   LB:  "Lateral Esquerdo",
@@ -61,8 +98,29 @@ const API_TO_SQUAD_POSITION: Record<string, string> = {
 
 function toSquadPosition(apiPosition: string): string {
   if (!apiPosition) return apiPosition;
-  const key = apiPosition.trim().toUpperCase();
-  return API_TO_SQUAD_POSITION[key] ?? apiPosition;
+
+  // Normalise: strip diacritics, collapse whitespace, uppercase
+  const key = apiPosition.trim().toUpperCase().replace(/\s+/g, " ");
+
+  if (API_TO_SQUAD_POSITION[key]) return API_TO_SQUAD_POSITION[key];
+
+  // Fuzzy keyword fallback for unexpected API strings
+  if (key.includes("GOAL"))                                       return "Goleiro";
+  if (key.includes("ATTACK") && key.includes("MID"))             return "Meia Atacante";
+  if (key.includes("LEFT")   && key.includes("MID"))             return "Meia Atacante";
+  if (key.includes("RIGHT")  && key.includes("MID"))             return "Meia Atacante";
+  if (key.includes("MID"))                                        return "Volante";
+  if (key.includes("LEFT")   && key.includes("BACK"))            return "Lateral Esquerdo";
+  if (key.includes("RIGHT")  && key.includes("BACK"))            return "Lateral Direito";
+  if (key.includes("LEFT")   && (key.includes("WING") || key.includes("FLANK"))) return "Lateral Esquerdo";
+  if (key.includes("RIGHT")  && (key.includes("WING") || key.includes("FLANK"))) return "Lateral Direito";
+  if (key.includes("BACK") || key.includes("DEFEND"))            return "Zagueiro";
+  if (key.includes("WING") || key.includes("WINGER"))            return "Atacante";
+  if (key.includes("FORWARD") || key.includes("STRIKER"))        return "Atacante";
+  if (key.includes("ATTACK"))                                     return "Atacante";
+
+  // Unknown — return as-is and let the validation catch it
+  return apiPosition;
 }
 
 // ─── DNA approximation from FIFA-style stats ───────────────────────────────
@@ -205,12 +263,16 @@ function sanitizeLineup(lineup: SquadLineup | null, squad: SquadPlayer[]) {
 
 // ─── Public API ─────────────────────────────────────────────────────────────
 
-export function getSquadSnapshot() {
-  const source = getDataSource("squad");
-  const storedSquad = readStorage<SquadPlayer[]>(SQUAD_STORAGE_KEY);
-  const squad = source === "mock" ? storedSquad ?? defaultSquad : storedSquad ?? defaultSquad;
+/** Re-normalise cached players so old localStorage entries with raw API positions
+ *  (e.g. "Midfielder", "Centre-Back") are correctly mapped to Portuguese vocab. */
+function normalizeSquad(players: SquadPlayer[]): SquadPlayer[] {
+  return players.map((p) => ({ ...p, position: toSquadPosition(p.position) }));
+}
 
-  return squad;
+export function getSquadSnapshot() {
+  const storedSquad = readStorage<SquadPlayer[]>(SQUAD_STORAGE_KEY);
+  const raw = storedSquad ?? defaultSquad;
+  return normalizeSquad(raw);
 }
 
 export function getLineupSnapshot(squad = getSquadSnapshot()) {
