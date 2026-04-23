@@ -237,26 +237,32 @@ export function persistLineup(lineup: SquadLineup) {
 }
 
 /**
- * Load Corinthians squad from the API, enriching each player with DNA scores
- * derived from their attributes. Falls back to local mock data on failure.
+ * Load any team's squad from the API.
+ * Falls back to Corinthians mock data only when the requested team is Corinthians.
  */
-export async function loadCorinthiansSquad(): Promise<{ players: SquadPlayer[]; fromApi: boolean }> {
+export async function loadTeamSquad(team: string): Promise<{ players: SquadPlayer[]; fromApi: boolean }> {
   try {
-    const response = await searchPlayers({ team: "Corinthians", limit: 100 });
-
+    const response = await searchPlayers({ team, limit: 100 });
     if (response.success && Array.isArray(response.data) && response.data.length > 0) {
-      const players = response.data.map(mapApiPlayerToSquad);
-      return { players, fromApi: true };
+      return { players: response.data.map(mapApiPlayerToSquad), fromApi: true };
     }
   } catch {
-    // fall through to mock
+    // fall through
   }
 
-  // Enrich the mock squad with approximate DNA too
-  const enrichedMock = defaultSquad.map((p) => ({
-    ...p,
-    dna: approximateDNA(p.stats, p.position, p.age, p.overallRating),
-  }));
+  // Only use Corinthians mock data as fallback for Corinthians
+  if (team.toLowerCase().includes("corinthians")) {
+    const enriched = defaultSquad.map((p) => ({
+      ...p,
+      dna: approximateDNA(p.stats, p.position, p.age, p.overallRating),
+    }));
+    return { players: enriched, fromApi: false };
+  }
 
-  return { players: enrichedMock, fromApi: false };
+  return { players: [], fromApi: false };
+}
+
+/** @deprecated Use loadTeamSquad("Corinthians") */
+export async function loadCorinthiansSquad(): Promise<{ players: SquadPlayer[]; fromApi: boolean }> {
+  return loadTeamSquad("Corinthians");
 }
