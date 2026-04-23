@@ -177,7 +177,8 @@ function mapApiPlayerToSquad(apiPlayer: PlayerCardModel): SquadPlayer {
     physical: apiPlayer.attributes.physical ?? 65,
   };
 
-  const overall = apiPlayer.overall ?? 65;
+  const rawOverall = apiPlayer.overall;
+  const overall = (typeof rawOverall === "number" && rawOverall > 50) ? rawOverall : 65;
   const age = apiPlayer.age ?? 25;
   const dna = approximateDNA(stats, apiPlayer.position, age, overall);
 
