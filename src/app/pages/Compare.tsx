@@ -1,33 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { GitCompareArrows, Search } from "lucide-react";
-import { useSearchParams } from "react-router";
-import { ActivePlayersFilterChips } from "../components/ActivePlayersFilterChips";
+import { Check, ChevronDown, GitCompareArrows, Search } from "lucide-react";
 import { AppHeader } from "../components/AppHeader";
 import { AppSidebar } from "../components/AppSidebar";
-import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { ComparisonBlock, type ComparisonMetricItem } from "../components/player-intelligence/ComparisonBlock";
 import { FinalDecisionPanel } from "../components/player-intelligence/FinalDecisionPanel";
 import { SectionCard } from "../components/player-intelligence/SectionCard";
 import { WinnerBadge } from "../components/player-intelligence/WinnerBadge";
 import { Button } from "../components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import { Input } from "../components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Textarea } from "../components/ui/textarea";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { createComparisonAnalysis } from "../services/analysis";
-import { getCompareDataByIds, getCompareEngineData, getCompareShortlist, type CompareViewModel, type PlayerFilterOptions } from "../services/compare";
+import { getCompareDataByIds, getCompareEngineData, getCompareShortlist, type CompareViewModel } from "../services/compare";
 import { EngineComparisonSection, type EngineComparisonOutput } from "../components/player-intelligence/EngineComparisonSection";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import { normalizePlayerIntelligenceProfile, type PlayerIntelligenceProfile } from "../types/player-intelligence";
-import {
-  buildApiFilters,
-  countActiveFilters,
-  DEFAULT_PLAYERS_FILTERS,
-  type FilterFieldKey,
-  type PlayersFiltersState,
-  parseFiltersFromSearchParams,
-} from "../utils/playerFilters";
 import { t as translate } from "../../i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -55,29 +45,27 @@ const BLOCK_DESC_KEYS: Record<BlockTab, string> = {
 };
 
 const DNA_LABELS_PT: Record<string, string> = {
-  "Progression":         "Progressão",
-  "Duel Power":          "Poder de Duelo",
-  "Game Intelligence":   "Intel. de Jogo",
-  "Explosiveness":       "Explosividade",
-  "Final Third Impact":  "Impacto no Terço Final",
-  "Pressing Intensity":  "Pressão Alta",
-  "Aerial Dominance":    "Domínio Aéreo",
-  "Ball Retention":      "Retenção de Bola",
-  "Chance Creation":     "Criação de Chances",
-  "Off-Ball Movement":   "Movimentação",
-  "Work Rate":           "Taxa de Trabalho",
-  "Positional Sense":    "Senso Posicional",
-  "Leadership":          "Liderança",
-  "Area Controller":     "Controlador de Área",
+  "Progression":        "Progressão",
+  "Duel Power":         "Poder de Duelo",
+  "Game Intelligence":  "Intel. de Jogo",
+  "Explosiveness":      "Explosividade",
+  "Final Third Impact": "Impacto no Terço Final",
+  "Pressing Intensity": "Pressão Alta",
+  "Aerial Dominance":   "Domínio Aéreo",
+  "Ball Retention":     "Retenção de Bola",
+  "Chance Creation":    "Criação de Chances",
+  "Off-Ball Movement":  "Movimentação",
+  "Work Rate":          "Taxa de Trabalho",
+  "Positional Sense":   "Senso Posicional",
+  "Leadership":         "Liderança",
+  "Area Controller":    "Controlador de Área",
 };
 
-const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = { positions: [], nationalities: [], teams: [], leagues: [], sources: [] };
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function average(values: number[]) {
   if (values.length === 0) return 0;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
 function money(value: number | null) {
@@ -88,9 +76,9 @@ function money(value: number | null) {
 }
 
 function normalizeWinner(value: unknown) {
-  const normalized = typeof value === "string" ? value.toUpperCase() : "DRAW";
-  if (normalized === "A" || normalized === "PLAYERA") return "A" as const;
-  if (normalized === "B" || normalized === "PLAYERB") return "B" as const;
+  const n = typeof value === "string" ? value.toUpperCase() : "DRAW";
+  if (n === "A" || n === "PLAYERA") return "A" as const;
+  if (n === "B" || n === "PLAYERB") return "B" as const;
   return "DRAW" as const;
 }
 
@@ -102,47 +90,28 @@ function winnerLabel(winner: "A" | "B" | "DRAW", nameA: string, nameB: string) {
 
 function dedupe(players: PlayerExtended[]) {
   const seen = new Set<string>();
-  return players.filter((player) => {
-    if (!player.id || seen.has(player.id)) return false;
-    seen.add(player.id);
+  return players.filter((p) => {
+    if (!p.id || seen.has(p.id)) return false;
+    seen.add(p.id);
     return true;
   });
 }
 
-function syncSelectedPlayers(
-  currentA: PlayerExtended,
-  currentB: PlayerExtended,
-  nextPlayers: PlayerExtended[],
-) {
-  const fallbackA = nextPlayers[0] ?? EMPTY_PLAYER;
-  const fallbackB = nextPlayers[1] ?? nextPlayers[0] ?? EMPTY_PLAYER;
-
-  const nextA =
-    currentA.id &&
-    currentA.id !== EMPTY_PLAYER.id &&
-    nextPlayers.some((player) => player.id === currentA.id)
-      ? currentA
-      : fallbackA;
-
-  const nextB =
-    currentB.id &&
-    currentB.id !== EMPTY_PLAYER.id &&
-    currentB.id !== nextA.id &&
-    nextPlayers.some((player) => player.id === currentB.id)
-      ? currentB
-      : nextPlayers.find((player) => player.id !== nextA.id) ?? fallbackB;
-
+function syncSelectedPlayers(currentA: PlayerExtended, currentB: PlayerExtended, next: PlayerExtended[]) {
+  const fallbackA = next[0] ?? EMPTY_PLAYER;
+  const fallbackB = next[1] ?? next[0] ?? EMPTY_PLAYER;
+  const nextA = currentA.id && currentA.id !== EMPTY_PLAYER.id && next.some((p) => p.id === currentA.id) ? currentA : fallbackA;
+  const nextB = currentB.id && currentB.id !== EMPTY_PLAYER.id && currentB.id !== nextA.id && next.some((p) => p.id === currentB.id) ? currentB : next.find((p) => p.id !== nextA.id) ?? fallbackB;
   return { nextA, nextB };
 }
 
 function scoreItems(profileA: PlayerIntelligenceProfile | null, profileB: PlayerIntelligenceProfile | null) {
-  const topTraits = Array.from(new Map([...(profileA?.dna.traits ?? []), ...(profileB?.dna.traits ?? [])].map((trait) => [trait.key, trait])).values()).slice(0, 5);
+  const topTraits = Array.from(new Map([...(profileA?.dna.traits ?? []), ...(profileB?.dna.traits ?? [])].map((t) => [t.key, t])).values()).slice(0, 5);
   const dnaItems = topTraits.map((trait) => ({
     label: DNA_LABELS_PT[trait.label] ?? trait.label,
-    valueA: profileA?.dna.traits.find((item) => item.key === trait.key)?.value ?? 0,
-    valueB: profileB?.dna.traits.find((item) => item.key === trait.key)?.value ?? 0,
+    valueA: profileA?.dna.traits.find((i) => i.key === trait.key)?.value ?? 0,
+    valueB: profileB?.dna.traits.find((i) => i.key === trait.key)?.value ?? 0,
   }));
-
   return {
     technical: [
       { label: translate("metrics.ballStriking"), valueA: profileA?.technical.ballStriking ?? 0, valueB: profileB?.technical.ballStriking ?? 0 },
@@ -166,11 +135,11 @@ function scoreItems(profileA: PlayerIntelligenceProfile | null, profileB: Player
       { label: translate("metrics.roleDiscipline"), valueA: profileA?.tactical.roleDiscipline ?? 0, valueB: profileB?.tactical.roleDiscipline ?? 0 },
     ] satisfies ComparisonMetricItem[],
     market: [
-      { label: translate("metrics.currentValue"), valueA: profileA?.market.currentValue ?? 0, valueB: profileB?.market.currentValue ?? 0, format: (value) => money(value) },
+      { label: translate("metrics.currentValue"), valueA: profileA?.market.currentValue ?? 0, valueB: profileB?.market.currentValue ?? 0, format: (v) => money(v) },
       { label: translate("dashboard.liquidity"), valueA: profileA?.market.liquidity.score ?? 0, valueB: profileB?.market.liquidity.score ?? 0 },
       { label: translate("player.valueRetention"), valueA: profileA?.market.valueRetention.score ?? 0, valueB: profileB?.market.valueRetention.score ?? 0 },
       { label: translate("player.contractPressure"), valueA: profileA?.market.contractPressure.score ?? 0, valueB: profileB?.market.contractPressure.score ?? 0, inverse: true },
-      { label: translate("metrics.transferValue"), valueA: profileA?.market.estimatedTransferValue ?? 0, valueB: profileB?.market.estimatedTransferValue ?? 0, format: (value) => money(value) },
+      { label: translate("metrics.transferValue"), valueA: profileA?.market.estimatedTransferValue ?? 0, valueB: profileB?.market.estimatedTransferValue ?? 0, format: (v) => money(v) },
     ] satisfies ComparisonMetricItem[],
     risk: [
       { label: translate("player.overallRisk"), valueA: profileA?.risk.overall.score ?? 0, valueB: profileB?.risk.overall.score ?? 0, inverse: true },
@@ -190,54 +159,155 @@ function scoreItems(profileA: PlayerIntelligenceProfile | null, profileB: Player
   };
 }
 
-// ─── Player info card ─────────────────────────────────────────────────────────
+// ─── PlayerCombobox ───────────────────────────────────────────────────────────
 
-function PlayerInfoCard({ player, side }: { player: PlayerExtended; side: "A" | "B" }) {
-  if (!player.id || player.id === EMPTY_PLAYER.id) return null;
+const TIER_COLORS: Record<string, string> = {
+  ELITE: "#FFD700", A: "#C8C8DC", B: "#CD7F32", C: "#7A9CC8", DEVELOPMENT: "#6EE7B7",
+};
 
-  const isA = side === "A";
-  const accentColor = isA ? "#38BDF8" : "#C084FC";
-  const borderColor = isA ? "rgba(56,189,248,0.18)" : "rgba(192,132,252,0.18)";
-  const bgColor = isA ? "rgba(56,189,248,0.05)" : "rgba(192,132,252,0.05)";
-
-  const tierColors: Record<string, string> = {
-    ELITE: "#FFD700",
-    A: "#C8C8DC",
-    B: "#CD7F32",
-    C: "#7A9CC8",
-    DEVELOPMENT: "#6EE7B7",
-  };
-  const tierColor = tierColors[player.tier] ?? "#7A9CC8";
-
-  const ovr = player.overallRating;
+function PlayerCombobox({
+  label,
+  sublabel,
+  value,
+  players,
+  variant,
+  onChange,
+}: {
+  label: string;
+  sublabel: string;
+  value: string;
+  players: PlayerExtended[];
+  variant: "A" | "B";
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const accent      = variant === "A" ? "#38BDF8" : "#C084FC";
+  const accentBg    = variant === "A" ? "rgba(56,189,248,0.08)"  : "rgba(192,132,252,0.08)";
+  const accentBorder = variant === "A" ? "rgba(56,189,248,0.28)" : "rgba(192,132,252,0.28)";
+  const labelColor  = variant === "A" ? "text-[#9BE7FF]"         : "text-[#D8B4FE]";
+  const selected    = players.find((p) => p.id === value);
 
   return (
-    <div
-      className="mt-4 flex items-center gap-3 rounded-[14px] px-3 py-3 transition-all"
-      style={{ border: `1px solid ${borderColor}`, background: bgColor }}
-    >
-      {/* OVR badge */}
-      <div
-        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border text-sm font-black"
-        style={{ borderColor: accentColor, color: accentColor, background: `${accentColor}18` }}
-      >
-        {ovr > 0 ? ovr : "–"}
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <label className={`flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.22em] ${labelColor}`}>
+          <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: accent }} />
+          {label}
+        </label>
+        <span className="text-[11px] text-gray-600">{sublabel}</span>
       </div>
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white">{player.name}</p>
-        <p className="truncate text-xs text-gray-400">
-          {player.position} · {player.club} · {player.age > 0 ? `${player.age} anos` : ""}
-        </p>
-      </div>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            className="flex h-14 w-full items-center justify-between gap-3 rounded-[14px] border px-4 text-left backdrop-blur-sm transition-all"
+            style={{
+              borderColor: open ? accent : accentBorder,
+              background:  open ? accentBg : "rgba(255,255,255,0.02)",
+              boxShadow:   open ? `0 0 0 3px ${accent}20` : undefined,
+            }}
+          >
+            {selected ? (
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <div
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-black"
+                  style={{ background: `${accent}18`, color: accent, border: `1.5px solid ${accent}50` }}
+                >
+                  {selected.overallRating > 0 ? selected.overallRating : "–"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-white">{selected.name}</p>
+                  <p className="truncate text-xs text-gray-400">{selected.position} · {selected.club}</p>
+                </div>
+              </div>
+            ) : (
+              <span className="text-sm text-gray-500">Buscar jogador por nome, clube ou posição…</span>
+            )}
+            <ChevronDown
+              className="h-4 w-4 flex-shrink-0 text-gray-500 transition-transform"
+              style={{ transform: open ? "rotate(180deg)" : undefined }}
+            />
+          </button>
+        </PopoverTrigger>
 
-      {/* Tier badge */}
-      <span
-        className="flex-shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase"
-        style={{ color: tierColor, borderColor: `${tierColor}44`, background: `${tierColor}12` }}
-      >
-        {player.tier}
-      </span>
+        <PopoverContent
+          className="p-0 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+          style={{ width: "var(--radix-popover-trigger-width)", border: `1px solid ${accent}40`, background: "#0A1B35" }}
+          align="start"
+        >
+          <Command className="bg-transparent">
+            <CommandInput
+              placeholder="Nome, clube ou posição…"
+              className="border-b text-white placeholder:text-gray-500"
+              style={{ borderColor: `${accent}25` }}
+            />
+            <CommandList className="max-h-[320px]">
+              <CommandEmpty className="py-8 text-center text-sm text-gray-500">
+                Nenhum jogador encontrado.
+              </CommandEmpty>
+              <CommandGroup>
+                {players.map((player) => {
+                  const isSelected  = player.id === value;
+                  const tierColor   = TIER_COLORS[player.tier] ?? "#7A9CC8";
+                  return (
+                    <CommandItem
+                      key={player.id}
+                      value={`${player.name} ${player.club} ${player.position} ${player.nationality}`}
+                      onSelect={() => { onChange(player.id); setOpen(false); }}
+                      className="cursor-pointer rounded-[10px] px-3 py-2.5 aria-selected:bg-[rgba(255,255,255,0.06)]"
+                    >
+                      <div
+                        className="mr-3 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-black"
+                        style={{ background: `${accent}14`, color: isSelected ? accent : "#9CA3AF", border: `1.5px solid ${isSelected ? accent : "rgba(255,255,255,0.1)"}50` }}
+                      >
+                        {player.overallRating > 0 ? player.overallRating : "–"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm font-semibold ${isSelected ? "text-white" : "text-gray-200"}`}>{player.name}</p>
+                        <p className="truncate text-[11px] text-gray-500">{player.position} · {player.club}</p>
+                      </div>
+                      <span
+                        className="mr-2 flex-shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase"
+                        style={{ color: tierColor, borderColor: `${tierColor}44`, background: `${tierColor}12` }}
+                      >
+                        {player.tier}
+                      </span>
+                      {isSelected && <Check className="h-4 w-4 flex-shrink-0" style={{ color: accent }} />}
+                    </CommandItem>
+                  );
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {/* Selected player info card */}
+      {selected && (
+        <div
+          className="flex items-center gap-3 rounded-[14px] px-3 py-3 transition-all"
+          style={{ border: `1px solid ${accent}20`, background: `${accent}05` }}
+        >
+          <div
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-black"
+            style={{ background: `${accent}18`, color: accent, border: `2px solid ${accent}45` }}
+          >
+            {selected.overallRating > 0 ? selected.overallRating : "–"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">{selected.name}</p>
+            <p className="truncate text-xs text-gray-400">
+              {selected.position} · {selected.club}{selected.age > 0 ? ` · ${selected.age} anos` : ""}
+            </p>
+          </div>
+          <div className="flex-shrink-0 text-right">
+            <p className="text-[10px] text-gray-500">POT</p>
+            <p className="text-sm font-bold" style={{ color: accent }}>
+              {selected.potential > 0 ? selected.potential : "–"}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -247,10 +317,6 @@ function PlayerInfoCard({ player, side }: { player: PlayerExtended; side: "A" | 
 export default function Compare() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const [urlSearchParams, setUrlSearchParams] = useSearchParams();
-  const [filters, setFilters] = useState<PlayersFiltersState>(() => parseFiltersFromSearchParams(urlSearchParams));
-  const [filtersExpanded, setFiltersExpanded] = useState(() => countActiveFilters(parseFiltersFromSearchParams(urlSearchParams)) > 0);
-  const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
   const [players, setPlayers] = useState<PlayerExtended[]>([]);
   const [playerA, setPlayerA] = useState<PlayerExtended>(EMPTY_PLAYER);
   const [playerB, setPlayerB] = useState<PlayerExtended>(EMPTY_PLAYER);
@@ -268,61 +334,45 @@ export default function Compare() {
   const [savedAnalysisId, setSavedAnalysisId] = useState<string | null>(null);
   const [activeBlockTab, setActiveBlockTab] = useState<BlockTab>("technical");
 
-  const activeFiltersCount = useMemo(() => countActiveFilters(filters), [filters]);
-  const apiFilters = useMemo(() => buildApiFilters(filters, filters.search.trim()), [filters]);
-
-  useEffect(() => {
-    const nextParams = new URLSearchParams();
-    if (filters.search.trim()) nextParams.set("search", filters.search.trim());
-    if (filters.positions.length > 0) nextParams.set("positions", filters.positions.join(","));
-    if (filters.nationality) nextParams.set("nationality", filters.nationality);
-    if (filters.team) nextParams.set("team", filters.team);
-    if (filters.league) nextParams.set("league", filters.league);
-    setUrlSearchParams(nextParams, { replace: true });
-  }, [filters, setUrlSearchParams]);
-
+  // Load players once
   useEffect(() => {
     let active = true;
     async function loadPlayers() {
       setPlayersLoading(true);
       try {
-        const response = await getCompareShortlist({ ...apiFilters, page: 1, limit: 80 });
+        const response = await getCompareShortlist({ page: 1, limit: 80 });
         if (!active) return;
         const nextPlayers = Array.isArray(response.data.players) ? response.data.players : [];
         setPlayers(nextPlayers);
-        setFilterOptions(response.data.filterOptions ?? EMPTY_FILTER_OPTIONS);
-        setPlayerA((currentA) => syncSelectedPlayers(currentA, playerB, nextPlayers).nextA);
-        setPlayerB((currentB) => syncSelectedPlayers(playerA, currentB, nextPlayers).nextB);
+        setPlayerA((cur) => syncSelectedPlayers(cur, playerB, nextPlayers).nextA);
+        setPlayerB((cur) => syncSelectedPlayers(playerA, cur, nextPlayers).nextB);
         setError(null);
-      } catch (loadError) {
+      } catch (err) {
         if (!active) return;
         setPlayers([]);
-        setError(loadError instanceof Error ? loadError.message : t("comparison.empty"));
+        setError(err instanceof Error ? err.message : t("comparison.empty"));
       } finally {
         if (active) setPlayersLoading(false);
       }
     }
     void loadPlayers();
     return () => { active = false; };
-  }, [apiFilters]);
+  }, []);
 
   useEffect(() => {
     let active = true;
     async function loadComparison() {
-      if (!playerA.id || !playerB.id || playerA.id === playerB.id) {
-        setComparisonData(null);
-        return;
-      }
+      if (!playerA.id || !playerB.id || playerA.id === playerB.id) { setComparisonData(null); return; }
       setCompareLoading(true);
       try {
         const response = await getCompareDataByIds(playerA.id, playerB.id);
         if (!active) return;
         setComparisonData(response.data);
         setError(null);
-      } catch (compareError) {
+      } catch (err) {
         if (!active) return;
         setComparisonData(null);
-        setError(compareError instanceof Error ? compareError.message : t("comparison.loading"));
+        setError(err instanceof Error ? err.message : t("comparison.loading"));
       } finally {
         if (active) setCompareLoading(false);
       }
@@ -334,10 +384,7 @@ export default function Compare() {
   useEffect(() => {
     let active = true;
     async function loadEngine() {
-      if (!playerA.id || !playerB.id || playerA.id === playerB.id) {
-        setEngineData(null);
-        return;
-      }
+      if (!playerA.id || !playerB.id || playerA.id === playerB.id) { setEngineData(null); return; }
       setEngineLoading(true);
       try {
         const response = await getCompareEngineData(playerA.id, playerB.id);
@@ -361,8 +408,8 @@ export default function Compare() {
     setSaveFeedback(null);
   }, [playerA.id, playerB.id]);
 
-  const selectablePlayers = useMemo(() => dedupe([playerA, playerB, ...players].filter((item) => item.id && item.id !== EMPTY_PLAYER.id)), [playerA, playerB, players]);
-  const playersById = useMemo(() => new Map(selectablePlayers.map((player) => [player.id, player])), [selectablePlayers]);
+  const selectablePlayers = useMemo(() => dedupe([playerA, playerB, ...players].filter((p) => p.id && p.id !== EMPTY_PLAYER.id)), [playerA, playerB, players]);
+  const playersById = useMemo(() => new Map(selectablePlayers.map((p) => [p.id, p])), [selectablePlayers]);
   const displayA = comparisonData?.playerA ?? playerA;
   const displayB = comparisonData?.playerB ?? playerB;
   const profileA = normalizePlayerIntelligenceProfile(comparisonData?.intelligenceProfiles?.playerA ?? null);
@@ -370,7 +417,7 @@ export default function Compare() {
   const comparison = (comparisonData?.comparison as { winnersByBlock?: Record<string, "A" | "B" | "tie">; finalDecision?: Record<string, "A" | "B">; summaryInsights?: string[] } | undefined) ?? {};
   const items = scoreItems(profileA, profileB);
 
-  function resolveSide(side: "A" | "B" | undefined | null, fallback: string): string {
+  function resolveSide(side: "A" | "B" | undefined | null, fallback: string) {
     if (side === "A") return displayA.name;
     if (side === "B") return displayB.name;
     return fallback;
@@ -378,22 +425,19 @@ export default function Compare() {
 
   const rawFinalDecision = comparison.finalDecision;
   const finalDecision = {
-    betterPlayer: { playerName: resolveSide(rawFinalDecision?.betterPlayer, t("comparison.balanced")) },
-    saferPlayer: { playerName: resolveSide(rawFinalDecision?.saferPlayer, t("comparison.balanced")) },
-    higherUpside: { playerName: resolveSide(rawFinalDecision?.higherUpside, t("comparison.balanced")) },
+    betterPlayer:  { playerName: resolveSide(rawFinalDecision?.betterPlayer,  t("comparison.balanced")) },
+    saferPlayer:   { playerName: resolveSide(rawFinalDecision?.saferPlayer,   t("comparison.balanced")) },
+    higherUpside:  { playerName: resolveSide(rawFinalDecision?.higherUpside,  t("comparison.balanced")) },
     bestTacticalFit: { playerName: resolveSide(rawFinalDecision?.bestTacticalFit, t("comparison.balanced")) },
   };
-  const insights = Array.isArray(comparison.summaryInsights) ? comparison.summaryInsights.slice(0, 5) : [];
-  const winner = rawFinalDecision?.betterPlayer === "A" ? "A" : rawFinalDecision?.betterPlayer === "B" ? "B" : normalizeWinner(comparisonData?.winner);
-  const confidence = winner === "A" ? profileA?.summary.confidence ?? 0 : winner === "B" ? profileB?.summary.confidence ?? 0 : Math.round(average([profileA?.summary.confidence ?? 0, profileB?.summary.confidence ?? 0]));
+  const insights  = Array.isArray(comparison.summaryInsights) ? comparison.summaryInsights.slice(0, 5) : [];
+  const winner    = rawFinalDecision?.betterPlayer === "A" ? "A" : rawFinalDecision?.betterPlayer === "B" ? "B" : normalizeWinner(comparisonData?.winner);
+  const confidence = winner === "A" ? (profileA?.summary.confidence ?? 0) : winner === "B" ? (profileB?.summary.confidence ?? 0) : Math.round(average([profileA?.summary.confidence ?? 0, profileB?.summary.confidence ?? 0]));
 
-  // Block tab winner indicator (dot)
   function getBlockWinner(tab: BlockTab): "A" | "B" | "DRAW" {
     const raw = comparison.winnersByBlock?.[tab];
     if (!raw || raw === "tie") return "DRAW";
-    if (raw === "A") return "A";
-    if (raw === "B") return "B";
-    return "DRAW";
+    return raw === "A" ? "A" : "B";
   }
 
   async function saveAnalysis() {
@@ -411,9 +455,9 @@ export default function Compare() {
       setSaveFeedback(t("comparison.saveSuccess", { title: response.data.title }));
       setAnalysisTitle("");
       setAnalysisDescription("");
-    } catch (saveError) {
+    } catch (err) {
       setSaveTone("error");
-      setSaveFeedback(saveError instanceof Error ? saveError.message : t("comparison.saveError"));
+      setSaveFeedback(err instanceof Error ? err.message : t("comparison.saveError"));
     } finally {
       setSaveLoading(false);
     }
@@ -440,14 +484,10 @@ export default function Compare() {
                   <h1 className="text-4xl font-semibold text-white">{t("comparison.title")}</h1>
                   <p className="mt-3 max-w-2xl text-sm text-gray-400">{t("comparison.subtitle")}</p>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4">
                     <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("comparison.shortlist")}</p>
                     <p className="mt-2 text-2xl font-bold text-[#C7B8FF]">{players.length}</p>
-                  </div>
-                  <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4">
-                    <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("comparison.activeFilters")}</p>
-                    <p className="mt-2 text-2xl font-bold text-[#9BE7FF]">{activeFiltersCount}</p>
                   </div>
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-5 py-4">
                     <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{t("comparison.recommended")}</p>
@@ -461,68 +501,34 @@ export default function Compare() {
             {saveFeedback ? <div className={`rounded-[16px] px-5 py-4 text-sm ${saveTone === "success" ? "border border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] text-[#9CFFD1]" : "border border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] text-[#FFB4B5]"}`}>{saveFeedback}</div> : null}
             {error ? <div className="rounded-[16px] border border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">{error}</div> : null}
 
-            {/* ── Filters ── */}
-            <PlayersFiltersPanel
-              filters={filters}
-              options={filterOptions}
-              activeFiltersCount={activeFiltersCount}
-              isExpanded={filtersExpanded}
-              onToggleExpanded={() => setFiltersExpanded((current) => !current)}
-              onSearchChange={(value) => setFilters((current) => ({ ...current, search: value }))}
-              onFieldChange={(field: FilterFieldKey, value: string) => setFilters((current) => ({ ...current, [field]: value }))}
-              onTogglePosition={(position) => setFilters((current) => ({ ...current, positions: current.positions.includes(position) ? current.positions.filter((item) => item !== position) : [...current.positions, position] }))}
-              onClearFilters={() => setFilters(DEFAULT_PLAYERS_FILTERS)}
-            />
-            <ActivePlayersFilterChips
-              filters={filters}
-              onClearSearch={() => setFilters((current) => ({ ...current, search: "" }))}
-              onRemovePosition={(position) => setFilters((current) => ({ ...current, positions: current.positions.filter((item) => item !== position) }))}
-              onClearField={(field) => setFilters((current) => ({ ...current, [field]: "" }))}
-              onClearRange={([minField, maxField]) => setFilters((current) => ({ ...current, [minField]: "", [maxField]: "" }))}
-            />
-
             {/* ── Player selectors ── */}
-            <section className="grid gap-6 xl:grid-cols-[1fr_auto_1fr]">
-              {/* Player A */}
-              <div className="rounded-[22px] border border-[rgba(56,189,248,0.25)] bg-[rgba(255,255,255,0.03)] p-6">
-                <label className="mb-3 block text-[11px] uppercase tracking-[0.24em] text-[#9BE7FF]">{t("comparison.playerA")}</label>
-                <Select value={playerA.id} onValueChange={(value) => setPlayerA(playersById.get(value) ?? EMPTY_PLAYER)}>
-                  <SelectTrigger className="h-14 rounded-[14px] border-[rgba(56,189,248,0.3)] bg-[rgba(255,255,255,0.02)]">
-                    <SelectValue placeholder={t("comparison.selectPlayerA")} />
-                  </SelectTrigger>
-                  <SelectContent className="border-[rgba(56,189,248,0.3)] bg-[#0A1B35]">
-                    {selectablePlayers.map((player) => (
-                      <SelectItem key={player.id} value={player.id}>{player.name} - {player.club}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <PlayerInfoCard player={displayA as PlayerExtended} side="A" />
-              </div>
+            <section className="grid gap-6 rounded-[24px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.3)] xl:grid-cols-[1fr_auto_1fr]">
+              <PlayerCombobox
+                label={t("comparison.playerA")}
+                sublabel="Candidato principal"
+                value={playerA.id}
+                players={selectablePlayers}
+                variant="A"
+                onChange={(id) => setPlayerA(playersById.get(id) ?? EMPTY_PLAYER)}
+              />
 
               {/* VS divider */}
               <div className="hidden items-center justify-center xl:flex">
                 <div className="flex flex-col items-center gap-2">
-                  <div className="h-px w-6 bg-[rgba(255,255,255,0.08)]" />
-                  <div className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-5 py-3 text-xl font-semibold tracking-[0.22em] text-white">VS</div>
-                  <div className="h-px w-6 bg-[rgba(255,255,255,0.08)]" />
+                  <div className="h-8 w-px bg-[rgba(255,255,255,0.08)]" />
+                  <div className="rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-4 py-2.5 text-base font-semibold tracking-[0.2em] text-white">VS</div>
+                  <div className="h-8 w-px bg-[rgba(255,255,255,0.08)]" />
                 </div>
               </div>
 
-              {/* Player B */}
-              <div className="rounded-[22px] border border-[rgba(192,132,252,0.25)] bg-[rgba(255,255,255,0.03)] p-6">
-                <label className="mb-3 block text-[11px] uppercase tracking-[0.24em] text-[#D8B4FE]">{t("comparison.playerB")}</label>
-                <Select value={playerB.id} onValueChange={(value) => setPlayerB(playersById.get(value) ?? EMPTY_PLAYER)}>
-                  <SelectTrigger className="h-14 rounded-[14px] border-[rgba(192,132,252,0.3)] bg-[rgba(255,255,255,0.02)]">
-                    <SelectValue placeholder={t("comparison.selectPlayerB")} />
-                  </SelectTrigger>
-                  <SelectContent className="border-[rgba(192,132,252,0.3)] bg-[#0A1B35]">
-                    {selectablePlayers.map((player) => (
-                      <SelectItem key={player.id} value={player.id}>{player.name} - {player.club}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <PlayerInfoCard player={displayB as PlayerExtended} side="B" />
-              </div>
+              <PlayerCombobox
+                label={t("comparison.playerB")}
+                sublabel="Benchmark alternativo"
+                value={playerB.id}
+                players={selectablePlayers}
+                variant="B"
+                onChange={(id) => setPlayerB(playersById.get(id) ?? EMPTY_PLAYER)}
+              />
             </section>
 
             {/* ── Engine comparison ── */}
@@ -538,34 +544,23 @@ export default function Compare() {
             {/* ── Tabbed ComparisonBlocks ── */}
             {hasComparison && (
               <div className="space-y-4">
-                {/* Tab bar */}
-                <div className="flex overflow-x-auto rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1.5 gap-1">
+                <div className="flex overflow-x-auto gap-1 rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1.5">
                   {BLOCK_TABS.map((tab) => {
-                    const blockWinner = getBlockWinner(tab.key);
+                    const bw = getBlockWinner(tab.key);
                     const isActive = activeBlockTab === tab.key;
                     return (
                       <button
                         key={tab.key}
                         onClick={() => setActiveBlockTab(tab.key)}
-                        className={`relative flex flex-shrink-0 items-center gap-1.5 rounded-[12px] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider transition-all ${
-                          isActive
-                            ? "bg-[rgba(0,194,255,0.12)] text-[#9BE7FF] border border-[rgba(0,194,255,0.22)]"
-                            : "text-gray-500 hover:text-gray-300"
-                        }`}
+                        className={`relative flex flex-shrink-0 items-center gap-1.5 rounded-[12px] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider transition-all ${isActive ? "bg-[rgba(0,194,255,0.12)] text-[#9BE7FF] border border-[rgba(0,194,255,0.22)]" : "text-gray-500 hover:text-gray-300"}`}
                       >
                         {translate(tab.labelKey)}
-                        {blockWinner !== "DRAW" && (
-                          <span
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ background: blockWinner === "A" ? "#38BDF8" : "#C084FC" }}
-                          />
-                        )}
+                        {bw !== "DRAW" && <span className="h-1.5 w-1.5 rounded-full" style={{ background: bw === "A" ? "#38BDF8" : "#C084FC" }} />}
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Active block */}
                 {compareLoading ? (
                   <div className="rounded-[24px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-6 py-10 text-center">
                     <div className="mx-auto mb-3 h-5 w-5 animate-spin rounded-full border-2 border-[rgba(0,194,255,0.3)] border-t-[#9BE7FF]" />
@@ -646,15 +641,11 @@ export default function Compare() {
                   <p className="mt-0.5 text-xs text-gray-500">A análise só é registrada no histórico quando você salvar explicitamente.</p>
                 </div>
                 {savedAnalysisId && (
-                  <a
-                    href={`/analysis/${savedAnalysisId}`}
-                    className="inline-flex items-center gap-1.5 rounded-[10px] border border-[rgba(0,255,156,0.25)] bg-[rgba(0,255,156,0.06)] px-3 py-1.5 text-[11px] font-semibold text-[#00FF9C] hover:bg-[rgba(0,255,156,0.12)] transition-colors"
-                  >
+                  <a href={`/analysis/${savedAnalysisId}`} className="inline-flex items-center gap-1.5 rounded-[10px] border border-[rgba(0,255,156,0.25)] bg-[rgba(0,255,156,0.06)] px-3 py-1.5 text-[11px] font-semibold text-[#00FF9C] hover:bg-[rgba(0,255,156,0.12)] transition-colors">
                     Ver no Histórico →
                   </a>
                 )}
               </div>
-
               {savedAnalysisId ? (
                 <div className="flex items-center gap-3 rounded-[14px] border border-[rgba(0,255,156,0.2)] bg-[rgba(0,255,156,0.06)] px-4 py-3">
                   <span className="text-lg">✓</span>
@@ -681,7 +672,7 @@ export default function Compare() {
                   />
                   <Button
                     type="button"
-                    onClick={saveAnalysis}
+                    onClick={() => void saveAnalysis()}
                     disabled={saveLoading || !playerA.id || !playerB.id || playerA.id === playerB.id}
                     className="h-10 rounded-[12px] bg-[#00C2FF] px-5 font-semibold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.3)] hover:bg-[#33CFFF] disabled:opacity-40"
                   >

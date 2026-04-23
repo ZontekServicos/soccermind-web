@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   Check,
   ChevronDown,
@@ -12,21 +12,11 @@ import {
 } from "lucide-react";
 import { AppSidebar } from "../components/AppSidebar";
 import { AppHeader } from "../components/AppHeader";
-import { ActivePlayersFilterChips } from "../components/ActivePlayersFilterChips";
-import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { Button } from "../components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { useAuth } from "../contexts/AuthContext";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
-import {
-  buildApiFilters,
-  countActiveFilters,
-  DEFAULT_PLAYERS_FILTERS,
-  type FilterFieldKey,
-  type PlayersFiltersState,
-  parseFiltersFromSearchParams,
-} from "../utils/playerFilters";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
 import type { ExecutiveReportMetric } from "../utils/executiveReport";
 import {
@@ -34,17 +24,8 @@ import {
   getExecutiveReportData,
   getReportShortlist,
   type ExecutiveReportModel,
-  type PlayerFilterOptions,
 } from "../services/reports";
 import { createReportAnalysis, type AnalysisViewModel } from "../services/analysis";
-
-const EMPTY_FILTER_OPTIONS: PlayerFilterOptions = {
-  positions: [],
-  nationalities: [],
-  teams: [],
-  leagues: [],
-  sources: [],
-};
 
 function money(value: number | null) {
   if (value === null || value === 0) return "N/A";
@@ -309,11 +290,6 @@ function ReportLoadingSkeleton() {
 export default function Reports() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [urlSearchParams, setUrlSearchParams] = useSearchParams();
-  const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
-  const [filters, setFilters] = useState<PlayersFiltersState>(initialFilters);
-  const [debouncedSearch, setDebouncedSearch] = useState(initialFilters.search.trim());
-  const [filtersExpanded, setFiltersExpanded] = useState(() => countActiveFilters(initialFilters) > 0);
   const [availablePlayers, setAvailablePlayers] = useState<PlayerExtended[]>([]);
   const [playerA, setPlayerA] = useState<PlayerExtended>(EMPTY_PLAYER);
   const [playerB, setPlayerB] = useState<PlayerExtended>(EMPTY_PLAYER);
@@ -326,49 +302,20 @@ export default function Reports() {
   const [saveFeedbackTone, setSaveFeedbackTone] = useState<"success" | "error" | "info">("info");
   const [comparisonData, setComparisonData] = useState<CompareViewModel | null>(null);
   const [reportModel, setReportModel] = useState<ExecutiveReportModel | null>(null);
-  const [filterOptions, setFilterOptions] = useState<PlayerFilterOptions>(EMPTY_FILTER_OPTIONS);
   const [savedAnalysis, setSavedAnalysis] = useState<AnalysisViewModel | null>(null);
   const [saveLoading, setSaveLoading] = useState(false);
   const lastPersistedSelectionRef = useRef<string>("");
-
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedSearch(filters.search.trim()), 300);
-    return () => window.clearTimeout(id);
-  }, [filters.search]);
-
-  const apiFilters = useMemo(() => buildApiFilters(filters, debouncedSearch), [filters, debouncedSearch]);
-  const activeFiltersCount = useMemo(() => countActiveFilters(filters), [filters]);
-
-  useEffect(() => {
-    const p = new URLSearchParams();
-    if (filters.search.trim()) p.set("search", filters.search.trim());
-    if (filters.positions.length > 0) p.set("positions", filters.positions.join(","));
-    if (filters.nationality) p.set("nationality", filters.nationality);
-    if (filters.team) p.set("team", filters.team);
-    if (filters.league) p.set("league", filters.league);
-    if (filters.source) p.set("source", filters.source);
-    if (filters.minAge) p.set("minAge", filters.minAge);
-    if (filters.maxAge) p.set("maxAge", filters.maxAge);
-    if (filters.minOverall) p.set("minOverall", filters.minOverall);
-    if (filters.maxOverall) p.set("maxOverall", filters.maxOverall);
-    if (filters.minPotential) p.set("minPotential", filters.minPotential);
-    if (filters.maxPotential) p.set("maxPotential", filters.maxPotential);
-    if (filters.minValue) p.set("minValue", filters.minValue);
-    if (filters.maxValue) p.set("maxValue", filters.maxValue);
-    setUrlSearchParams(p, { replace: true });
-  }, [filters, setUrlSearchParams]);
 
   useEffect(() => {
     let active = true;
     async function load() {
       setPlayersLoading(true);
       try {
-        const res = await getReportShortlist({ ...apiFilters, page: 1, limit: 80 });
+        const res = await getReportShortlist({ page: 1, limit: 80 });
         if (!active) return;
         const list = Array.isArray(res.data.players) ? res.data.players : [];
         setAvailablePlayers(list);
         setPlayersError(null);
-        setFilterOptions(res.data.filterOptions ?? EMPTY_FILTER_OPTIONS);
         setPlayerA((cur) => (cur.id && cur.id !== EMPTY_PLAYER.id ? cur : list[0] ?? EMPTY_PLAYER));
         setPlayerB((cur) => (cur.id && cur.id !== EMPTY_PLAYER.id ? cur : list[1] ?? list[0] ?? EMPTY_PLAYER));
       } catch (err) {
@@ -381,7 +328,7 @@ export default function Reports() {
     }
     void load();
     return () => { active = false; };
-  }, [apiFilters]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -506,9 +453,8 @@ export default function Reports() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <MetricHeroCard label="Shortlist" value={`${availablePlayers.length}`} caption="Após aplicação dos filtros" accent="cyan" />
-                  <MetricHeroCard label="Filtros ativos" value={`${activeFiltersCount}`} caption="Refinando o radar atual" accent="violet" />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <MetricHeroCard label="Shortlist" value={`${availablePlayers.length}`} caption="Jogadores disponíveis" accent="cyan" />
                   <div className="rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(255,255,255,0.02))] px-5 py-4 backdrop-blur-sm">
                     <p className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Ações</p>
                     <div className="mt-3 grid gap-2.5">
@@ -551,26 +497,6 @@ export default function Reports() {
               </div>
             )}
 
-            {/* ── Filters ── */}
-            <PlayersFiltersPanel
-              filters={filters}
-              options={filterOptions}
-              activeFiltersCount={activeFiltersCount}
-              isExpanded={filtersExpanded}
-              onToggleExpanded={() => setFiltersExpanded((c) => !c)}
-              onSearchChange={(v) => setFilters((c) => ({ ...c, search: v }))}
-              onFieldChange={(field: FilterFieldKey, value: string) => setFilters((c) => ({ ...c, [field]: value }))}
-              onTogglePosition={(pos) => setFilters((c) => ({ ...c, positions: c.positions.includes(pos) ? c.positions.filter((p) => p !== pos) : [...c.positions, pos] }))}
-              onClearFilters={() => setFilters(DEFAULT_PLAYERS_FILTERS)}
-            />
-            <ActivePlayersFilterChips
-              filters={filters}
-              onClearSearch={() => setFilters((c) => ({ ...c, search: "" }))}
-              onRemovePosition={(pos) => setFilters((c) => ({ ...c, positions: c.positions.filter((p) => p !== pos) }))}
-              onClearField={(field) => setFilters((c) => ({ ...c, [field]: "" }))}
-              onClearRange={([min, max]) => setFilters((c) => ({ ...c, [min]: "", [max]: "" }))}
-            />
-
             {/* ── Player selectors ── */}
             <section className="grid gap-6 rounded-[24px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 shadow-[0_16px_48px_rgba(0,0,0,0.3)] xl:grid-cols-2">
               <PlayerCombobox
@@ -597,7 +523,7 @@ export default function Reports() {
 
             {!playersLoading && selectablePlayers.length === 0 && (
               <div className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] px-6 py-14 text-center text-sm text-gray-500">
-                Nenhum jogador encontrado com os filtros atuais. Ajuste o painel para montar uma shortlist comparável.
+                Nenhum jogador encontrado na shortlist. Verifique se há jogadores cadastrados no sistema.
               </div>
             )}
 
