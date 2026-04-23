@@ -51,19 +51,46 @@ function PlayerCombobox({
   players,
   variant,
   onChange,
+  onSearch,
 }: {
   label: string;
   value: string;
   players: PlayerExtended[];
   variant: "A" | "B";
   onChange: (id: string) => void;
+  onSearch?: (q: string) => Promise<PlayerExtended[]>;
 }) {
   const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [searchResults, setSearchResults] = useState<PlayerExtended[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const q = inputValue.trim();
+    if (!q || q.length < 2 || !onSearch) { setSearchResults(null); return; }
+    const id = window.setTimeout(() => {
+      setSearching(true);
+      onSearch(q)
+        .then((r) => setSearchResults(r))
+        .catch(() => setSearchResults(null))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, [inputValue, onSearch]);
+
+  useEffect(() => { if (!open) { setInputValue(""); setSearchResults(null); } }, [open]);
+
+  const displayPlayers = searchResults ?? (
+    inputValue.trim()
+      ? players.filter((p) => `${p.name} ${p.club} ${p.position} ${p.nationality}`.toLowerCase().includes(inputValue.toLowerCase()))
+      : players
+  );
+
   const accent = variant === "A" ? "#38BDF8" : "#C084FC";
   const accentBg = variant === "A" ? "rgba(56,189,248,0.08)" : "rgba(192,132,252,0.08)";
   const accentBorder = variant === "A" ? "rgba(56,189,248,0.28)" : "rgba(192,132,252,0.28)";
   const labelColor = variant === "A" ? "text-[#9BE7FF]" : "text-[#D8B4FE]";
-  const selected = players.find((p) => p.id === value);
+  const selected = players.find((p) => p.id === value) ?? searchResults?.find((p) => p.id === value);
 
   const tierColors: Record<string, string> = {
     ELITE: "#FFD700", A: "#C8C8DC", B: "#CD7F32", C: "#7A9CC8", DEVELOPMENT: "#6EE7B7",
@@ -121,18 +148,28 @@ function PlayerCombobox({
           style={{ width: "var(--radix-popover-trigger-width)", border: `1px solid ${accent}40`, background: "#0A1B35" }}
           align="start"
         >
-          <Command className="bg-transparent">
+          <Command shouldFilter={false} className="bg-transparent">
             <CommandInput
               placeholder="Nome, clube ou posição…"
+              value={inputValue}
+              onValueChange={setInputValue}
               className="border-b text-white placeholder:text-gray-500"
               style={{ borderColor: `${accent}25` }}
             />
             <CommandList className="max-h-[320px]">
-              <CommandEmpty className="py-8 text-center text-sm text-gray-500">
-                Nenhum jogador encontrado.
-              </CommandEmpty>
+              {searching && (
+                <div className="flex items-center justify-center gap-2 py-4 text-xs text-gray-500">
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border border-gray-600 border-t-gray-300" />
+                  Buscando…
+                </div>
+              )}
+              {!searching && displayPlayers.length === 0 && (
+                <CommandEmpty className="py-8 text-center text-sm text-gray-500">
+                  Nenhum jogador encontrado.
+                </CommandEmpty>
+              )}
               <CommandGroup>
-                {players.map((player) => {
+                {displayPlayers.map((player) => {
                   const isSelected = player.id === value;
                   const tierColor = tierColors[player.tier] ?? "#7A9CC8";
                   return (
@@ -142,19 +179,16 @@ function PlayerCombobox({
                       onSelect={() => { onChange(player.id); setOpen(false); }}
                       className="cursor-pointer rounded-[10px] px-3 py-2.5 aria-selected:bg-[rgba(255,255,255,0.06)]"
                     >
-                      {/* OVR */}
                       <div
                         className="mr-3 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[12px] font-black"
                         style={{ background: `${accent}14`, color: isSelected ? accent : "#9CA3AF", border: `1.5px solid ${isSelected ? accent : "rgba(255,255,255,0.1)"}50` }}
                       >
                         {player.overallRating > 0 ? player.overallRating : "–"}
                       </div>
-                      {/* Info */}
                       <div className="min-w-0 flex-1">
                         <p className={`truncate text-sm font-semibold ${isSelected ? "text-white" : "text-gray-200"}`}>{player.name}</p>
                         <p className="truncate text-[11px] text-gray-500">{player.position} · {player.club}</p>
                       </div>
-                      {/* Tier */}
                       <span
                         className="mr-2 flex-shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase"
                         style={{ color: tierColor, borderColor: `${tierColor}44`, background: `${tierColor}12` }}
@@ -505,6 +539,7 @@ export default function Reports() {
                 players={selectablePlayers}
                 variant="A"
                 onChange={(id) => setPlayerA(playersById.get(id) ?? EMPTY_PLAYER)}
+                onSearch={(q) => getReportShortlist({ search: q, limit: 20 }).then((r) => r.data.players)}
               />
               <PlayerCombobox
                 label="Player B"
@@ -512,6 +547,7 @@ export default function Reports() {
                 players={selectablePlayers}
                 variant="B"
                 onChange={(id) => setPlayerB(playersById.get(id) ?? EMPTY_PLAYER)}
+                onSearch={(q) => getReportShortlist({ search: q, limit: 20 }).then((r) => r.data.players)}
               />
             </section>
 

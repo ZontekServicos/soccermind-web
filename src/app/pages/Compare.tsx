@@ -172,6 +172,7 @@ function PlayerCombobox({
   players,
   variant,
   onChange,
+  onSearch,
 }: {
   label: string;
   sublabel: string;
@@ -179,13 +180,39 @@ function PlayerCombobox({
   players: PlayerExtended[];
   variant: "A" | "B";
   onChange: (id: string) => void;
+  onSearch?: (q: string) => Promise<PlayerExtended[]>;
 }) {
   const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
+  const [searchResults, setSearchResults] = useState<PlayerExtended[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const q = inputValue.trim();
+    if (!q || q.length < 2 || !onSearch) { setSearchResults(null); return; }
+    const id = window.setTimeout(() => {
+      setSearching(true);
+      onSearch(q)
+        .then((r) => setSearchResults(r))
+        .catch(() => setSearchResults(null))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => window.clearTimeout(id);
+  }, [inputValue, onSearch]);
+
+  useEffect(() => { if (!open) { setInputValue(""); setSearchResults(null); } }, [open]);
+
+  const displayPlayers = searchResults ?? (
+    inputValue.trim()
+      ? players.filter((p) => `${p.name} ${p.club} ${p.position} ${p.nationality}`.toLowerCase().includes(inputValue.toLowerCase()))
+      : players
+  );
+
   const accent      = variant === "A" ? "#38BDF8" : "#C084FC";
   const accentBg    = variant === "A" ? "rgba(56,189,248,0.08)"  : "rgba(192,132,252,0.08)";
   const accentBorder = variant === "A" ? "rgba(56,189,248,0.28)" : "rgba(192,132,252,0.28)";
   const labelColor  = variant === "A" ? "text-[#9BE7FF]"         : "text-[#D8B4FE]";
-  const selected    = players.find((p) => p.id === value);
+  const selected    = players.find((p) => p.id === value) ?? searchResults?.find((p) => p.id === value);
 
   return (
     <div className="space-y-3">
@@ -235,18 +262,28 @@ function PlayerCombobox({
           style={{ width: "var(--radix-popover-trigger-width)", border: `1px solid ${accent}40`, background: "#0A1B35" }}
           align="start"
         >
-          <Command className="bg-transparent">
+          <Command shouldFilter={false} className="bg-transparent">
             <CommandInput
               placeholder="Nome, clube ou posição…"
+              value={inputValue}
+              onValueChange={setInputValue}
               className="border-b text-white placeholder:text-gray-500"
               style={{ borderColor: `${accent}25` }}
             />
             <CommandList className="max-h-[320px]">
-              <CommandEmpty className="py-8 text-center text-sm text-gray-500">
-                Nenhum jogador encontrado.
-              </CommandEmpty>
+              {searching && (
+                <div className="flex items-center justify-center gap-2 py-4 text-xs text-gray-500">
+                  <div className="h-3.5 w-3.5 animate-spin rounded-full border border-gray-600 border-t-gray-300" />
+                  Buscando…
+                </div>
+              )}
+              {!searching && displayPlayers.length === 0 && (
+                <CommandEmpty className="py-8 text-center text-sm text-gray-500">
+                  Nenhum jogador encontrado.
+                </CommandEmpty>
+              )}
               <CommandGroup>
-                {players.map((player) => {
+                {displayPlayers.map((player) => {
                   const isSelected  = player.id === value;
                   const tierColor   = TIER_COLORS[player.tier] ?? "#7A9CC8";
                   return (
@@ -510,6 +547,7 @@ export default function Compare() {
                 players={selectablePlayers}
                 variant="A"
                 onChange={(id) => setPlayerA(playersById.get(id) ?? EMPTY_PLAYER)}
+                onSearch={(q) => getCompareShortlist({ search: q, limit: 20 }).then((r) => r.data.players)}
               />
 
               {/* VS divider */}
@@ -528,6 +566,7 @@ export default function Compare() {
                 players={selectablePlayers}
                 variant="B"
                 onChange={(id) => setPlayerB(playersById.get(id) ?? EMPTY_PLAYER)}
+                onSearch={(q) => getCompareShortlist({ search: q, limit: 20 }).then((r) => r.data.players)}
               />
             </section>
 
