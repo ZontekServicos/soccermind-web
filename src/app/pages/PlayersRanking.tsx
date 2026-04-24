@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { AppHeader } from "../components/AppHeader";
+import { useLanguage } from "../contexts/LanguageContext";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { AppSidebar } from "../components/AppSidebar";
 import { PlayerAvatar } from "../components/scout/PlayerAvatar";
@@ -95,6 +96,7 @@ function parseSortOrder(searchParams: URLSearchParams): SortOrder {
 }
 
 export default function PlayersRanking() {
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [urlSearchParams, setUrlSearchParams] = useSearchParams();
   const initialFilters = useMemo(() => parseFiltersFromSearchParams(urlSearchParams), []);
@@ -163,7 +165,7 @@ export default function PlayersRanking() {
         if (!active) return;
         setPlayers([]);
         setMeta({});
-        setError(fetchError instanceof Error ? fetchError.message : "Erro ao carregar jogadores");
+        setError(fetchError instanceof Error ? fetchError.message : t("ranking.loadError"));
       } finally {
         if (active) setLoading(false);
       }
@@ -246,7 +248,7 @@ export default function PlayersRanking() {
       setWatchlistIds((current) => new Set(current).add(player.id));
     } catch (watchlistError) {
       setError(
-        watchlistError instanceof Error ? watchlistError.message : "Erro ao atualizar watchlist",
+        watchlistError instanceof Error ? watchlistError.message : t("ranking.watchlistError"),
       );
     }
   };
@@ -299,11 +301,11 @@ export default function PlayersRanking() {
                 <div className="max-w-3xl">
                   <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-[#7FDBFF]">
                     <Crosshair className="h-3.5 w-3.5" />
-                    Scout Intelligence
+                    {t("ranking.badge")}
                   </div>
-                  <h1 className="text-4xl font-semibold text-white">Ranking de Jogadores</h1>
+                  <h1 className="text-4xl font-semibold text-white">{t("ranking.title")}</h1>
                   <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-400">
-                    Jogadores ordenados por overall. Use os filtros para refinar por posição, liga, idade ou valor de mercado.
+                    {t("ranking.subtitle")}
                   </p>
                 </div>
 
@@ -311,12 +313,12 @@ export default function PlayersRanking() {
                   <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4 text-[#00C2FF]" />
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Jogadores</p>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">{t("ranking.players")}</p>
                     </div>
                     <p className="mt-1 text-2xl font-bold text-[#00C2FF]">{meta.total ?? filteredAndSortedPlayers.length}</p>
                   </div>
                   <div className="rounded-[16px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Filtros ativos</p>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">{t("comparison.activeFilters")}</p>
                     <p className="mt-1 text-2xl font-bold text-[#9BE7FF]">{countActiveFilters(committedFilters)}</p>
                   </div>
                 </div>
@@ -344,7 +346,7 @@ export default function PlayersRanking() {
                 className="inline-flex items-center gap-2.5 rounded-[14px] bg-[#00C2FF] px-7 py-3.5 text-sm font-bold text-[#07142A] shadow-[0_4px_20px_rgba(0,194,255,0.35)] transition-all hover:bg-[#33CFFF] hover:shadow-[0_6px_24px_rgba(0,194,255,0.45)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Search className="h-4 w-4" />
-                Aplicar filtros
+                {t("ranking.applyFilters")}
               </button>
               {activeFiltersCount > 0 && (
                 <button
@@ -353,12 +355,12 @@ export default function PlayersRanking() {
                   className="inline-flex items-center gap-2 rounded-[14px] border border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.03)] px-5 py-3.5 text-sm font-medium text-gray-400 transition-all hover:border-[rgba(255,255,255,0.18)] hover:text-gray-200"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
-                  Limpar filtros
+                  {t("ranking.clearFilters")}
                 </button>
               )}
               {isDirty && (
                 <span className="rounded-full border border-[rgba(251,191,36,0.3)] bg-[rgba(251,191,36,0.1)] px-3 py-1.5 text-xs font-semibold text-[#fbbf24]">
-                  Filtros modificados — clique em Buscar para atualizar
+                  {t("ranking.filtersDirty")}
                 </span>
               )}
             </div>
@@ -371,7 +373,7 @@ export default function PlayersRanking() {
 
             {/* ── Sort controls ── */}
             <div className="flex items-center gap-2">
-              <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Ordenar por:</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">{t("ranking.sortBy")}</span>
               {(["overall", "potential", "age"] as SortBy[]).map((field) => (
                 <button
                   key={field}
@@ -384,7 +386,11 @@ export default function PlayersRanking() {
                       : { borderColor: "rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#94a3b8" }
                   }
                 >
-                  {field === "overall" ? "Overall" : field === "potential" ? "Potencial" : "Idade"}
+                  {field === "overall"
+                    ? t("ranking.sortOverall")
+                    : field === "potential"
+                      ? t("ranking.sortPotential")
+                      : t("ranking.sortAge")}
                   {sortBy === field && (
                     <span className="ml-1 opacity-70">{sortOrder === "asc" ? "↑" : "↓"}</span>
                   )}
@@ -494,7 +500,7 @@ export default function PlayersRanking() {
                             <span className="text-3xl font-black tabular-nums" style={{ color: medal.color }}>
                               {player.overall ?? "—"}
                             </span>
-                            <span className="text-xs font-medium text-gray-500">OVR</span>
+                            <span className="text-xs font-medium text-gray-500">{t("ranking.ovr")}</span>
                           </div>
 
                           <div className="my-3 w-full border-t" style={{ borderColor: "rgba(255,255,255,0.07)" }} />
@@ -505,7 +511,7 @@ export default function PlayersRanking() {
                             </span>
                             {player.potential != null && (
                               <span className="text-gray-500">
-                                POT <span className="font-semibold text-gray-300">{player.potential}</span>
+                                {t("ranking.pot")} <span className="font-semibold text-gray-300">{player.potential}</span>
                               </span>
                             )}
                           </div>
@@ -560,7 +566,7 @@ export default function PlayersRanking() {
                           {/* OVR bar */}
                           <div className="hidden w-24 shrink-0 sm:block">
                             <div className="mb-1 flex justify-between">
-                              <span className="text-[10px] text-gray-600">OVR</span>
+                              <span className="text-[10px] text-gray-600">{t("ranking.ovr")}</span>
                               <span className="text-[11px] font-bold" style={{ color: barColor }}>{player.overall ?? "—"}</span>
                             </div>
                             <div className="h-1 w-full rounded-full bg-[rgba(255,255,255,0.07)]">
@@ -572,11 +578,11 @@ export default function PlayersRanking() {
                           <div className="hidden shrink-0 items-center gap-5 md:flex">
                             <div className="text-center">
                               <p className="text-sm font-bold tabular-nums text-white">{player.potential ?? "—"}</p>
-                              <p className="text-[9px] uppercase tracking-widest text-gray-600">POT</p>
+                              <p className="text-[9px] uppercase tracking-widest text-gray-600">{t("ranking.pot")}</p>
                             </div>
                             <div className="text-center">
                               <p className="text-sm font-bold tabular-nums text-white">{player.age ?? "—"}</p>
-                              <p className="text-[9px] uppercase tracking-widest text-gray-600">Age</p>
+                              <p className="text-[9px] uppercase tracking-widest text-gray-600">{t("ranking.age")}</p>
                             </div>
                           </div>
 
@@ -611,12 +617,12 @@ export default function PlayersRanking() {
                 <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,255,255,0.03)]">
                   <Search className="h-7 w-7 text-gray-600" />
                 </div>
-                <p className="text-sm text-gray-500">Nenhum jogador encontrado com os filtros aplicados.</p>
+                <p className="text-sm text-gray-500">{t("ranking.empty")}</p>
                 <button
                   onClick={handleClearFilters}
                   className="mt-4 text-xs text-[#00C2FF] underline-offset-2 hover:underline"
                 >
-                  Limpar filtros e tentar novamente
+                  {t("ranking.clearAndRetry")}
                 </button>
               </div>
             )}
@@ -629,12 +635,14 @@ export default function PlayersRanking() {
                 className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
               >
                 <ChevronLeft className="h-4 w-4" />
-                Anterior
+                {t("ranking.prevPage")}
               </button>
               <span className="text-sm text-gray-500">
-                Página {meta.page ?? committedPage} de {meta.totalPages ?? 1}
+                {t("ranking.pageOf", { page: meta.page ?? committedPage, totalPages: meta.totalPages ?? 1 })}
                 {meta.total != null && (
-                  <span className="ml-3 text-[#00C2FF]">{meta.total} jogador{meta.total !== 1 ? "es" : ""}</span>
+                  <span className="ml-3 text-[#00C2FF]">
+                    {t(meta.total !== 1 ? "ranking.playerCountPlural" : "ranking.playerCount", { total: meta.total })}
+                  </span>
                 )}
               </span>
               <button
@@ -643,7 +651,7 @@ export default function PlayersRanking() {
                 disabled={loading || (meta.totalPages !== undefined && committedPage >= meta.totalPages)}
                 className="inline-flex items-center gap-2 rounded-[10px] border border-[rgba(255,255,255,0.08)] px-4 py-2 text-sm text-gray-300 disabled:opacity-40"
               >
-                Próxima
+                {t("ranking.nextPage")}
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>

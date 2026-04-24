@@ -334,5 +334,31 @@
     "sort_name_asc": "Nome (A-Z)",
     "sort_name_desc": "Nome (Z-A)",
     "months": "{n} meses"
+  },
+  "ranking": {
+    "title": "Ranking de Jogadores",
+    "badge": "Scout Intelligence",
+    "subtitle": "Jogadores ordenados por overall. Use os filtros para refinar por posição, liga, idade ou valor de mercado.",
+    "players": "Jogadores",
+    "applyFilters": "Aplicar filtros",
+    "clearFilters": "Limpar filtros",
+    "filtersDirty": "Filtros modificados — clique em Aplicar para atualizar",
+    "sortBy": "Ordenar por:",
+    "sortOverall": "Overall",
+    "sortPotential": "Potencial",
+    "sortAge": "Idade",
+    "ovr": "OVR",
+    "pot": "POT",
+    "age": "Idade",
+    "view": "Ver →",
+    "empty": "Nenhum jogador encontrado com os filtros aplicados.",
+    "clearAndRetry": "Limpar filtros e tentar novamente",
+    "prevPage": "Anterior",
+    "nextPage": "Próxima",
+    "pageOf": "Página {page} de {totalPages}",
+    "playerCount": "{total} jogador",
+    "playerCountPlural": "{total} jogadores",
+    "loadError": "Erro ao carregar jogadores",
+    "watchlistError": "Erro ao atualizar watchlist"
   }
 }

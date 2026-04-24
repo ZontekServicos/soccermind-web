@@ -334,5 +334,31 @@
     "sort_name_asc": "Name (A-Z)",
     "sort_name_desc": "Name (Z-A)",
     "months": "{n} months"
+  },
+  "ranking": {
+    "title": "Players Ranking",
+    "badge": "Scout Intelligence",
+    "subtitle": "Players sorted by overall rating. Use filters to refine by position, league, age or market value.",
+    "players": "Players",
+    "applyFilters": "Apply filters",
+    "clearFilters": "Clear filters",
+    "filtersDirty": "Filters modified — click Apply to update",
+    "sortBy": "Sort by:",
+    "sortOverall": "Overall",
+    "sortPotential": "Potential",
+    "sortAge": "Age",
+    "ovr": "OVR",
+    "pot": "POT",
+    "age": "Age",
+    "view": "View →",
+    "empty": "No players found with the applied filters.",
+    "clearAndRetry": "Clear filters and try again",
+    "prevPage": "Previous",
+    "nextPage": "Next",
+    "pageOf": "Page {page} of {totalPages}",
+    "playerCount": "{total} player",
+    "playerCountPlural": "{total} players",
+    "loadError": "Error loading players",
+    "watchlistError": "Error updating watchlist"
   }
 }
