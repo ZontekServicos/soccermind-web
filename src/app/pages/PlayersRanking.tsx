@@ -6,7 +6,6 @@ import {
   RotateCcw,
   Search,
   Star,
-  TrendingUp,
   Users,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -14,8 +13,6 @@ import { AppHeader } from "../components/AppHeader";
 import { PlayersFiltersPanel } from "../components/PlayersFiltersPanel";
 import { AppSidebar } from "../components/AppSidebar";
 import { PlayerAvatar } from "../components/scout/PlayerAvatar";
-import { ScorePill } from "../components/scout/ScoreBadge";
-import { PlayerLevelBadge } from "../components/scout/LabelBadge";
 import type { PlayerCardModel } from "../mappers/player.mapper";
 import { getRankingData } from "../services/ranking";
 import { type PlayerFilterOptions, type PlayersResponseMeta } from "../services/players";
@@ -65,6 +62,20 @@ function getPositionColor(position: string): string {
   };
   return colors[position] ?? "#94a3b8";
 }
+
+function ovrBarColor(ovr: number | null) {
+  if (!ovr) return "#4b5563";
+  if (ovr >= 85) return "#FFD700";
+  if (ovr >= 75) return "#00C2FF";
+  if (ovr >= 65) return "#00FF9C";
+  return "#7A9CC8";
+}
+
+const MEDAL: Record<number, { color: string; border: string; glow: string; bg: string; rankBg: string }> = {
+  1: { color: "#FFD700", border: "rgba(255,215,0,0.40)", glow: "0 0 48px rgba(255,215,0,0.22), 0 8px 32px rgba(0,0,0,0.4)", bg: "linear-gradient(160deg,rgba(30,22,0,0.98) 0%,rgba(20,16,0,0.96) 100%)", rankBg: "rgba(255,215,0,0.15)" },
+  2: { color: "#C8C8DC", border: "rgba(200,200,220,0.35)", glow: "0 0 36px rgba(200,200,220,0.16), 0 8px 32px rgba(0,0,0,0.4)", bg: "linear-gradient(160deg,rgba(20,20,30,0.98) 0%,rgba(14,14,22,0.96) 100%)", rankBg: "rgba(200,200,220,0.12)" },
+  3: { color: "#CD7F32", border: "rgba(205,127,50,0.35)", glow: "0 0 36px rgba(205,127,50,0.16), 0 8px 32px rgba(0,0,0,0.4)", bg: "linear-gradient(160deg,rgba(22,14,4,0.98) 0%,rgba(16,10,2,0.96) 100%)", rankBg: "rgba(205,127,50,0.13)" },
+};
 
 function parsePage(searchParams: URLSearchParams) {
   const rawValue = Number(searchParams.get("page") ?? "1");
@@ -267,6 +278,13 @@ export default function PlayersRanking() {
     setCommittedPage(1);
   };
 
+  const baseRank = (committedPage - 1) * limit + 1;
+  const podiumPlayers = committedPage === 1 ? filteredAndSortedPlayers.slice(0, 3) : [];
+  const listPlayers = committedPage === 1 ? filteredAndSortedPlayers.slice(3) : filteredAndSortedPlayers;
+  const maxOvr = filteredAndSortedPlayers.length
+    ? Math.max(...filteredAndSortedPlayers.map((p) => p.overall ?? 0), 1)
+    : 1;
+
   return (
     <div className="flex h-screen bg-[#07142A]">
       <AppSidebar />
@@ -376,130 +394,215 @@ export default function PlayersRanking() {
 
             {/* ── Loading skeleton ── */}
             {loading && (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="animate-pulse rounded-[20px] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] p-5"
-                    style={{ height: 220 }}
-                  />
+              <div className="space-y-3">
+                <div className="grid grid-cols-3 gap-4">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="animate-pulse rounded-[20px] bg-[rgba(255,255,255,0.03)]"
+                      style={{ height: i === 1 ? 300 : 240 }}
+                    />
+                  ))}
+                </div>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="animate-pulse rounded-[12px] bg-[rgba(255,255,255,0.02)]" style={{ height: 68 }} />
                 ))}
               </div>
             )}
 
-            {/* ── Cards grid ── */}
+            {/* ── Rank layout ── */}
             {!loading && filteredAndSortedPlayers.length > 0 && (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {filteredAndSortedPlayers.map((player, index) => {
-                  const rank = (committedPage - 1) * limit + index + 1;
-                  const posColor = getPositionColor(player.position ?? "");
-                  const isWatchlisted = watchlistIds.has(player.id);
-                  const hasPotentialGrowth =
-                    player.potential !== null && player.overall !== null && player.potential > player.overall + 5;
+              <div className="space-y-3">
 
-                  return (
-                    <article
-                      key={`${player.id ?? player.name}-${index}`}
-                      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-[20px] border transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_60px_rgba(0,0,0,0.55)]"
-                      style={{
-                        background: "linear-gradient(160deg, rgba(10,27,53,0.98) 0%, rgba(7,20,42,0.96) 100%)",
-                        borderColor: "rgba(0,194,255,0.18)",
-                        boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-                      }}
-                      onClick={() => navigate(`/players/${player.id}`)}
-                    >
-                      {/* Top glow strip */}
-                      <div
-                        className="absolute left-0 right-0 top-0 h-[2px] opacity-60"
-                        style={{ background: "linear-gradient(90deg, transparent, rgba(0,194,255,0.7), transparent)" }}
-                      />
+                {/* Podium — top 3 (page 1 only) */}
+                {podiumPlayers.length > 0 && (
+                  <div className="grid grid-cols-3 items-end gap-4 pb-2">
+                    {[1, 0, 2].map((playerIdx, colIdx) => {
+                      const player = podiumPlayers[playerIdx];
+                      if (!player) return <div key={colIdx} />;
+                      const rank = playerIdx + 1;
+                      const medal = MEDAL[rank];
+                      const posColor = getPositionColor(player.position ?? "");
+                      const isWatchlisted = watchlistIds.has(player.id);
+                      const isFirst = rank === 1;
 
-                      <div className="flex flex-col gap-4 p-5">
-                        {/* Row 1 — rank + level + watchlist */}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold"
-                              style={{ background: "rgba(255,255,255,0.06)", color: "#94a3b8" }}
-                            >
-                              {rank}
-                            </span>
-                            <PlayerLevelBadge overall={player.overall} />
+                      return (
+                        <article
+                          key={player.id}
+                          className="relative flex cursor-pointer flex-col items-center overflow-hidden rounded-[24px] border transition-all duration-300 hover:-translate-y-1"
+                          style={{
+                            background: medal.bg,
+                            borderColor: medal.border,
+                            boxShadow: medal.glow,
+                            padding: isFirst ? "2.5rem 1.5rem 1.5rem" : "1.75rem 1.5rem 1.5rem",
+                          }}
+                          onClick={() => navigate(`/players/${player.id}`)}
+                        >
+                          {/* Top accent strip */}
+                          <div
+                            className="absolute left-0 right-0 top-0 h-[2px]"
+                            style={{ background: `linear-gradient(90deg, transparent, ${medal.color}, transparent)` }}
+                          />
+
+                          {/* Rank badge */}
+                          <div
+                            className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-sm font-black"
+                            style={{ background: medal.rankBg, color: medal.color, border: `1.5px solid ${medal.color}40` }}
+                          >
+                            {rank}
                           </div>
+
+                          {/* Watchlist */}
                           <button
-                            className={`inline-flex h-7 w-7 items-center justify-center rounded-[8px] border transition-all ${
+                            className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-[8px] border transition-all"
+                            style={
                               isWatchlisted
-                                ? "border-[#fbbf24] bg-[#fbbf24]/15 text-[#fbbf24]"
-                                : "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] text-gray-500 opacity-0 group-hover:opacity-100"
+                                ? { borderColor: "#fbbf24", background: "rgba(251,191,36,0.15)", color: "#fbbf24" }
+                                : { borderColor: "rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#6b7280" }
+                            }
+                            onClick={(e) => { e.stopPropagation(); void handleWatchlistToggle(player); }}
+                          >
+                            <Star className="h-3.5 w-3.5" fill={isWatchlisted ? "currentColor" : "none"} />
+                          </button>
+
+                          {isFirst && (
+                            <div className="mb-2 select-none text-xl leading-none">👑</div>
+                          )}
+
+                          <PlayerAvatar
+                            name={player.name}
+                            image={player.image}
+                            overall={player.overall}
+                            size={isFirst ? "lg" : "md"}
+                          />
+
+                          <h3
+                            className="mt-3 line-clamp-2 text-center text-sm font-bold leading-tight"
+                            style={{ color: isFirst ? medal.color : "rgba(255,255,255,0.92)" }}
+                          >
+                            {player.name}
+                          </h3>
+
+                          <span
+                            className="mt-1 rounded px-2 py-0.5 text-[10px] font-semibold"
+                            style={{ background: `${posColor}20`, color: posColor }}
+                          >
+                            {player.position ? positionLabel(player.position) : "—"}
+                          </span>
+
+                          <div className="mt-3 flex items-baseline gap-1">
+                            <span className="text-3xl font-black tabular-nums" style={{ color: medal.color }}>
+                              {player.overall ?? "—"}
+                            </span>
+                            <span className="text-xs font-medium text-gray-500">OVR</span>
+                          </div>
+
+                          <div className="my-3 w-full border-t" style={{ borderColor: "rgba(255,255,255,0.07)" }} />
+
+                          <div className="flex w-full items-center justify-between text-xs">
+                            <span className="font-bold" style={{ color: "#00FF9C" }}>
+                              {formatMarketValue(player.marketValue)}
+                            </span>
+                            {player.potential != null && (
+                              <span className="text-gray-500">
+                                POT <span className="font-semibold text-gray-300">{player.potential}</span>
+                              </span>
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* List — ranks 4+ (or all on page 2+) */}
+                {listPlayers.length > 0 && (
+                  <div className="overflow-hidden rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(7,20,42,0.7)]">
+                    {listPlayers.map((player, index) => {
+                      const rank = baseRank + (committedPage === 1 ? 3 : 0) + index;
+                      const posColor = getPositionColor(player.position ?? "");
+                      const isWatchlisted = watchlistIds.has(player.id);
+                      const ovrPct = Math.round(((player.overall ?? 0) / maxOvr) * 100);
+                      const barColor = ovrBarColor(player.overall);
+
+                      return (
+                        <div
+                          key={`${player.id}-${index}`}
+                          className="group flex cursor-pointer items-center gap-4 border-b border-[rgba(255,255,255,0.04)] px-5 py-3.5 transition-colors last:border-b-0 hover:bg-[rgba(255,255,255,0.03)]"
+                          onClick={() => navigate(`/players/${player.id}`)}
+                        >
+                          {/* Rank */}
+                          <div className="w-7 shrink-0 text-right">
+                            <span className="text-sm font-bold tabular-nums text-gray-500">{rank}</span>
+                          </div>
+
+                          {/* Avatar */}
+                          <PlayerAvatar name={player.name} image={player.image} overall={player.overall} size="sm" />
+
+                          {/* Identity */}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm font-bold text-white transition-colors group-hover:text-[#00C2FF]">
+                                {player.name}
+                              </span>
+                              <span
+                                className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold"
+                                style={{ background: `${posColor}18`, color: posColor }}
+                              >
+                                {player.position ? positionLabel(player.position) : "—"}
+                              </span>
+                            </div>
+                            <p className="truncate text-[11px] text-gray-600">
+                              {[player.team, player.league].filter(Boolean).join(" · ") || "—"}
+                            </p>
+                          </div>
+
+                          {/* OVR bar */}
+                          <div className="hidden w-24 shrink-0 sm:block">
+                            <div className="mb-1 flex justify-between">
+                              <span className="text-[10px] text-gray-600">OVR</span>
+                              <span className="text-[11px] font-bold" style={{ color: barColor }}>{player.overall ?? "—"}</span>
+                            </div>
+                            <div className="h-1 w-full rounded-full bg-[rgba(255,255,255,0.07)]">
+                              <div className="h-1 rounded-full" style={{ width: `${ovrPct}%`, background: barColor }} />
+                            </div>
+                          </div>
+
+                          {/* POT + Age */}
+                          <div className="hidden shrink-0 items-center gap-5 md:flex">
+                            <div className="text-center">
+                              <p className="text-sm font-bold tabular-nums text-white">{player.potential ?? "—"}</p>
+                              <p className="text-[9px] uppercase tracking-widest text-gray-600">POT</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-sm font-bold tabular-nums text-white">{player.age ?? "—"}</p>
+                              <p className="text-[9px] uppercase tracking-widest text-gray-600">Age</p>
+                            </div>
+                          </div>
+
+                          {/* Value */}
+                          <div className="shrink-0">
+                            <span className="text-sm font-semibold" style={{ color: "#00FF9C" }}>
+                              {formatMarketValue(player.marketValue)}
+                            </span>
+                          </div>
+
+                          {/* Watchlist */}
+                          <button
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border transition-all ${
+                              isWatchlisted
+                                ? "border-[#fbbf24] bg-[rgba(251,191,36,0.15)] text-[#fbbf24]"
+                                : "border-[rgba(255,255,255,0.08)] bg-transparent text-gray-600 opacity-0 group-hover:opacity-100"
                             }`}
                             onClick={(e) => { e.stopPropagation(); void handleWatchlistToggle(player); }}
                           >
                             <Star className="h-3.5 w-3.5" fill={isWatchlisted ? "currentColor" : "none"} />
                           </button>
                         </div>
-
-                        {/* Row 2 — avatar + identity */}
-                        <div className="flex items-start gap-3">
-                          <PlayerAvatar name={player.name} image={player.image} overall={player.overall} size="md" />
-                          <div className="min-w-0 flex-1">
-                            <h3 className="truncate text-base font-bold text-white transition-colors group-hover:text-[#00C2FF]">
-                              {player.name}
-                            </h3>
-                            <p className="mt-0.5 text-xs text-gray-400">
-                              <span
-                                className="mr-1.5 rounded px-1.5 py-0.5 text-[10px] font-semibold"
-                                style={{ background: `${posColor}18`, color: posColor }}
-                              >
-                                {player.position ? positionLabel(player.position) : "—"}
-                              </span>
-                              {player.age != null ? `${player.age} anos` : "—"}
-                              {player.nationality ? ` · ${player.nationality}` : ""}
-                            </p>
-                            {(player.team || player.league) && (
-                              <p className="mt-0.5 truncate text-[11px] text-gray-500">
-                                {[player.team, player.league].filter(Boolean).join(" · ")}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Row 3 — score metrics */}
-                        <div
-                          className="grid grid-cols-3 gap-2 rounded-[12px] px-3 py-3"
-                          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}
-                        >
-                          <div className="flex flex-col items-center gap-1">
-                            <ScorePill value={player.overall} />
-                            <span className="text-[9px] uppercase tracking-[0.18em] text-gray-500">Overall</span>
-                          </div>
-                          <div className="relative flex flex-col items-center gap-1 before:absolute before:left-0 before:top-1/2 before:h-8 before:-translate-y-1/2 before:w-px before:bg-[rgba(255,255,255,0.06)] after:absolute after:right-0 after:top-1/2 after:h-8 after:-translate-y-1/2 after:w-px after:bg-[rgba(255,255,255,0.06)]">
-                            <div className="flex items-center gap-1">
-                              <ScorePill value={player.potential} />
-                              {hasPotentialGrowth && <TrendingUp className="h-3 w-3 text-[#00FF9C]" />}
-                            </div>
-                            <span className="text-[9px] uppercase tracking-[0.18em] text-gray-500">Potencial</span>
-                          </div>
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-xl font-bold tabular-nums text-gray-300">
-                              {player.age ?? "—"}
-                            </span>
-                            <span className="text-[9px] uppercase tracking-[0.18em] text-gray-500">Anos</span>
-                          </div>
-                        </div>
-
-                        {/* Row 4 — footer */}
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-[#00FF9C]">
-                            {formatMarketValue(player.marketValue)}
-                          </span>
-                          <span className="rounded-[8px] bg-[rgba(0,194,255,0.1)] px-2.5 py-1 text-[11px] font-semibold text-[#00C2FF] opacity-0 transition-opacity group-hover:opacity-100">
-                            Ver →
-                          </span>
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
