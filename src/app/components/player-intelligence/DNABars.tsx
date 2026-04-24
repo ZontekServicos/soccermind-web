@@ -47,7 +47,7 @@ export function DNABars({ dna, limit = 5 }: DNABarsProps) {
                   <p className="text-sm font-semibold text-white">{trait.label}</p>
                   {trait.emphasis ? (
                     <span className="rounded-full border border-[rgba(255,255,255,0.08)] px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] text-gray-400">
-                      {trait.emphasis}
+                      {translate(`dna.emphasis.${trait.emphasis}`) || trait.emphasis}
                     </span>
                   ) : null}
                 </div>

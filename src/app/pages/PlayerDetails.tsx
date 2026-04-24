@@ -134,7 +134,7 @@ function PlayerAvatar({ name, imageUrl }: { name: string; imageUrl?: string | nu
 export default function PlayerDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { user } = useAuth();
   const [player, setPlayer] = useState<PlayerProfileModel | null>(null);
   const [similarPlayers, setSimilarPlayers] = useState<PlayerCardModel[]>([]);
@@ -214,27 +214,27 @@ export default function PlayerDetails() {
     () =>
       profile
         ? [
-            { label: "Ball Striking", value: profile.technical.ballStriking },
-            { label: "Passing", value: profile.technical.passing },
-            { label: "Carrying", value: profile.technical.carrying },
-            { label: "First Touch", value: profile.technical.firstTouch },
-            { label: "Creativity", value: profile.technical.creativity },
+            { label: t("metrics.ballStriking"), value: profile.technical.ballStriking },
+            { label: t("metrics.passing"),      value: profile.technical.passing },
+            { label: t("metrics.carrying"),     value: profile.technical.carrying },
+            { label: t("metrics.firstTouch"),   value: profile.technical.firstTouch },
+            { label: t("metrics.creativity"),   value: profile.technical.creativity },
           ]
         : [],
-    [profile],
+    [profile, language],
   );
   const physicalMetrics = useMemo(
     () =>
       profile
         ? [
-            { label: "Acceleration", value: profile.physical.acceleration },
-            { label: "Sprint Speed", value: profile.physical.sprintSpeed },
-            { label: "Agility", value: profile.physical.agility },
-            { label: "Strength", value: profile.physical.strength },
-            { label: "Stamina", value: profile.physical.stamina },
+            { label: t("metrics.acceleration"), value: profile.physical.acceleration },
+            { label: t("metrics.sprintSpeed"),  value: profile.physical.sprintSpeed },
+            { label: t("metrics.agility"),      value: profile.physical.agility },
+            { label: t("metrics.strength"),     value: profile.physical.strength },
+            { label: t("metrics.stamina"),      value: profile.physical.stamina },
           ]
         : [],
-    [profile],
+    [profile, language],
   );
 
   async function handleWatchlistToggle() {
@@ -339,10 +339,13 @@ export default function PlayerDetails() {
                       {(() => {
                         const ovr = player.overall ?? null;
                         const tiers: Array<[number, string, string]> = [
-                          [90, "Ícone",    "#FFD700"], [85, "Elite",    "#00FF9C"],
-                          [80, "Premium",  "#00C2FF"], [75, "Destaque", "#7A5CFF"],
-                          [70, "Regular",  "#FBBF24"], [65, "Básico",   "#94a3b8"],
-                          [0,  "Promessa", "#C084FC"],
+                          [90, t("player.tierIcon"),     "#FFD700"],
+                          [85, t("player.tierElite"),    "#00FF9C"],
+                          [78, t("player.tierPremium"),  "#00C2FF"],
+                          [70, t("player.tierStandout"), "#7A5CFF"],
+                          [62, t("player.tierRegular"),  "#FBBF24"],
+                          [54, t("player.tierBasic"),    "#94a3b8"],
+                          [0,  t("player.tierProspect"), "#C084FC"],
                         ];
                         const [, label, color] = tiers.find(([min]) => (ovr ?? 0) >= min) ?? tiers[tiers.length - 1];
                         return (
@@ -368,14 +371,17 @@ export default function PlayerDetails() {
                       <span className="rounded-full border border-[rgba(168,85,247,0.22)] bg-[rgba(168,85,247,0.10)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#E9D5FF]">
                         {profile.dna.archetype}
                       </span>
-                      {profile.dna.dominantTraits.slice(0, 2).map((trait) => (
-                        <span
-                          key={trait}
-                          className="rounded-full border border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.08)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9BE7FF]"
-                        >
-                          {trait}
-                        </span>
-                      ))}
+                      {profile.dna.dominantTraits
+                        .filter((trait) => trait.toLowerCase() !== profile.dna.archetype.toLowerCase())
+                        .slice(0, 2)
+                        .map((trait) => (
+                          <span
+                            key={trait}
+                            className="rounded-full border border-[rgba(0,194,255,0.22)] bg-[rgba(0,194,255,0.08)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9BE7FF]"
+                          >
+                            {trait}
+                          </span>
+                        ))}
                     </div>
                   </div>
                 </div>
@@ -413,7 +419,7 @@ export default function PlayerDetails() {
                       }`}
                     >
                       <BookmarkPlus className="h-4 w-4 shrink-0" />
-                      {savedToHistory ? "Salvo ✓" : saveLoading ? "Salvando..." : "Histórico"}
+                      {savedToHistory ? t("player.historySaved") : saveLoading ? t("player.historySaving") : t("player.addToHistory")}
                     </button>
                   </div>
                 </div>
@@ -581,7 +587,7 @@ export default function PlayerDetails() {
                     >
                       <p className="font-semibold text-white">{similarPlayer.name}</p>
                       <p className="mt-1 text-sm text-gray-400">
-                        {similarPlayer.position ? positionLabel(similarPlayer.position) : "-"} • {(similarPlayer.team || "Sem clube")}
+                        {similarPlayer.position ? positionLabel(similarPlayer.position) : "-"} • {(similarPlayer.team || t("player.noClub"))}
                       </p>
                       <p className="mt-3 text-xs uppercase tracking-[0.18em] text-[#B6FFD8]">
                         {formatMarketValue(similarPlayer.marketValue)}

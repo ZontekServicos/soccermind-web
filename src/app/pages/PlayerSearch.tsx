@@ -65,10 +65,10 @@ function getPlayerLevel(overall: number | null) {
   const ovr = overall ?? 0;
   if (ovr >= 90) return { label: "Ícone",    color: "#FFD700", bg: "rgba(255,215,0,0.12)",   border: "rgba(255,215,0,0.30)"  };
   if (ovr >= 85) return { label: "Elite",    color: "#00FF9C", bg: "rgba(0,255,156,0.10)",   border: "rgba(0,255,156,0.28)"  };
-  if (ovr >= 80) return { label: "Premium",  color: "#00C2FF", bg: "rgba(0,194,255,0.10)",   border: "rgba(0,194,255,0.26)"  };
-  if (ovr >= 75) return { label: "Destaque", color: "#7A5CFF", bg: "rgba(122,92,255,0.11)",  border: "rgba(122,92,255,0.26)" };
-  if (ovr >= 70) return { label: "Regular",  color: "#FBBF24", bg: "rgba(251,191,36,0.10)",  border: "rgba(251,191,36,0.26)" };
-  if (ovr >= 65) return { label: "Básico",   color: "#94a3b8", bg: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.22)" };
+  if (ovr >= 78) return { label: "Premium",  color: "#00C2FF", bg: "rgba(0,194,255,0.10)",   border: "rgba(0,194,255,0.26)"  };
+  if (ovr >= 70) return { label: "Destaque", color: "#7A5CFF", bg: "rgba(122,92,255,0.11)",  border: "rgba(122,92,255,0.26)" };
+  if (ovr >= 62) return { label: "Regular",  color: "#FBBF24", bg: "rgba(251,191,36,0.10)",  border: "rgba(251,191,36,0.26)" };
+  if (ovr >= 54) return { label: "Básico",   color: "#94a3b8", bg: "rgba(148,163,184,0.08)", border: "rgba(148,163,184,0.22)" };
   return           { label: "Promessa",   color: "#C084FC", bg: "rgba(192,132,252,0.09)",  border: "rgba(192,132,252,0.24)" };
 }
 

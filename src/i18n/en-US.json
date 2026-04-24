@@ -121,7 +121,17 @@
     "relatedPlayersTitle": "Follow-up alternatives",
     "relatedPlayersDescription": "Fast pivots if the main target leaves the board.",
     "compareWithAnother": "Compare with another player",
-    "addToReport": "Add to report"
+    "addToReport": "Add to report",
+    "tierIcon": "Icon",
+    "tierElite": "Elite",
+    "tierPremium": "Premium",
+    "tierStandout": "Standout",
+    "tierRegular": "Regular",
+    "tierBasic": "Basic",
+    "tierProspect": "Prospect",
+    "historySaved": "Saved ✓",
+    "historySaving": "Saving...",
+    "addToHistory": "History"
   },
   "comparison": {
     "title": "Player Comparison",
@@ -204,7 +214,13 @@
     "quickTake": "Quick take"
   },
   "dna": {
-    "title": "SoccerMind DNA"
+    "title": "SoccerMind DNA",
+    "emphasis": {
+      "elite": "Elite",
+      "strong": "Strong",
+      "stable": "Stable",
+      "developing": "Developing"
+    }
   },
   "decision": {
     "title": "Final Decision",

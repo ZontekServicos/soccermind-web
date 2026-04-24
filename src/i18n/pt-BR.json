@@ -121,7 +121,17 @@
     "relatedPlayersTitle": "Alternativas de acompanhamento",
     "relatedPlayersDescription": "Pivôs rápidos caso o alvo principal saia do radar.",
     "compareWithAnother": "Comparar com outro jogador",
-    "addToReport": "Adicionar ao relatório"
+    "addToReport": "Adicionar ao relatório",
+    "tierIcon": "Ícone",
+    "tierElite": "Elite",
+    "tierPremium": "Premium",
+    "tierStandout": "Destaque",
+    "tierRegular": "Regular",
+    "tierBasic": "Básico",
+    "tierProspect": "Promessa",
+    "historySaved": "Salvo ✓",
+    "historySaving": "Salvando...",
+    "addToHistory": "Histórico"
   },
   "comparison": {
     "title": "Comparação de Jogadores",
@@ -204,7 +214,13 @@
     "quickTake": "Leitura rápida"
   },
   "dna": {
-    "title": "DNA SoccerMind"
+    "title": "DNA SoccerMind",
+    "emphasis": {
+      "elite": "Elite",
+      "strong": "Forte",
+      "stable": "Estável",
+      "developing": "Em Desenvolvimento"
+    }
   },
   "decision": {
     "title": "Decisão Final",
