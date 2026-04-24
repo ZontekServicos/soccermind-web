@@ -204,7 +204,27 @@ function GemCard({ gem, index }: { gem: HiddenGemEntry; index: number }) {
         boxShadow: `0 4px 24px rgba(0,0,0,0.35), inset 0 0 80px ${labelCfg.glow}`,
         animationDelay: `${index * 40}ms`,
       }}
-      onClick={() => navigate(`/player/${gem.id}`)}
+      onClick={() =>
+        navigate(`/player/${gem.id}`, {
+          state: {
+            source: "hidden-gems",
+            gem: {
+              scoutingLabel:  gem.scoutingScore.label,
+              overall:        gem.overall,
+              potential:      gem.potential,
+              marketValue:    gem.marketValue,
+              valueScore:     gem.valueScore,
+              trendDirection: gem.trendDirection,
+              trendDelta:     gem.trendDelta,
+              seasonCount:    gem.seasonCount,
+              nationality:    gem.nationality,
+              positions:      gem.positions,
+              breakdown:      gem.scoutingScore.breakdown,
+              dnaScore:       gem.dnaScore,
+            },
+          },
+        })
+      }
     >
       {/* Top glow strip */}
       <div

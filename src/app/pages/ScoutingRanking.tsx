@@ -58,7 +58,28 @@ function PlayerCard({ entry, rank }: { entry: ScoutingRankingEntry; rank: number
         borderColor: cfg.border,
         boxShadow: `0 8px 32px rgba(0,0,0,0.3), inset 0 0 60px ${cfg.glow}`,
       }}
-      onClick={() => navigate(`/player/${entry.playerId}`)}
+      onClick={() =>
+        navigate(`/player/${entry.playerId}`, {
+          state: {
+            source: "scouting-ranking",
+            entry: {
+              rank:           entry.rank,
+              scoutingLabel:  entry.scoutingLabel,
+              overall:        entry.overall,
+              potential:      entry.potential,
+              marketValue:    entry.marketValue,
+              trendDirection: entry.trendDirection,
+              slopePerYear:   entry.slopePerYear,
+              scoutingTotal:  entry.scoutingTotal,
+              trendDelta:     entry.trendDelta,
+              seasonCount:    entry.seasonCount,
+              positions:      entry.positions,
+              nationality:    entry.nationality,
+              breakdown:      entry.breakdown,
+            },
+          },
+        })
+      }
     >
       {/* Top glow strip */}
       <div
