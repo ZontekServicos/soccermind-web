@@ -7,6 +7,7 @@ import {
   Clock,
   Crosshair,
   Heart,
+  Info,
   RotateCcw,
   Search,
   ShieldAlert,
@@ -111,6 +112,55 @@ function generateNarrative(inj: InjuryEntry): string[] {
   );
 
   return lines;
+}
+
+// ─── Medical disclaimer ───────────────────────────────────────────────────────
+
+function MedicalDisclaimer({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <div
+        className="flex items-start gap-2 rounded-[12px] px-3 py-2.5"
+        style={{ background: "rgba(251,191,36,0.07)", border: "1px solid rgba(251,191,36,0.22)" }}
+      >
+        <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-[#FBBF24]" />
+        <p className="text-[11px] leading-relaxed text-[#FBBF24]/80">
+          <span className="font-bold text-[#FBBF24]">Análise paliativa — </span>
+          estas informações são de caráter orientativo. Não substituem a avaliação clínica de um fisioterapeuta ou médico do esporte.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-[16px] border px-5 py-4"
+      style={{
+        borderColor: "rgba(251,191,36,0.28)",
+        background: "linear-gradient(135deg, rgba(251,191,36,0.07) 0%, rgba(251,146,60,0.04) 100%)",
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+          style={{ background: "rgba(251,191,36,0.15)", border: "1px solid rgba(251,191,36,0.3)" }}
+        >
+          <AlertTriangle className="h-4 w-4 text-[#FBBF24]" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-bold text-[#FBBF24]">Aviso Médico Importante</p>
+          <p className="text-xs leading-relaxed text-gray-300">
+            As análises desta plataforma são de caráter <span className="font-semibold text-[#FBBF24]">paliativo e orientativo</span>, baseadas em dados estatísticos de lesões no futebol.
+            Elas <span className="font-semibold text-white">não substituem</span> a avaliação clínica individualizada, o diagnóstico médico ou o acompanhamento de um{" "}
+            <span className="font-semibold text-white">fisioterapeuta esportivo ou médico do esporte</span>.
+          </p>
+          <p className="text-xs text-gray-400">
+            Em caso de lesão, procure imediatamente um profissional de saúde qualificado antes de tomar qualquer decisão clínica ou retorno ao esporte.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Search logic ─────────────────────────────────────────────────────────────
@@ -272,26 +322,43 @@ function InjuryDetailCard({ injury, onClose }: { injury: InjuryEntry; onClose: (
           className="rounded-[16px] p-4 space-y-3"
           style={{ background: "rgba(0,194,255,0.04)", border: "1px solid rgba(0,194,255,0.12)" }}
         >
-          <div className="flex items-center gap-2">
-            <Brain className="h-4 w-4 text-[#00C2FF]" />
-            <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#00C2FF]">Análise de Inteligência</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Brain className="h-4 w-4 text-[#00C2FF]" />
+              <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#00C2FF]">Análise de Inteligência</span>
+            </div>
+            <span
+              className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em]"
+              style={{ background: "rgba(251,191,36,0.12)", color: "#FBBF24", border: "1px solid rgba(251,191,36,0.25)" }}
+            >
+              Orientativo
+            </span>
           </div>
           {narrative.map((line, i) => (
             <p key={i} className="text-sm leading-relaxed text-gray-300">{line}</p>
           ))}
+          <MedicalDisclaimer compact />
         </div>
 
         {/* Treatment protocol */}
         <div
-          className="flex items-start gap-3 rounded-[14px] p-4"
+          className="rounded-[14px] p-4 space-y-2"
           style={{ background: "rgba(0,255,156,0.04)", border: "1px solid rgba(0,255,156,0.14)" }}
         >
-          <Stethoscope className="h-4 w-4 shrink-0 mt-0.5 text-[#00FF9C]" />
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#00FF9C]">Protocolo Recomendado</span>
-            <p className="mt-1 text-sm text-gray-300">{injury.treatment}</p>
+          <div className="flex items-center gap-2">
+            <Stethoscope className="h-4 w-4 text-[#00FF9C]" />
+            <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#00FF9C]">Referência de Protocolo</span>
           </div>
+          <p className="text-sm text-gray-300">{injury.treatment}</p>
+          <p className="text-[11px] leading-relaxed text-gray-500">
+            <span className="font-semibold text-gray-400">Importante:</span> este protocolo é uma referência geral de base epidemiológica.
+            A conduta clínica deve ser definida exclusivamente pelo fisioterapeuta ou médico do esporte responsável pelo atleta,
+            considerando histórico individual, exames de imagem e avaliação funcional presencial.
+          </p>
         </div>
+
+        {/* Full medical disclaimer */}
+        <MedicalDisclaimer />
       </div>
     </div>
   );
@@ -478,8 +545,15 @@ export default function HealthAnalytics() {
                     </span>
                   </h1>
                   <p className="mt-2 max-w-lg text-sm leading-relaxed text-gray-400">
-                    Mapeamento completo de 212 lesões do futebol — impacto por atributo, risco de recorrência e análise de carreira com inteligência de scouting.
+                    Mapeamento de 212 lesões do futebol — impacto por atributo, risco de recorrência e análise de carreira com inteligência de scouting.
                   </p>
+                  <div
+                    className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px]"
+                    style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.25)", color: "#FBBF24" }}
+                  >
+                    <Info className="h-3 w-3 shrink-0" />
+                    Análise paliativa — não substitui avaliação de fisioterapeuta ou médico do esporte
+                  </div>
                 </div>
 
                 {/* Stats strip */}
@@ -568,6 +642,9 @@ export default function HealthAnalytics() {
               )}
             </section>
 
+            {/* ── Medical disclaimer (always visible) ────────────────────── */}
+            <MedicalDisclaimer />
+
             {/* ── Selected injury detail ──────────────────────────────────── */}
             {selectedInjury && (
               <InjuryDetailCard injury={selectedInjury} onClose={handleClose} />
@@ -619,6 +696,25 @@ export default function HealthAnalytics() {
                   <span className="text-gray-600">({s.desc})</span>
                 </span>
               ))}
+            </section>
+
+            {/* ── Footer disclaimer ──────────────────────────────────────── */}
+            <section
+              className="flex flex-col items-center gap-2 rounded-[16px] border border-[rgba(255,255,255,0.04)] bg-[rgba(255,255,255,0.015)] px-6 py-4 text-center"
+            >
+              <div className="flex items-center gap-2 text-[#FBBF24]">
+                <Stethoscope className="h-4 w-4" />
+                <span className="text-xs font-bold uppercase tracking-[0.2em]">Aviso de Responsabilidade</span>
+              </div>
+              <p className="max-w-2xl text-[11px] leading-relaxed text-gray-500">
+                Este módulo fornece referências epidemiológicas e análises paliativas com fins de <span className="text-gray-400 font-medium">suporte ao scouting esportivo</span>.
+                Nenhuma informação aqui apresentada tem caráter diagnóstico ou terapêutico.{" "}
+                <span className="text-gray-300 font-medium">A avaliação, diagnóstico e conduta clínica de qualquer lesão devem ser realizados exclusivamente por fisioterapeuta ou médico do esporte habilitado</span>,
+                com base no histórico e na avaliação presencial do atleta.
+              </p>
+              <p className="text-[10px] text-gray-600">
+                SoccerMind Health Analytics · Dados de referência baseados em literatura esportiva · Não substitui atendimento profissional
+              </p>
             </section>
 
           </div>
