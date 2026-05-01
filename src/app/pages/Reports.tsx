@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router";
 import {
   Check,
@@ -57,7 +57,7 @@ function PlayerCombobox({
   value: string;
   players: PlayerExtended[];
   variant: "A" | "B";
-  onChange: (id: string) => void;
+  onChange: (player: PlayerExtended) => void;
   onSearch?: (q: string) => Promise<PlayerExtended[]>;
 }) {
   const [open, setOpen] = useState(false);
@@ -176,7 +176,7 @@ function PlayerCombobox({
                     <CommandItem
                       key={player.id}
                       value={`${player.name} ${player.club} ${player.position} ${player.nationality}`}
-                      onSelect={() => { onChange(player.id); setOpen(false); }}
+                      onSelect={() => { onChange(player); setOpen(false); }}
                       className="cursor-pointer rounded-[10px] px-3 py-2.5 aria-selected:bg-[rgba(255,255,255,0.06)]"
                     >
                       <div
@@ -188,6 +188,7 @@ function PlayerCombobox({
                       <div className="min-w-0 flex-1">
                         <p className={`truncate text-sm font-semibold ${isSelected ? "text-white" : "text-gray-200"}`}>{player.name}</p>
                         <p className="truncate text-[11px] text-gray-500">{player.position} · {player.club}</p>
+                        <p className="truncate text-[10px] text-gray-600">ID: {player.id}</p>
                       </div>
                       <span
                         className="mr-2 flex-shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase"
@@ -350,8 +351,7 @@ export default function Reports() {
         const list = Array.isArray(res.data.players) ? res.data.players : [];
         setAvailablePlayers(list);
         setPlayersError(null);
-        setPlayerA((cur) => (cur.id && cur.id !== EMPTY_PLAYER.id ? cur : list[0] ?? EMPTY_PLAYER));
-        setPlayerB((cur) => (cur.id && cur.id !== EMPTY_PLAYER.id ? cur : list[1] ?? list[0] ?? EMPTY_PLAYER));
+        setReportError(list.length > 0 ? "Selecione dois jogadores para gerar o relatório executivo." : null);
       } catch (err) {
         if (!active) return;
         setAvailablePlayers([]);
@@ -367,10 +367,16 @@ export default function Reports() {
   useEffect(() => {
     let active = true;
     async function loadReport() {
-      if (!playerA.name || !playerB.name || playerA.name === "Sem dados" || playerB.name === "Sem dados") {
+      if (!playerA.id || !playerB.id || playerA.id === playerB.id) {
         setComparisonData(null);
         setReportModel(null);
         setSavedAnalysis(null);
+        setReportLoading(false);
+        setReportError(
+          !playerA.id || !playerB.id
+            ? "Selecione dois jogadores para gerar o relatório executivo."
+            : "Selecione dois jogadores diferentes para gerar o relatório executivo.",
+        );
         return;
       }
       setReportLoading(true);
@@ -397,13 +403,12 @@ export default function Reports() {
     }
     void loadReport();
     return () => { active = false; };
-  }, [playerA.id, playerA.name, playerB.id, playerB.name, user?.name]);
+  }, [playerA.id, playerB.id, user?.name]);
 
   const selectablePlayers = useMemo(
     () => dedupePlayers([playerA, playerB, ...availablePlayers].filter((p) => p.id && p.id !== EMPTY_PLAYER.id)),
     [availablePlayers, playerA, playerB],
   );
-  const playersById = useMemo(() => new Map(selectablePlayers.map((p) => [p.id, p])), [selectablePlayers]);
   const displayPlayerA = comparisonData?.playerA ?? playerA;
   const displayPlayerB = comparisonData?.playerB ?? playerB;
 
@@ -445,6 +450,11 @@ export default function Reports() {
       setSaveLoading(false);
     }
   }
+
+  const handleSearch = useCallback(
+    (q: string) => getReportShortlist({ search: q, limit: 20 }).then((r) => r.data.players),
+    [],
+  );
 
   const insightColors = {
     cyan:    { border: "rgba(0,194,255,0.2)",   bg: "rgba(0,194,255,0.06)",   text: "#9BE7FF" },
@@ -538,16 +548,16 @@ export default function Reports() {
                 value={playerA.id}
                 players={selectablePlayers}
                 variant="A"
-                onChange={(id) => setPlayerA(playersById.get(id) ?? EMPTY_PLAYER)}
-                onSearch={(q) => getReportShortlist({ search: q, limit: 20 }).then((r) => r.data.players)}
+                onChange={setPlayerA}
+                onSearch={handleSearch}
               />
               <PlayerCombobox
                 label="Player B"
                 value={playerB.id}
                 players={selectablePlayers}
                 variant="B"
-                onChange={(id) => setPlayerB(playersById.get(id) ?? EMPTY_PLAYER)}
-                onSearch={(q) => getReportShortlist({ search: q, limit: 20 }).then((r) => r.data.players)}
+                onChange={setPlayerB}
+                onSearch={handleSearch}
               />
             </section>
 

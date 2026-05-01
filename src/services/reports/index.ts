@@ -2,7 +2,7 @@ import type { ApiEnvelope } from "../../app/services/api";
 import { buildExecutiveReportData } from "../../adapters/reports";
 import type { PlayerExtended } from "../../app/types/player";
 import { EMPTY_PLAYER } from "../../app/types/player";
-import { getCompareDataByIds, getCompareDataByNames, getCompareShortlist, type CompareViewModel } from "../compare";
+import { getCompareDataByIds, getCompareShortlist, type CompareViewModel } from "../compare";
 import type { PlayerFilterOptions, PlayersFiltersParams } from "../players";
 
 export type { CompareViewModel } from "../compare";
@@ -30,7 +30,7 @@ export async function getExecutiveReportData(
     status?: string;
   },
 ): Promise<ApiEnvelope<ExecutiveReportResponse | null>> {
-  if (!playerA.name || !playerB.name || playerA.id === EMPTY_PLAYER.id || playerB.id === EMPTY_PLAYER.id) {
+  if (!playerA.id || !playerB.id || playerA.id === EMPTY_PLAYER.id || playerB.id === EMPTY_PLAYER.id) {
     return {
       success: true,
       data: null,
@@ -39,10 +39,7 @@ export async function getExecutiveReportData(
     };
   }
 
-  const response =
-    playerA.id && playerB.id && playerA.id !== EMPTY_PLAYER.id && playerB.id !== EMPTY_PLAYER.id
-      ? await getCompareDataByIds(playerA.id, playerB.id)
-      : await getCompareDataByNames(playerA.name, playerB.name);
+  const response = await getCompareDataByIds(playerA.id, playerB.id);
 
   return {
     ...response,
