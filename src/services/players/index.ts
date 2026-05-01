@@ -335,7 +335,9 @@ function buildMockPlayersEnvelope(params: PlayersFiltersParams = {}): ApiEnvelop
 async function fetchPlayersFromApi(params: PlayersFiltersParams = {}) {
   const searchParams = buildPlayersSearchParams(params);
   const query = searchParams.toString();
-  return apiFetch<unknown>(`/players${query ? `?${query}` : ""}`);
+  const hasSearchTerm = typeof params.search === "string" && params.search.trim().length > 0;
+  const endpoint = hasSearchTerm ? "/players/search" : "/players";
+  return apiFetch<unknown>(`${endpoint}${query ? `?${query}` : ""}`);
 }
 
 function mapPlayersEnvelope(

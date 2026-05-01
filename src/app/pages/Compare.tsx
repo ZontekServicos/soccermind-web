@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, GitCompareArrows, Search } from "lucide-react";
 import { AppHeader } from "../components/AppHeader";
 import { AppSidebar } from "../components/AppSidebar";
@@ -97,14 +97,6 @@ function dedupe(players: PlayerExtended[]) {
   });
 }
 
-function syncSelectedPlayers(currentA: PlayerExtended, currentB: PlayerExtended, next: PlayerExtended[]) {
-  const fallbackA = next[0] ?? EMPTY_PLAYER;
-  const fallbackB = next[1] ?? next[0] ?? EMPTY_PLAYER;
-  const nextA = currentA.id && currentA.id !== EMPTY_PLAYER.id && next.some((p) => p.id === currentA.id) ? currentA : fallbackA;
-  const nextB = currentB.id && currentB.id !== EMPTY_PLAYER.id && currentB.id !== nextA.id && next.some((p) => p.id === currentB.id) ? currentB : next.find((p) => p.id !== nextA.id) ?? fallbackB;
-  return { nextA, nextB };
-}
-
 function scoreItems(profileA: PlayerIntelligenceProfile | null, profileB: PlayerIntelligenceProfile | null) {
   const topTraits = Array.from(new Map([...(profileA?.dna.traits ?? []), ...(profileB?.dna.traits ?? [])].map((t) => [t.key, t])).values()).slice(0, 5);
   const dnaItems = topTraits.map((trait) => ({
@@ -179,7 +171,7 @@ function PlayerCombobox({
   value: string;
   players: PlayerExtended[];
   variant: "A" | "B";
-  onChange: (id: string) => void;
+  onChange: (player: PlayerExtended) => void;
   onSearch?: (q: string) => Promise<PlayerExtended[]>;
 }) {
   const [open, setOpen] = useState(false);
@@ -290,7 +282,7 @@ function PlayerCombobox({
                     <CommandItem
                       key={player.id}
                       value={`${player.name} ${player.club} ${player.position} ${player.nationality}`}
-                      onSelect={() => { onChange(player.id); setOpen(false); }}
+                      onSelect={() => { onChange(player); setOpen(false); }}
                       className="cursor-pointer rounded-[10px] px-3 py-2.5 aria-selected:bg-[rgba(255,255,255,0.06)]"
                     >
                       <div
@@ -302,6 +294,7 @@ function PlayerCombobox({
                       <div className="min-w-0 flex-1">
                         <p className={`truncate text-sm font-semibold ${isSelected ? "text-white" : "text-gray-200"}`}>{player.name}</p>
                         <p className="truncate text-[11px] text-gray-500">{player.position} · {player.club}</p>
+                        <p className="truncate text-[10px] text-gray-600">ID: {player.id}</p>
                       </div>
                       <span
                         className="mr-2 flex-shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase"
@@ -371,6 +364,11 @@ export default function Compare() {
   const [savedAnalysisId, setSavedAnalysisId] = useState<string | null>(null);
   const [activeBlockTab, setActiveBlockTab] = useState<BlockTab>("technical");
 
+  const handleSearch = useCallback(
+    (q: string) => getCompareShortlist({ search: q, limit: 20 }).then((r) => r.data.players),
+    [],
+  );
+
   // Load players once
   useEffect(() => {
     let active = true;
@@ -381,9 +379,7 @@ export default function Compare() {
         if (!active) return;
         const nextPlayers = Array.isArray(response.data.players) ? response.data.players : [];
         setPlayers(nextPlayers);
-        setPlayerA((cur) => syncSelectedPlayers(cur, playerB, nextPlayers).nextA);
-        setPlayerB((cur) => syncSelectedPlayers(playerA, cur, nextPlayers).nextB);
-        setError(null);
+        setError(nextPlayers.length > 0 ? t("comparison.selectPlayers") : t("comparison.empty"));
       } catch (err) {
         if (!active) return;
         setPlayers([]);
@@ -399,7 +395,18 @@ export default function Compare() {
   useEffect(() => {
     let active = true;
     async function loadComparison() {
-      if (!playerA.id || !playerB.id || playerA.id === playerB.id) { setComparisonData(null); return; }
+      if (!playerA.id || !playerB.id) {
+        setComparisonData(null);
+        setCompareLoading(false);
+        setError(t("comparison.selectPlayers"));
+        return;
+      }
+      if (playerA.id === playerB.id) {
+        setComparisonData(null);
+        setCompareLoading(false);
+        setError(t("comparison.selectDifferentPlayers"));
+        return;
+      }
       setCompareLoading(true);
       try {
         const response = await getCompareDataByIds(playerA.id, playerB.id);
@@ -421,7 +428,7 @@ export default function Compare() {
   useEffect(() => {
     let active = true;
     async function loadEngine() {
-      if (!playerA.id || !playerB.id || playerA.id === playerB.id) { setEngineData(null); return; }
+      if (!playerA.id || !playerB.id || playerA.id === playerB.id) { setEngineData(null); setEngineLoading(false); return; }
       setEngineLoading(true);
       try {
         const response = await getCompareEngineData(playerA.id, playerB.id);
@@ -446,7 +453,6 @@ export default function Compare() {
   }, [playerA.id, playerB.id]);
 
   const selectablePlayers = useMemo(() => dedupe([playerA, playerB, ...players].filter((p) => p.id && p.id !== EMPTY_PLAYER.id)), [playerA, playerB, players]);
-  const playersById = useMemo(() => new Map(selectablePlayers.map((p) => [p.id, p])), [selectablePlayers]);
   const displayA = comparisonData?.playerA ?? playerA;
   const displayB = comparisonData?.playerB ?? playerB;
   const profileA = normalizePlayerIntelligenceProfile(comparisonData?.intelligenceProfiles?.playerA ?? null);
@@ -546,8 +552,8 @@ export default function Compare() {
                 value={playerA.id}
                 players={selectablePlayers}
                 variant="A"
-                onChange={(id) => setPlayerA(playersById.get(id) ?? EMPTY_PLAYER)}
-                onSearch={(q) => getCompareShortlist({ search: q, limit: 20 }).then((r) => r.data.players)}
+                onChange={setPlayerA}
+                onSearch={handleSearch}
               />
 
               {/* VS divider */}
@@ -565,8 +571,8 @@ export default function Compare() {
                 value={playerB.id}
                 players={selectablePlayers}
                 variant="B"
-                onChange={(id) => setPlayerB(playersById.get(id) ?? EMPTY_PLAYER)}
-                onSearch={(q) => getCompareShortlist({ search: q, limit: 20 }).then((r) => r.data.players)}
+                onChange={setPlayerB}
+                onSearch={handleSearch}
               />
             </section>
 

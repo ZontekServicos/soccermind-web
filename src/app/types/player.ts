@@ -44,7 +44,7 @@ export interface PlayerExtended extends PlayerProfile {
 }
 
 export const EMPTY_PLAYER: PlayerExtended = {
-  id: "empty-player",
+  id: "",
   name: "Sem dados",
   position: "N/A",
   age: 0,
