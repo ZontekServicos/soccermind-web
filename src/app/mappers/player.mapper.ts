@@ -16,6 +16,12 @@ export interface ApiPlayerLike {
   overall?: number | string | null;
   potential?: number | string | null;
   marketValue?: number | string | null;
+  estimatedValue?: number | string | null;
+  height?: number | string | null;
+  weight?: number | string | null;
+  foot?: string | null;
+  dominantFoot?: string | null;
+  agencyName?: string | null;
   image?: string | null;
   attributes?: Record<string, number | string | null | undefined> | null;
   player?: ApiPlayerLike | null;
@@ -85,6 +91,11 @@ export interface PlayerCardModel {
   marketValueLabel: string;
   image: string | null;
   attributes: PlayerAttributeModel;
+  height?: number | null;
+  weight?: number | null;
+  foot?: string | null;
+  dominantFoot?: string | null;
+  agencyName?: string | null;
 }
 
 export interface PlayerProfileModel extends PlayerCardModel {
@@ -237,7 +248,7 @@ function resolveImage(source: UnknownRecord) {
 
 function resolveTeam(source: UnknownRecord, attributes: UnknownRecord) {
   return (
-    getTextCandidate(getValue(source, ["team", "club", "clubName", "teamName"])) ??
+    getTextCandidate(getValue(source, ["team", "club", "clubName", "teamName", "currentClub"])) ??
     getTextCandidate(getValue(attributes, ["team", "club", "club_name", "teamName"])) ??
     ""
   );
@@ -245,7 +256,7 @@ function resolveTeam(source: UnknownRecord, attributes: UnknownRecord) {
 
 function resolveLeague(source: UnknownRecord, attributes: UnknownRecord) {
   return (
-    getTextCandidate(getValue(source, ["league", "leagueName", "competition"])) ??
+    getTextCandidate(getValue(source, ["league", "leagueName", "competition", "currentLeague"])) ??
     getTextCandidate(getValue(attributes, ["league", "clubLeague", "league_name"])) ??
     ""
   );
@@ -262,6 +273,7 @@ function resolvePotential(source: UnknownRecord, attributes: UnknownRecord) {
 function resolveMarketValueNumber(source: UnknownRecord, attributes: UnknownRecord) {
   return parseNullableNumber(
     getValue(source, ["marketValue", "market_value", "valueEur", "value_eur", "marketValueEur"]) ??
+      getValue(source, ["estimatedValue", "estimated_value"]) ??
       getValue(attributes, ["marketValue", "market_value", "valueEur", "value_eur"]),
   );
 }
@@ -424,7 +436,7 @@ export function mapApiPlayerToCard(player: ApiPlayerLike | UnknownRecord): Playe
   const marketValue = resolveMarketValueNumber(source, attributeSource);
 
   return {
-    id: getTextCandidate(getValue(source, ["id", "playerId", "playerKey"])) ?? "unknown-player",
+    id: getTextCandidate(getValue(source, ["id", "playerId", "playerKey"])) ?? "",
     name: getTextCandidate(getValue(source, ["name", "nomeJogador", "playerName"])) ?? "",
     position: position || positions[0] || "",
     positions,
@@ -441,6 +453,11 @@ export function mapApiPlayerToCard(player: ApiPlayerLike | UnknownRecord): Playe
     marketValueLabel: formatMarketValue(marketValue),
     image: resolveImage(source),
     attributes,
+    height: parseNullableNumber(getValue(source, ["height"])) ?? null,
+    weight: parseNullableNumber(getValue(source, ["weight"])) ?? null,
+    foot: getTextCandidate(getValue(source, ["foot", "dominantFoot"])) ?? null,
+    dominantFoot: getTextCandidate(getValue(source, ["dominantFoot", "foot"])) ?? null,
+    agencyName: getTextCandidate(getValue(source, ["agencyName", "agency_name", "agency"])) ?? null,
   };
 }
 
@@ -551,6 +568,11 @@ export function mapApiPlayerToExtended(player: ApiPlayerLike | UnknownRecord): P
     marketValueAmount: card.marketValue,
     marketValueLabel: card.marketValueLabel,
     contract: "N/A",
+    height: card.height,
+    weight: card.weight,
+    foot: card.foot,
+    dominantFoot: card.dominantFoot,
+    agencyName: card.agencyName,
     structuralRisk: {
       score: finalStructuralRiskScore,
       level: finalStructuralRiskLevel,

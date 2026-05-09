@@ -18,6 +18,7 @@ import { getCompareDataByIds, getCompareEngineData, getCompareShortlist, type Co
 import { EngineComparisonSection, type EngineComparisonOutput } from "../components/player-intelligence/EngineComparisonSection";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import { normalizePlayerIntelligenceProfile, type PlayerIntelligenceProfile } from "../types/player-intelligence";
+import { isValidUUID } from "../utils/uuid";
 import { t as translate } from "../../i18n";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -91,7 +92,7 @@ function winnerLabel(winner: "A" | "B" | "DRAW", nameA: string, nameB: string) {
 function dedupe(players: PlayerExtended[]) {
   const seen = new Set<string>();
   return players.filter((p) => {
-    if (!p.id || seen.has(p.id)) return false;
+    if (!isValidUUID(p.id) || seen.has(p.id)) return false;
     seen.add(p.id);
     return true;
   });
@@ -294,7 +295,6 @@ function PlayerCombobox({
                       <div className="min-w-0 flex-1">
                         <p className={`truncate text-sm font-semibold ${isSelected ? "text-white" : "text-gray-200"}`}>{player.name}</p>
                         <p className="truncate text-[11px] text-gray-500">{player.position} · {player.club}</p>
-                        <p className="truncate text-[10px] text-gray-600">ID: {player.id}</p>
                       </div>
                       <span
                         className="mr-2 flex-shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase"
@@ -365,7 +365,7 @@ export default function Compare() {
   const [activeBlockTab, setActiveBlockTab] = useState<BlockTab>("technical");
 
   const handleSearch = useCallback(
-    (q: string) => getCompareShortlist({ search: q, limit: 20 }).then((r) => r.data.players),
+    (q: string) => getCompareShortlist({ search: q, limit: 20 }).then((r) => r.data.players.filter((player) => isValidUUID(player.id))),
     [],
   );
 
@@ -377,7 +377,9 @@ export default function Compare() {
       try {
         const response = await getCompareShortlist({ page: 1, limit: 80 });
         if (!active) return;
-        const nextPlayers = Array.isArray(response.data.players) ? response.data.players : [];
+        const nextPlayers = Array.isArray(response.data.players)
+          ? response.data.players.filter((player) => isValidUUID(player.id))
+          : [];
         setPlayers(nextPlayers);
         setError(nextPlayers.length > 0 ? t("comparison.selectPlayers") : t("comparison.empty"));
       } catch (err) {
@@ -395,7 +397,7 @@ export default function Compare() {
   useEffect(() => {
     let active = true;
     async function loadComparison() {
-      if (!playerA.id || !playerB.id) {
+      if (!isValidUUID(playerA.id) || !isValidUUID(playerB.id)) {
         setComparisonData(null);
         setCompareLoading(false);
         setError(t("comparison.selectPlayers"));
@@ -428,7 +430,7 @@ export default function Compare() {
   useEffect(() => {
     let active = true;
     async function loadEngine() {
-      if (!playerA.id || !playerB.id || playerA.id === playerB.id) { setEngineData(null); setEngineLoading(false); return; }
+      if (!isValidUUID(playerA.id) || !isValidUUID(playerB.id) || playerA.id === playerB.id) { setEngineData(null); setEngineLoading(false); return; }
       setEngineLoading(true);
       try {
         const response = await getCompareEngineData(playerA.id, playerB.id);
@@ -452,7 +454,7 @@ export default function Compare() {
     setSaveFeedback(null);
   }, [playerA.id, playerB.id]);
 
-  const selectablePlayers = useMemo(() => dedupe([playerA, playerB, ...players].filter((p) => p.id && p.id !== EMPTY_PLAYER.id)), [playerA, playerB, players]);
+  const selectablePlayers = useMemo(() => dedupe([playerA, playerB, ...players]), [playerA, playerB, players]);
   const displayA = comparisonData?.playerA ?? playerA;
   const displayB = comparisonData?.playerB ?? playerB;
   const profileA = normalizePlayerIntelligenceProfile(comparisonData?.intelligenceProfiles?.playerA ?? null);
@@ -484,7 +486,7 @@ export default function Compare() {
   }
 
   async function saveAnalysis() {
-    if (!playerA.id || !playerB.id || playerA.id === playerB.id || savedAnalysisId) return;
+    if (!isValidUUID(playerA.id) || !isValidUUID(playerB.id) || playerA.id === playerB.id || savedAnalysisId) return;
     setSaveLoading(true);
     try {
       const response = await createComparisonAnalysis({
@@ -506,7 +508,7 @@ export default function Compare() {
     }
   }
 
-  const hasComparison = !!(playerA.id && playerB.id && playerA.id !== playerB.id && playerA.id !== EMPTY_PLAYER.id && playerB.id !== EMPTY_PLAYER.id);
+  const hasComparison = isValidUUID(playerA.id) && isValidUUID(playerB.id) && playerA.id !== playerB.id;
 
   return (
     <div className="flex h-screen bg-[#07142A]">
@@ -718,7 +720,7 @@ export default function Compare() {
                   <Button
                     type="button"
                     onClick={() => void saveAnalysis()}
-                    disabled={saveLoading || !playerA.id || !playerB.id || playerA.id === playerB.id}
+                    disabled={saveLoading || !isValidUUID(playerA.id) || !isValidUUID(playerB.id) || playerA.id === playerB.id}
                     className="h-10 rounded-[12px] bg-[#00C2FF] px-5 font-semibold text-[#07142A] shadow-[0_4px_16px_rgba(0,194,255,0.3)] hover:bg-[#33CFFF] disabled:opacity-40"
                   >
                     {saveLoading ? "Salvando..." : "Salvar análise"}

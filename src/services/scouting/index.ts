@@ -38,13 +38,14 @@ export interface ScoutingRankingEntry {
 }
 
 export interface ScoutingRankingParams {
-  position?:   string;
-  leagueId?:   string;
-  ageMin?:     number;
-  ageMax?:     number;
-  overallMin?: number;
-  label?:      ScoutingLabel;
-  limit?:      number;
+  position?:    string;
+  leagueId?:    string;
+  nationality?: string;
+  ageMin?:      number;
+  ageMax?:      number;
+  overallMin?:  number;
+  label?:       ScoutingLabel;
+  limit?:       number;
 }
 
 interface ScoutingRankingResponse {
@@ -59,13 +60,14 @@ export async function getScoutingRanking(
 ): Promise<ApiEnvelope<ScoutingRankingEntry[]>> {
   const qs = new URLSearchParams();
 
-  if (params.position)            qs.set("position",   params.position);
-  if (params.leagueId)            qs.set("leagueId",   params.leagueId);
-  if (params.ageMin   != null)    qs.set("ageMin",     String(params.ageMin));
-  if (params.ageMax   != null)    qs.set("ageMax",     String(params.ageMax));
-  if (params.overallMin != null)  qs.set("overallMin", String(params.overallMin));
-  if (params.label)               qs.set("label",      params.label);
-  if (params.limit    != null)    qs.set("limit",      String(params.limit));
+  if (params.position)            qs.set("position",    params.position);
+  if (params.leagueId)            qs.set("leagueId",    params.leagueId);
+  if (params.nationality)         qs.set("nationality", params.nationality);
+  if (params.ageMin   != null)    qs.set("ageMin",      String(params.ageMin));
+  if (params.ageMax   != null)    qs.set("ageMax",      String(params.ageMax));
+  if (params.overallMin != null)  qs.set("overallMin",  String(params.overallMin));
+  if (params.label)               qs.set("label",       params.label);
+  if (params.limit    != null)    qs.set("limit",       String(params.limit));
 
   const query = qs.toString();
   const url   = `/scouting/ranking${query ? `?${query}` : ""}`;

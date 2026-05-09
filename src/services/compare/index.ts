@@ -1,4 +1,5 @@
 import { apiFetch, type ApiEnvelope } from "../../app/services/api";
+import { isValidUUID } from "../../app/utils/uuid";
 import { mapCompareResponse, type CompareViewModel } from "../../adapters/compare";
 import { getDataSource } from "../../config/dataSource";
 import { searchExtendedPlayers, type PlayerFilterOptions, type PlayersFiltersParams } from "../players";
@@ -11,11 +12,14 @@ export async function getCompareShortlist(
 ): Promise<ApiEnvelope<{ players: ReturnType<typeof mapCompareResponse>["playerA"][]; filterOptions: PlayerFilterOptions }>> {
   const response = await searchExtendedPlayers(params);
   const nextMeta = (response.meta || {}) as { filterOptions?: PlayerFilterOptions };
+  const players = Array.isArray(response.data)
+    ? response.data.filter((player) => isValidUUID(player.id))
+    : [];
 
   return {
     ...response,
     data: {
-      players: Array.isArray(response.data) ? response.data : [],
+      players,
       filterOptions: nextMeta.filterOptions ?? {
         positions: [],
         nationalities: [],
@@ -37,11 +41,21 @@ async function comparePlayersByEndpoint(endpoint: string): Promise<ApiEnvelope<C
 }
 
 export async function getCompareDataByIds(idA: string, idB: string) {
-  return comparePlayersByEndpoint(`/compare/${idA}/${idB}`);
+  const playerAId = idA.trim();
+  const playerBId = idB.trim();
+  if (!isValidUUID(playerAId) || !isValidUUID(playerBId)) {
+    throw new Error("Selecione dois jogadores validos antes de comparar.");
+  }
+  return comparePlayersByEndpoint(`/compare/${playerAId}/${playerBId}`);
 }
 
 export async function getCompareEngineData(idA: string, idB: string) {
-  return apiFetch<unknown>(`/compare/engine/${idA}/${idB}`);
+  const playerAId = idA.trim();
+  const playerBId = idB.trim();
+  if (!isValidUUID(playerAId) || !isValidUUID(playerBId)) {
+    throw new Error("Selecione dois jogadores validos antes de comparar.");
+  }
+  return apiFetch<unknown>(`/compare/engine/${playerAId}/${playerBId}`);
 }
 
 export async function getCompareDataByNames(nameA: string, nameB: string) {

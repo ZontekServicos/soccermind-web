@@ -16,6 +16,10 @@ export interface PlayerProfile {
   capitalEfficiency: number;
   riskLevel: "LOW" | "MEDIUM" | "HIGH";
   photoUrl?: string;
+  height?: number | null;
+  weight?: number | null;
+  foot?: string | null;
+  dominantFoot?: string | null;
 }
 
 interface PlayerProfileCardProps {

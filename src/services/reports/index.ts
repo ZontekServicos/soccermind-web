@@ -1,7 +1,7 @@
 import type { ApiEnvelope } from "../../app/services/api";
 import { buildExecutiveReportData } from "../../adapters/reports";
 import type { PlayerExtended } from "../../app/types/player";
-import { EMPTY_PLAYER } from "../../app/types/player";
+import { isValidUUID } from "../../app/utils/uuid";
 import { getCompareDataByIds, getCompareShortlist, type CompareViewModel } from "../compare";
 import type { PlayerFilterOptions, PlayersFiltersParams } from "../players";
 
@@ -30,7 +30,7 @@ export async function getExecutiveReportData(
     status?: string;
   },
 ): Promise<ApiEnvelope<ExecutiveReportResponse | null>> {
-  if (!playerA.id || !playerB.id || playerA.id === EMPTY_PLAYER.id || playerB.id === EMPTY_PLAYER.id) {
+  if (!isValidUUID(playerA.id) || !isValidUUID(playerB.id)) {
     return {
       success: true,
       data: null,

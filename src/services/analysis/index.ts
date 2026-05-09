@@ -5,6 +5,7 @@ import {
   type AnalysisViewModel,
 } from "../../adapters/analysis";
 import { apiFetch, type ApiEnvelope } from "../../app/services/api";
+import { isValidUUID } from "../../app/utils/uuid";
 import { getDataSource } from "../../config/dataSource";
 
 export type { AnalysisViewModel };
@@ -233,6 +234,11 @@ function dedupeById(entries: AnalysisViewModel[]): AnalysisViewModel[] {
 }
 
 export async function createComparisonAnalysis(payload: CreateComparisonAnalysisPayload) {
+  const [playerAId, playerBId] = payload.playerIds;
+  if (!isValidUUID(playerAId) || !isValidUUID(playerBId)) {
+    throw new Error("Selecione dois jogadores validos antes de salvar a comparacao.");
+  }
+
   // Build a local entry immediately (used as fallback or when API is unavailable)
   const localEntry: AnalysisViewModel = {
     id: `CMP-${Date.now()}`,
@@ -241,10 +247,10 @@ export async function createComparisonAnalysis(payload: CreateComparisonAnalysis
     date: new Date().toISOString(),
     type: "comparison",
     typeLabel: "Comparação",
-    players: payload.playerIds,
+    players: [playerAId, playerBId],
     playerDetails: [],
-    playerAId: payload.playerIds[0] ?? null,
-    playerBId: payload.playerIds[1] ?? null,
+    playerAId,
+    playerBId,
     user: payload.analyst ?? "Scout",
     club: "",
     status: "completed",
@@ -260,7 +266,10 @@ export async function createComparisonAnalysis(payload: CreateComparisonAnalysis
   try {
     const response = await apiFetch<unknown>("/analysis/comparison", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        playerIds: [playerAId, playerBId],
+      }),
     });
 
     const analysis = mapAnalysisResponse(response.data);

@@ -78,6 +78,50 @@ function InsightCard({
   );
 }
 
+function formatFoot(foot: string | null | undefined): string {
+  if (!foot) return "—";
+  const map: Record<string, string> = { left: "Esquerdo", right: "Direito", both: "Ambidestro" };
+  return map[foot.toLowerCase()] ?? foot;
+}
+
+function InfoField({ label, value }: { label: string; value: string | number | null | undefined }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">{label}</span>
+      <span className="text-sm font-semibold text-white">{value ?? "—"}</span>
+    </div>
+  );
+}
+
+function PlayerInfoCard({ player }: { player: PlayerProfileModel }) {
+  const hasAnyExtra =
+    player.height != null ||
+    player.weight != null ||
+    player.foot != null ||
+    player.agencyName != null;
+
+  if (!hasAnyExtra) return null;
+
+  const items = [
+    { label: "Altura",          value: player.height ? `${player.height} cm` : null },
+    { label: "Peso",            value: player.weight ? `${player.weight} kg` : null },
+    { label: "Pé Dominante",   value: formatFoot(player.foot) },
+    { label: "Valor de Mercado", value: player.marketValue != null && player.marketValue > 0 ? formatMarketValue(player.marketValue) : null },
+    { label: "Empresa Gestora", value: player.agencyName ?? null },
+  ];
+
+  return (
+    <section className="rounded-[22px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] px-6 py-5">
+      <p className="mb-4 text-[10px] uppercase tracking-[0.24em] text-gray-500">Informações Principais</p>
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
+        {items.map(({ label, value }) => (
+          <InfoField key={label} label={label} value={value} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function MetricBar({ label, value, inverse = false }: { label: string; value: number; inverse?: boolean }) {
   const width = Math.max(8, Math.min(100, inverse ? 100 - value : value));
   return (
@@ -425,6 +469,8 @@ export default function PlayerDetails() {
                 </div>
               </div>
             </section>
+
+            <PlayerInfoCard player={player} />
 
             <ExecutiveSnapshotCard
               snapshot={profile.summary}

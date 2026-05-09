@@ -40,9 +40,19 @@ export interface ScoutingScore {
 
 export interface PlayerEvolutionResult {
   playerId:       string;
+  name:           string;
   playerName:     string;
   age:            number | null;
+  height:         number | null;
+  weight:         number | null;
   positions:      string[];
+  position:       string | null;
+  currentClub:    string | null;
+  currentLeague:  string | null;
+  dominantFoot:   string | null;
+  marketValue:    number | null;
+  estimatedValue: number | null;
+  agencyName:     string | null;
   currentOverall: number | null;
   trend:          PlayerTrend;
   scoutingScore:  ScoutingScore;

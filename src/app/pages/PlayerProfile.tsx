@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Gem,
   Minus,
+  Ruler,
   RotateCcw,
   Star,
   Target,
@@ -18,6 +19,7 @@ import {
   TrendingUp,
   Trophy,
   Users,
+  Weight,
   Zap,
 } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
@@ -89,6 +91,21 @@ function fmtMV(v: number | null): string | null {
 
 function formatMarketValue(v: number | null) {
   return fmtMV(v) ?? "N/A";
+}
+
+function formatMainInfo(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === "") return "Não informado";
+  return String(value);
+}
+
+function formatDominantFoot(value: string | null | undefined) {
+  if (!value) return "Não informado";
+  const map: Record<string, string> = {
+    left: "Esquerdo",
+    right: "Direito",
+    both: "Ambidestro",
+  };
+  return map[value.toLowerCase()] ?? value;
 }
 
 function overallColor(overall: number | null): string {
@@ -615,6 +632,41 @@ function ScoreBar({ label, value, color }: { label: string; value: number; color
   );
 }
 
+function MainInfoSection({ data }: { data: PlayerEvolutionResult }) {
+  const items = [
+    { label: "Altura", value: data.height != null ? `${data.height} cm` : null, Icon: Ruler, color: "#9BE7FF" },
+    { label: "Peso", value: data.weight != null ? `${data.weight} kg` : null, Icon: Weight, color: "#B6FFD8" },
+    { label: "Posição", value: data.position ?? data.positions[0] ?? null, Icon: Crosshair, color: "#C7B8FF" },
+    { label: "Clube atual", value: data.currentClub, Icon: Users, color: "#FDE68A" },
+    { label: "Liga atual", value: data.currentLeague, Icon: Trophy, color: "#93C5FD" },
+    { label: "Pé dominante", value: formatDominantFoot(data.dominantFoot), Icon: Target, color: "#FDA4AF" },
+    { label: "Valor estimado", value: data.estimatedValue != null ? formatMarketValue(data.estimatedValue) : null, Icon: DollarSign, color: "#00FF9C" },
+    { label: "Agência", value: data.agencyName, Icon: Star, color: "#E9D5FF" },
+  ];
+
+  return (
+    <section className="rounded-[24px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.025)] p-5 shadow-[0_16px_48px_rgba(0,0,0,0.24)]">
+      <div className="mb-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[#9BE7FF]">Informações principais</p>
+        <p className="mt-1 text-xs text-gray-500">Dados cadastrais e comerciais do atleta</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        {items.map(({ label, value, Icon, color }) => (
+          <div key={label} className="min-h-[96px] rounded-[16px] border border-[rgba(255,255,255,0.07)] bg-[rgba(7,20,42,0.72)] p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-[10px]" style={{ background: `${color}14`, border: `1px solid ${color}28` }}>
+                <Icon className="h-4 w-4" style={{ color }} />
+              </span>
+              <span className="text-[10px] uppercase tracking-[0.18em] text-gray-500">{label}</span>
+            </div>
+            <p className="text-sm font-semibold leading-snug text-white">{formatMainInfo(value)}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PlayerProfile() {
@@ -653,15 +705,16 @@ export default function PlayerProfile() {
   const tCfg  = TREND_CONFIG[trend?.direction ?? "stable"];
   const { Icon: TrendIcon } = tCfg;
 
-  const primaryPosition = data?.positions?.[0] ?? null;
+  const primaryPosition = data?.position ?? data?.positions?.[0] ?? null;
 
   // Context from navigation state
   const ctx       = navState?.source === "hidden-gems" ? navState.gem : navState?.entry;
   const nationality = ctx?.nationality ?? null;
   const potential   = ctx?.potential ?? null;
-  const marketValue = navState?.source === "hidden-gems" ? navState.gem?.marketValue ?? null
-                    : navState?.source === "scouting-ranking" ? navState.entry?.marketValue ?? null
-                    : null;
+  const marketValue = data?.estimatedValue ?? data?.marketValue ??
+    (navState?.source === "hidden-gems" ? navState.gem?.marketValue ?? null
+    : navState?.source === "scouting-ranking" ? navState.entry?.marketValue ?? null
+    : null);
 
   // Breadcrumb source label
   const sourceLabel = navState?.source === "hidden-gems" ? "Hidden Gems"
@@ -787,16 +840,16 @@ export default function PlayerProfile() {
                             <span>{nationality}</span>
                           </>
                         )}
-                        {lastSeason?.teamName && (
+                        {(data.currentClub ?? lastSeason?.teamName) && (
                           <>
                             <span className="opacity-30">·</span>
-                            <span>{lastSeason.teamName}</span>
+                            <span>{data.currentClub ?? lastSeason?.teamName}</span>
                           </>
                         )}
-                        {lastSeason?.leagueName && (
+                        {(data.currentLeague ?? lastSeason?.leagueName) && (
                           <>
                             <span className="opacity-30">·</span>
-                            <span>{lastSeason.leagueName}</span>
+                            <span>{data.currentLeague ?? lastSeason?.leagueName}</span>
                           </>
                         )}
                       </div>
@@ -840,6 +893,8 @@ export default function PlayerProfile() {
                 </section>
 
                 {/* ── Section 2 — Intelligence panel ───────────────────────── */}
+                <MainInfoSection data={data} />
+
                 {navState?.source && ctx && (
                   <IntelligencePanel
                     source={navState.source}

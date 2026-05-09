@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popove
 import { useAuth } from "../contexts/AuthContext";
 import { EMPTY_PLAYER, type PlayerExtended } from "../types/player";
 import { downloadExecutiveReportPdf } from "../utils/executiveReportPdf";
+import { isValidUUID } from "../utils/uuid";
 import type { ExecutiveReportMetric } from "../utils/executiveReport";
 import {
   type CompareViewModel,
@@ -37,7 +38,7 @@ function money(value: number | null) {
 function dedupePlayers(players: PlayerExtended[]) {
   const seen = new Set<string>();
   return players.filter((player) => {
-    if (!player.id || seen.has(player.id)) return false;
+    if (!isValidUUID(player.id) || seen.has(player.id)) return false;
     seen.add(player.id);
     return true;
   });
@@ -188,7 +189,6 @@ function PlayerCombobox({
                       <div className="min-w-0 flex-1">
                         <p className={`truncate text-sm font-semibold ${isSelected ? "text-white" : "text-gray-200"}`}>{player.name}</p>
                         <p className="truncate text-[11px] text-gray-500">{player.position} · {player.club}</p>
-                        <p className="truncate text-[10px] text-gray-600">ID: {player.id}</p>
                       </div>
                       <span
                         className="mr-2 flex-shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-bold uppercase"
@@ -348,7 +348,9 @@ export default function Reports() {
       try {
         const res = await getReportShortlist({ page: 1, limit: 80 });
         if (!active) return;
-        const list = Array.isArray(res.data.players) ? res.data.players : [];
+        const list = Array.isArray(res.data.players)
+          ? res.data.players.filter((player) => isValidUUID(player.id))
+          : [];
         setAvailablePlayers(list);
         setPlayersError(null);
         setReportError(list.length > 0 ? "Selecione dois jogadores para gerar o relatório executivo." : null);
@@ -367,13 +369,13 @@ export default function Reports() {
   useEffect(() => {
     let active = true;
     async function loadReport() {
-      if (!playerA.id || !playerB.id || playerA.id === playerB.id) {
+      if (!isValidUUID(playerA.id) || !isValidUUID(playerB.id) || playerA.id === playerB.id) {
         setComparisonData(null);
         setReportModel(null);
         setSavedAnalysis(null);
         setReportLoading(false);
         setReportError(
-          !playerA.id || !playerB.id
+          !isValidUUID(playerA.id) || !isValidUUID(playerB.id)
             ? "Selecione dois jogadores para gerar o relatório executivo."
             : "Selecione dois jogadores diferentes para gerar o relatório executivo.",
         );
@@ -406,7 +408,7 @@ export default function Reports() {
   }, [playerA.id, playerB.id, user?.name]);
 
   const selectablePlayers = useMemo(
-    () => dedupePlayers([playerA, playerB, ...availablePlayers].filter((p) => p.id && p.id !== EMPTY_PLAYER.id)),
+    () => dedupePlayers([playerA, playerB, ...availablePlayers]),
     [availablePlayers, playerA, playerB],
   );
   const displayPlayerA = comparisonData?.playerA ?? playerA;
@@ -429,7 +431,7 @@ export default function Reports() {
   }
 
   async function handleSaveToHistory() {
-    if (!reportModel || saveLoading) return;
+    if (!reportModel || saveLoading || !isValidUUID(playerA.id) || !isValidUUID(playerB.id)) return;
     setSaveLoading(true);
     setSaveFeedback(null);
     try {
@@ -452,7 +454,7 @@ export default function Reports() {
   }
 
   const handleSearch = useCallback(
-    (q: string) => getReportShortlist({ search: q, limit: 20 }).then((r) => r.data.players),
+    (q: string) => getReportShortlist({ search: q, limit: 20 }).then((r) => r.data.players.filter((player) => isValidUUID(player.id))),
     [],
   );
 

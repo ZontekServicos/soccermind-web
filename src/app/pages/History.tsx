@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
+  Activity,
   Calendar,
   Download,
   Eye,
@@ -11,6 +12,7 @@ import {
   Loader2,
   Search,
   Sparkles,
+  Star,
   Trash2,
   Users,
   X,
@@ -32,9 +34,11 @@ import {
   subscribeToAnalysisHubUpdates,
   type AnalysisViewModel as AnalysisHistory,
 } from "../services/analysis";
+import { getEventHistory, type UserEventEntry, type UserEventType } from "../../services/events";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+type ActiveTab  = "saved" | "activity";
 type FilterType = "all" | AnalysisHistory["type"];
 type PeriodType = "7d" | "30d" | "90d" | "all";
 type SortOption = "date_desc" | "date_asc" | "type";
@@ -85,6 +89,9 @@ const PERIOD_IN_DAYS: Partial<Record<Exclude<PeriodType, "all">, number>> = {
 export default function History() {
   const navigate = useNavigate();
 
+  const [activeTab, setActiveTab]       = useState<ActiveTab>("saved");
+
+  // ── Saved analyses state ──────────────────────────────────────────────────
   const [historyItems, setHistoryItems] = useState<AnalysisHistory[]>([]);
   const [searchQuery, setSearchQuery]   = useState("");
   const [filterType, setFilterType]     = useState<FilterType>("all");
@@ -95,6 +102,11 @@ export default function History() {
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [actionError, setActionError]       = useState<string | null>(null);
   const [deletingId, setDeletingId]         = useState<string | null>(null);
+
+  // ── Activity feed state ───────────────────────────────────────────────────
+  const [activityItems, setActivityItems]     = useState<UserEventEntry[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityError, setActivityError]     = useState<string | null>(null);
 
   // ── Load & live-refresh ──────────────────────────────────────────────────
   useEffect(() => {
@@ -127,6 +139,19 @@ export default function History() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== "activity") return;
+    let active = true;
+
+    setActivityLoading(true);
+    getEventHistory({ limit: 100 })
+      .then((res) => { if (active) { setActivityItems(res.data); setActivityError(null); } })
+      .catch((err) => { if (active) setActivityError(err instanceof Error ? err.message : "Não foi possível carregar a atividade."); })
+      .finally(() => { if (active) setActivityLoading(false); });
+
+    return () => { active = false; };
+  }, [activeTab]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const filteredData = useMemo(() => {
@@ -250,146 +275,182 @@ export default function History() {
               </div>
             </div>
 
-            {/* ── KPIs ── */}
-            <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-              <KPICard
-                icon={HistoryIcon} iconColor="#00C2FF" iconBg="rgba(0,194,255,0.12)"
-                label="Total" value={stats.total}
-                onClick={() => setFilterType("all")}
-              />
-              <KPICard
-                icon={Sparkles} iconColor="#00C2FF" iconBg="rgba(0,194,255,0.08)"
-                label="Análises" value={stats.analyses}
-                onClick={() => setFilterType("analysis")}
-              />
-              <KPICard
-                icon={GitCompareArrows} iconColor="#7A5CFF" iconBg="rgba(122,92,255,0.12)"
-                label="Comparações" value={stats.comparisons}
-                onClick={() => setFilterType("comparison")}
-              />
-              <KPICard
-                icon={FileText} iconColor="#00FF9C" iconBg="rgba(0,255,156,0.12)"
-                label="Relatórios" value={stats.reports}
-                onClick={() => setFilterType("report")}
-              />
+            {/* ── Tabs ── */}
+            <div className="mb-8 flex gap-1 rounded-[14px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-1 w-fit">
+              <button
+                onClick={() => setActiveTab("saved")}
+                className={`flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-sm font-semibold transition-all ${
+                  activeTab === "saved"
+                    ? "bg-[rgba(0,194,255,0.15)] text-[#00C2FF] shadow-[0_0_0_1px_rgba(0,194,255,0.25)]"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                <HistoryIcon className="h-4 w-4" />
+                Análises Salvas
+              </button>
+              <button
+                onClick={() => setActiveTab("activity")}
+                className={`flex items-center gap-2 rounded-[10px] px-5 py-2.5 text-sm font-semibold transition-all ${
+                  activeTab === "activity"
+                    ? "bg-[rgba(0,194,255,0.15)] text-[#00C2FF] shadow-[0_0_0_1px_rgba(0,194,255,0.25)]"
+                    : "text-gray-500 hover:text-gray-300"
+                }`}
+              >
+                <Activity className="h-4 w-4" />
+                Atividade Recente
+              </button>
             </div>
 
-            {/* ── Filters ── */}
-            <div className="mb-8 rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-5 backdrop-blur-sm">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
-
-                <div className="relative sm:col-span-2 lg:col-span-5">
-                  <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                  <Input
-                    type="text"
-                    placeholder="Buscar por título, jogador ou analista..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] pl-11 focus:border-[#00C2FF]"
+            {/* ── Saved tab ── */}
+            {activeTab === "saved" && (
+              <>
+                <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+                  <KPICard
+                    icon={HistoryIcon} iconColor="#00C2FF" iconBg="rgba(0,194,255,0.12)"
+                    label="Total" value={stats.total}
+                    onClick={() => setFilterType("all")}
+                  />
+                  <KPICard
+                    icon={Sparkles} iconColor="#00C2FF" iconBg="rgba(0,194,255,0.08)"
+                    label="Análises" value={stats.analyses}
+                    onClick={() => setFilterType("analysis")}
+                  />
+                  <KPICard
+                    icon={GitCompareArrows} iconColor="#7A5CFF" iconBg="rgba(122,92,255,0.12)"
+                    label="Comparações" value={stats.comparisons}
+                    onClick={() => setFilterType("comparison")}
+                  />
+                  <KPICard
+                    icon={FileText} iconColor="#00FF9C" iconBg="rgba(0,255,156,0.12)"
+                    label="Relatórios" value={stats.reports}
+                    onClick={() => setFilterType("report")}
                   />
                 </div>
 
-                <div className="lg:col-span-3">
-                  <Select value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
-                    <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
-                      <Filter className="mr-2 h-4 w-4 text-gray-500" />
-                      <SelectValue placeholder="Tipo" />
-                    </SelectTrigger>
-                    <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
-                      {TYPE_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <div className="mb-8 rounded-[18px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-5 backdrop-blur-sm">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-12">
 
-                <div className="lg:col-span-2">
-                  <Select value={filterPeriod} onValueChange={(v) => setFilterPeriod(v as PeriodType)}>
-                    <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
-                      <Calendar className="mr-2 h-4 w-4 text-gray-500" />
-                      <SelectValue placeholder="Período" />
-                    </SelectTrigger>
-                    <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
-                      <SelectItem value="all">Todo período</SelectItem>
-                      <SelectItem value="7d">Últimos 7 dias</SelectItem>
-                      <SelectItem value="30d">Últimos 30 dias</SelectItem>
-                      <SelectItem value="90d">Últimos 90 dias</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                    <div className="relative sm:col-span-2 lg:col-span-5">
+                      <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                      <Input
+                        type="text"
+                        placeholder="Buscar por título, jogador ou analista..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)] pl-11 focus:border-[#00C2FF]"
+                      />
+                    </div>
 
-                <div className="lg:col-span-2">
-                  <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
-                    <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
-                      {SORT_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+                    <div className="lg:col-span-3">
+                      <Select value={filterType} onValueChange={(v) => setFilterType(v as FilterType)}>
+                        <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+                          <Filter className="mr-2 h-4 w-4 text-gray-500" />
+                          <SelectValue placeholder="Tipo" />
+                        </SelectTrigger>
+                        <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
+                          {TYPE_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              {activeFiltersCount > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {filterType !== "all" && (
-                    <FilterChip
-                      label={`Tipo: ${TYPE_OPTIONS.find((o) => o.value === filterType)?.label ?? filterType}`}
-                      onRemove={() => setFilterType("all")}
-                    />
+                    <div className="lg:col-span-2">
+                      <Select value={filterPeriod} onValueChange={(v) => setFilterPeriod(v as PeriodType)}>
+                        <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+                          <Calendar className="mr-2 h-4 w-4 text-gray-500" />
+                          <SelectValue placeholder="Período" />
+                        </SelectTrigger>
+                        <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
+                          <SelectItem value="all">Todo período</SelectItem>
+                          <SelectItem value="7d">Últimos 7 dias</SelectItem>
+                          <SelectItem value="30d">Últimos 30 dias</SelectItem>
+                          <SelectItem value="90d">Últimos 90 dias</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="lg:col-span-2">
+                      <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+                        <SelectTrigger className="h-11 rounded-[12px] border-[rgba(255,255,255,0.1)] bg-[rgba(255,255,255,0.02)]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="border-[rgba(255,255,255,0.1)] bg-[#0A1B35]">
+                          {SORT_OPTIONS.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {activeFiltersCount > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {filterType !== "all" && (
+                        <FilterChip
+                          label={`Tipo: ${TYPE_OPTIONS.find((o) => o.value === filterType)?.label ?? filterType}`}
+                          onRemove={() => setFilterType("all")}
+                        />
+                      )}
+                      {searchQuery && (
+                        <FilterChip label={`"${searchQuery}"`} onRemove={() => setSearchQuery("")} />
+                      )}
+                      <button
+                        onClick={handleClearFilters}
+                        className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                      >
+                        Limpar filtros
+                      </button>
+                    </div>
                   )}
-                  {searchQuery && (
-                    <FilterChip label={`"${searchQuery}"`} onRemove={() => setSearchQuery("")} />
-                  )}
-                  <button
-                    onClick={handleClearFilters}
-                    className="ml-auto text-xs text-gray-500 hover:text-gray-300 transition-colors"
-                  >
-                    Limpar filtros
-                  </button>
                 </div>
-              )}
-            </div>
 
-            {/* ── Feedback toasts ── */}
-            {actionFeedback && (
-              <div className="mb-6 rounded-[16px] border border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] px-5 py-4 text-sm text-[#9CFFD1]">
-                {actionFeedback}
-              </div>
-            )}
-            {(loadError ?? actionError) && (
-              <div className="mb-6 rounded-[16px] border border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
-                {loadError ?? actionError}
-              </div>
-            )}
+                {actionFeedback && (
+                  <div className="mb-6 rounded-[16px] border border-[rgba(0,255,156,0.18)] bg-[rgba(0,255,156,0.08)] px-5 py-4 text-sm text-[#9CFFD1]">
+                    {actionFeedback}
+                  </div>
+                )}
+                {(loadError ?? actionError) && (
+                  <div className="mb-6 rounded-[16px] border border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+                    {loadError ?? actionError}
+                  </div>
+                )}
 
-            {/* ── Content ── */}
-            {isLoading ? (
-              <LoadingState />
-            ) : filteredData.length === 0 ? (
-              <EmptyState
-                hasFilters={activeFiltersCount > 0 || filterPeriod !== "all"}
-                onClear={handleClearFilters}
-              />
-            ) : (
-              <>
-                <p className="mb-4 text-xs text-gray-600">
-                  {filteredData.length} {filteredData.length === 1 ? "registro" : "registros"}
-                </p>
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-                  {filteredData.map((item) => (
-                    <HistoryCard
-                      key={item.id}
-                      item={item}
-                      deleting={deletingId === item.id}
-                      onView={() => navigate(`/analysis/${item.id}`)}
-                      onDelete={() => void handleDelete(item)}
-                    />
-                  ))}
-                </div>
+                {isLoading ? (
+                  <LoadingState />
+                ) : filteredData.length === 0 ? (
+                  <EmptyState
+                    hasFilters={activeFiltersCount > 0 || filterPeriod !== "all"}
+                    onClear={handleClearFilters}
+                  />
+                ) : (
+                  <>
+                    <p className="mb-4 text-xs text-gray-600">
+                      {filteredData.length} {filteredData.length === 1 ? "registro" : "registros"}
+                    </p>
+                    <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+                      {filteredData.map((item) => (
+                        <HistoryCard
+                          key={item.id}
+                          item={item}
+                          deleting={deletingId === item.id}
+                          onView={() => navigate(`/analysis/${item.id}`)}
+                          onDelete={() => void handleDelete(item)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
+            )}
+
+            {/* ── Activity tab ── */}
+            {activeTab === "activity" && (
+              <ActivityFeed
+                items={activityItems}
+                loading={activityLoading}
+                error={activityError}
+              />
             )}
 
           </div>
@@ -398,6 +459,83 @@ export default function History() {
     </div>
   );
 }
+
+// ─── Activity Feed ────────────────────────────────────────────────────────────
+
+const EVENT_META: Record<UserEventType, { icon: React.ElementType; color: string; bg: string }> = {
+  PLAYER_VIEWED:    { icon: Eye,              color: "#00C2FF", bg: "rgba(0,194,255,0.12)"  },
+  PLAYER_COMPARED:  { icon: GitCompareArrows, color: "#7A5CFF", bg: "rgba(122,92,255,0.12)" },
+  SEARCH_PERFORMED: { icon: Search,           color: "#94a3b8", bg: "rgba(148,163,184,0.1)" },
+  REPORT_GENERATED: { icon: FileText,         color: "#00FF9C", bg: "rgba(0,255,156,0.12)"  },
+  GEM_OPENED:       { icon: Star,             color: "#fbbf24", bg: "rgba(251,191,36,0.12)" },
+};
+
+const ActivityFeed = memo(({
+  items, loading, error,
+}: {
+  items: UserEventEntry[];
+  loading: boolean;
+  error: string | null;
+}) => {
+  if (loading) return <LoadingState />;
+
+  if (error) {
+    return (
+      <div className="rounded-[16px] border border-[rgba(255,77,79,0.22)] bg-[rgba(255,77,79,0.08)] px-5 py-4 text-sm text-[#FFB4B5]">
+        {error}
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-[20px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-16 text-center backdrop-blur-sm">
+        <div className="mx-auto max-w-sm">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[14px] bg-[rgba(0,194,255,0.08)]">
+            <Activity className="h-8 w-8 text-[#00C2FF]/50" />
+          </div>
+          <h3 className="mb-2 text-lg font-semibold text-gray-200">Nenhuma atividade</h3>
+          <p className="text-sm leading-relaxed text-gray-500">
+            As ações realizadas na plataforma — visualizações, comparações e buscas — aparecerão aqui automaticamente.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="mb-2 text-xs text-gray-600">{items.length} {items.length === 1 ? "evento" : "eventos"}</p>
+      {items.map((event) => {
+        const meta = EVENT_META[event.type] ?? EVENT_META.SEARCH_PERFORMED;
+        const Icon = meta.icon;
+        const date = new Date(event.createdAt);
+        const dateStr = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+        const timeStr = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+        return (
+          <div
+            key={event.id}
+            className="flex items-center gap-4 rounded-[14px] border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] px-5 py-3.5 transition-colors hover:bg-[rgba(255,255,255,0.035)]"
+          >
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px]"
+              style={{ background: meta.bg }}
+            >
+              <Icon className="h-4 w-4" style={{ color: meta.color }} />
+            </div>
+            <span className="flex-1 text-sm text-gray-200">{event.message}</span>
+            <div className="shrink-0 text-right">
+              <p className="text-[11px] tabular-nums text-gray-400">{dateStr}</p>
+              <p className="text-[10px] tabular-nums text-gray-600">{timeStr}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+});
+ActivityFeed.displayName = "ActivityFeed";
 
 // ─── KPI Card ─────────────────────────────────────────────────────────────────
 

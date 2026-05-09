@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   Crosshair,
@@ -189,17 +189,19 @@ function PlayerCard({ entry, rank }: { entry: ScoutingRankingEntry; rank: number
 // ─── Filters ──────────────────────────────────────────────────────────────────
 
 interface FiltersState {
-  position:   string;
-  label:      ScoutingLabel | "";
-  ageMax:     string;
-  overallMin: string;
+  position:    string;
+  label:       ScoutingLabel | "";
+  nationality: string;
+  ageMax:      string;
+  overallMin:  string;
 }
 
 const DEFAULT_FILTERS: FiltersState = {
-  position:   "",
-  label:      "",
-  ageMax:     "",
-  overallMin: "",
+  position:    "",
+  label:       "",
+  nationality: "",
+  ageMax:      "",
+  overallMin:  "",
 };
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -221,10 +223,11 @@ export default function ScoutingRanking() {
     setLoading(true);
 
     getScoutingRanking({
-      position:   committed.position  || undefined,
-      label:      (committed.label || undefined) as ScoutingLabel | undefined,
-      ageMax:     committed.ageMax    ? Number(committed.ageMax)    : undefined,
-      overallMin: committed.overallMin ? Number(committed.overallMin) : undefined,
+      position:    committed.position    || undefined,
+      label:       (committed.label || undefined) as ScoutingLabel | undefined,
+      nationality: committed.nationality || undefined,
+      ageMax:      committed.ageMax      ? Number(committed.ageMax)      : undefined,
+      overallMin:  committed.overallMin  ? Number(committed.overallMin)  : undefined,
       limit: 60,
     })
       .then((res) => {
@@ -253,6 +256,16 @@ export default function ScoutingRanking() {
     setFilters(DEFAULT_FILTERS);
     setCommitted(DEFAULT_FILTERS);
   };
+
+  const availableNationalities = useMemo(
+    () => Array.from(
+      new Set([
+        ...players.map((p) => p.nationality).filter((n): n is string => Boolean(n)),
+        ...(filters.nationality ? [filters.nationality] : []),
+      ]),
+    ).sort(),
+    [filters.nationality, players],
+  );
 
   // label distribution for header chips
   const labelCounts = players.reduce<Partial<Record<ScoutingLabel, number>>>((acc, p) => {
@@ -354,6 +367,24 @@ export default function ScoutingRanking() {
                         <option key={opt.value} value={opt.value} className="bg-[#07142A]">
                           {opt.label}
                         </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+                  </div>
+                </div>
+
+                {/* Nationality */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Nacionalidade</span>
+                  <div className="relative">
+                    <select
+                      value={filters.nationality}
+                      onChange={(e) => setFilters((f) => ({ ...f, nationality: e.target.value }))}
+                      className="appearance-none rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 pr-8 text-sm text-gray-300 focus:border-[#00C2FF] focus:outline-none"
+                    >
+                      <option value="" className="bg-[#07142A]">Todas as nacionalidades</option>
+                      {availableNationalities.map((nat) => (
+                        <option key={nat} value={nat} className="bg-[#07142A]">{nat}</option>
                       ))}
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />

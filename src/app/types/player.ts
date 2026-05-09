@@ -16,6 +16,7 @@ export interface PlayerExtended extends PlayerProfile {
   marketValueAmount: number | null;
   marketValueLabel: string;
   contract: string;
+  agencyName?: string | null;
   risk: {
     score: number;
     level: "LOW" | "MEDIUM" | "HIGH";
@@ -56,10 +57,15 @@ export const EMPTY_PLAYER: PlayerExtended = {
   positionRank: 0,
   capitalEfficiency: 0,
   riskLevel: "MEDIUM",
+  height: null,
+  weight: null,
+  foot: null,
+  dominantFoot: null,
   marketValue: "N/A",
   marketValueAmount: null,
   marketValueLabel: "N/A",
   contract: "N/A",
+  agencyName: null,
   risk: {
     score: 0,
     level: "MEDIUM",
