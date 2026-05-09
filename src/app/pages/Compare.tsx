@@ -410,6 +410,7 @@ export default function Compare() {
         return;
       }
       setCompareLoading(true);
+      setComparisonData(null);
       try {
         const response = await getCompareDataByIds(playerA.id, playerB.id);
         if (!active) return;
@@ -432,12 +433,15 @@ export default function Compare() {
     async function loadEngine() {
       if (!isValidUUID(playerA.id) || !isValidUUID(playerB.id) || playerA.id === playerB.id) { setEngineData(null); setEngineLoading(false); return; }
       setEngineLoading(true);
+      setEngineData(null);
       try {
         const response = await getCompareEngineData(playerA.id, playerB.id);
         if (!active) return;
         const payload = (response as { data?: unknown }).data;
         if (payload && typeof payload === "object" && "betterOverall" in payload) {
           setEngineData(payload as EngineComparisonOutput);
+        } else {
+          setEngineData(null);
         }
       } catch {
         if (active) setEngineData(null);

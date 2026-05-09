@@ -28,6 +28,7 @@ export function ComparisonRadarChart({ nameA, nameB, dimensions }: ComparisonRad
     B: Math.round(d.valueB),
     fullMark: 100,
   }));
+  const chartKey = data.map((d) => `${d.subject}:${d.A}:${d.B}`).join("|");
 
   return (
     <div className="flex flex-col gap-4">
@@ -44,7 +45,7 @@ export function ComparisonRadarChart({ nameA, nameB, dimensions }: ComparisonRad
       </div>
 
       <ResponsiveContainer width="100%" height={340}>
-        <RadarChart cx="50%" cy="50%" outerRadius="72%" data={data}>
+        <RadarChart key={chartKey} cx="50%" cy="50%" outerRadius="72%" data={data}>
           <PolarGrid stroke="rgba(255,255,255,0.08)" />
           <PolarAngleAxis
             dataKey="subject"

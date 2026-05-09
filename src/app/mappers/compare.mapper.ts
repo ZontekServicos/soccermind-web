@@ -109,12 +109,26 @@ function buildFallbackPositionContext(positionA: string, positionB: string) {
   };
 }
 
+function scoreFromBand(record: UnknownRecord | null, fallback: number | null = null) {
+  const value = record?.score;
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
 /**
- * Build an ApiPlayerLike payload from a PlayerIntelligenceProfile identity block.
- * Used when the API returns playerAProfile/playerBProfile (new format) instead of
- * legacy playerA/playerB flat objects.
+ * Build an ApiPlayerLike payload from a PlayerIntelligenceProfile.
+ * The compare API returns profile blocks instead of legacy flat player objects;
+ * carrying the profile scores into attributes keeps legacy radar datasets unique.
  */
-function playerFromIntelligenceIdentity(identity: UnknownRecord): ApiPlayerLike & UnknownRecord {
+function playerFromIntelligenceProfile(profile: UnknownRecord): ApiPlayerLike & UnknownRecord {
+  const identity = pickRecord(profile, ["identity"]) ?? {};
+  const technical = pickRecord(profile, ["technical"]);
+  const physical = pickRecord(profile, ["physical"]);
+  const tactical = pickRecord(profile, ["tactical"]);
+  const projection = pickRecord(profile, ["projection"]);
+  const market = pickRecord(profile, ["market"]);
+  const risk = pickRecord(profile, ["risk"]);
+  const overallRisk = risk ? pickRecord(risk, ["overall"]) : null;
+
   return {
     id: toText(identity.id, ""),
     name: toText(identity.name, ""),
@@ -124,10 +138,39 @@ function playerFromIntelligenceIdentity(identity: UnknownRecord): ApiPlayerLike 
     nationality: toText(identity.nationality, "") || null,
     team: toText(identity.club, "") || null,
     league: toText(identity.league, "") || null,
-    marketValue: null,
-    overall: null,
-    potential: null,
-    attributes: {},
+    marketValue: market?.currentValue ?? null,
+    overall: projection?.currentOverall ?? null,
+    potential: projection?.expectedPeakOverall ?? null,
+    liquidity: market?.liquidity,
+    attributes: {
+      pace: physical?.sprintSpeed ?? physical?.acceleration ?? physical?.overall,
+      shooting: technical?.ballStriking ?? technical?.overall,
+      passing: technical?.passing ?? technical?.overall,
+      dribbling: technical?.carrying ?? technical?.overall,
+      defending: technical?.defending ?? tactical?.defensiveAwareness,
+      physical: physical?.overall,
+      acceleration: physical?.acceleration,
+      sprintSpeed: physical?.sprintSpeed,
+      agility: physical?.agility,
+      balance: physical?.balance,
+      stamina: physical?.stamina,
+      strength: physical?.strength,
+      finishing: technical?.ballStriking,
+      shortPassing: technical?.passing,
+      longPassing: technical?.creativity,
+      ballControl: technical?.firstTouch,
+      vision: technical?.creativity,
+      interceptions: tactical?.defensiveAwareness,
+      defensiveAwareness: tactical?.defensiveAwareness,
+      standingTackle: technical?.defending,
+      overall: projection?.currentOverall,
+      potential: projection?.expectedPeakOverall,
+    },
+    risk: {
+      score: scoreFromBand(overallRisk),
+      level: null,
+      explanation: "",
+    },
   } as ApiPlayerLike & UnknownRecord;
 }
 
@@ -138,18 +181,15 @@ export function mapCompareResponse(response: unknown) {
   // New format: { playerAProfile, playerBProfile, comparison }
   const playerAProfileSource = pickRecord(source, ["playerAProfile"]);
   const playerBProfileSource = pickRecord(source, ["playerBProfile"]);
-  const profileIdentityA = playerAProfileSource ? pickRecord(playerAProfileSource, ["identity"]) : null;
-  const profileIdentityB = playerBProfileSource ? pickRecord(playerBProfileSource, ["identity"]) : null;
-
   // Resolve player payload — prefer direct playerA/B (legacy), fall back to identity from profile (new)
   const rawPlayerA =
     pickRecord(source, ["playerA"]) ??
-    (profileIdentityA !== null ? playerFromIntelligenceIdentity(profileIdentityA) : null) ??
+    (playerAProfileSource !== null ? playerFromIntelligenceProfile(playerAProfileSource) : null) ??
     ({} as UnknownRecord);
 
   const rawPlayerB =
     pickRecord(source, ["playerB"]) ??
-    (profileIdentityB !== null ? playerFromIntelligenceIdentity(profileIdentityB) : null) ??
+    (playerBProfileSource !== null ? playerFromIntelligenceProfile(playerBProfileSource) : null) ??
     ({} as UnknownRecord);
 
   const playerA = mapApiPlayerToExtended(rawPlayerA);
