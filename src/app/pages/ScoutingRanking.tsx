@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   Crosshair,
@@ -257,15 +257,6 @@ export default function ScoutingRanking() {
     setCommitted(DEFAULT_FILTERS);
   };
 
-  const availableNationalities = useMemo(
-    () => Array.from(
-      new Set([
-        ...players.map((p) => p.nationality).filter((n): n is string => Boolean(n)),
-        ...(filters.nationality ? [filters.nationality] : []),
-      ]),
-    ).sort(),
-    [filters.nationality, players],
-  );
 
   // label distribution for header chips
   const labelCounts = players.reduce<Partial<Record<ScoutingLabel, number>>>((acc, p) => {
@@ -376,19 +367,13 @@ export default function ScoutingRanking() {
                 {/* Nationality */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Nacionalidade</span>
-                  <div className="relative">
-                    <select
-                      value={filters.nationality}
-                      onChange={(e) => setFilters((f) => ({ ...f, nationality: e.target.value }))}
-                      className="appearance-none rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 pr-8 text-sm text-gray-300 focus:border-[#00C2FF] focus:outline-none"
-                    >
-                      <option value="" className="bg-[#07142A]">Todas as nacionalidades</option>
-                      {availableNationalities.map((nat) => (
-                        <option key={nat} value={nat} className="bg-[#07142A]">{nat}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="ex: Brazil"
+                    value={filters.nationality}
+                    onChange={(e) => setFilters((f) => ({ ...f, nationality: e.target.value }))}
+                    className="w-36 rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:border-[#00C2FF] focus:outline-none"
+                  />
                 </div>
 
                 {/* Age max */}

@@ -94,15 +94,9 @@ function InfoField({ label, value }: { label: string; value: string | number | n
 }
 
 function PlayerInfoCard({ player }: { player: PlayerProfileModel }) {
-  const hasAnyExtra =
-    player.height != null ||
-    player.weight != null ||
-    player.foot != null ||
-    player.agencyName != null;
-
-  if (!hasAnyExtra) return null;
-
   const items = [
+    { label: "Posição",         value: player.position ?? null },
+    { label: "Clube",           value: player.team ?? null },
     { label: "Altura",          value: player.height ? `${player.height} cm` : null },
     { label: "Peso",            value: player.weight ? `${player.weight} kg` : null },
     { label: "Pé Dominante",   value: formatFoot(player.foot) },
