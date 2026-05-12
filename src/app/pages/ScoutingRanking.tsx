@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Check,
   ChevronDown,
   Crosshair,
   RotateCcw,
+  Search,
   Sparkles,
   TrendingUp,
   Users,
@@ -20,6 +22,104 @@ import {
   type ScoutingLabel,
   type ScoutingRankingEntry,
 } from "../../services/scouting";
+import { searchPlayers, type PlayersResponseMeta } from "../../services/players";
+
+// ─── NationalityCombobox ──────────────────────────────────────────────────────
+
+function NationalityCombobox({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen]   = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const merged = value && !options.includes(value) ? [value, ...options] : options;
+    return q ? merged.filter((n) => n.toLowerCase().includes(q)) : merged;
+  }, [options, query, value]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex min-w-[160px] items-center justify-between gap-2 rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm transition-colors hover:border-[rgba(255,255,255,0.15)]"
+      >
+        <span className={value ? "text-gray-200" : "text-gray-600"}>
+          {value || "Todas as nac."}
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-[calc(100%+6px)] z-50 w-56 overflow-hidden rounded-[14px] border border-[rgba(0,194,255,0.2)] bg-[#07142a] shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+          <div className="border-b border-[rgba(255,255,255,0.06)] p-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-500" />
+              <input
+                autoFocus
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar nacionalidade…"
+                className="w-full rounded-[8px] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.03)] py-1.5 pl-8 pr-3 text-xs text-gray-200 placeholder-gray-600 outline-none focus:border-[rgba(0,194,255,0.3)]"
+              />
+            </div>
+          </div>
+
+          <div className="max-h-52 overflow-y-auto p-1.5">
+            <button
+              type="button"
+              onClick={() => { onChange(""); setOpen(false); setQuery(""); }}
+              className={`flex w-full items-center justify-between rounded-[8px] px-3 py-2 text-xs transition-colors ${
+                !value ? "bg-[rgba(0,194,255,0.12)] text-[#00C2FF]" : "text-gray-400 hover:bg-[rgba(255,255,255,0.04)]"
+              }`}
+            >
+              <span>Todas</span>
+              {!value && <Check className="h-3.5 w-3.5" />}
+            </button>
+
+            {filtered.map((nat) => (
+              <button
+                key={nat}
+                type="button"
+                onClick={() => { onChange(nat); setOpen(false); setQuery(""); }}
+                className={`flex w-full items-center justify-between rounded-[8px] px-3 py-2 text-xs transition-colors ${
+                  nat === value
+                    ? "bg-[rgba(0,194,255,0.12)] text-[#00C2FF]"
+                    : "text-gray-300 hover:bg-[rgba(255,255,255,0.04)]"
+                }`}
+              >
+                <span>{nat}</span>
+                {nat === value && <Check className="h-3.5 w-3.5" />}
+              </button>
+            ))}
+
+            {filtered.length === 0 && (
+              <p className="px-3 py-3 text-center text-xs text-gray-600">Nenhuma encontrada</p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -211,10 +311,21 @@ export default function ScoutingRanking() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState<number | null>(null);
+  const [nationalityOptions, setNationalityOptions] = useState<string[]>([]);
 
   // local (editing) vs committed (fetched) filters
   const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS);
   const [committed, setCommitted] = useState<FiltersState>(DEFAULT_FILTERS);
+
+  // Load nationality options from DB once on mount
+  useEffect(() => {
+    searchPlayers({ limit: 1 })
+      .then((res) => {
+        const opts = (res.meta as PlayersResponseMeta | undefined)?.filterOptions?.nationalities;
+        if (Array.isArray(opts) && opts.length > 0) setNationalityOptions(opts);
+      })
+      .catch(() => {});
+  }, []);
 
   const isDirty = JSON.stringify(filters) !== JSON.stringify(committed);
 
@@ -367,12 +478,10 @@ export default function ScoutingRanking() {
                 {/* Nationality */}
                 <div className="flex flex-col gap-2">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Nacionalidade</span>
-                  <input
-                    type="text"
-                    placeholder="ex: Brazil"
+                  <NationalityCombobox
                     value={filters.nationality}
-                    onChange={(e) => setFilters((f) => ({ ...f, nationality: e.target.value }))}
-                    className="w-36 rounded-[10px] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-sm text-gray-300 placeholder-gray-600 focus:border-[#00C2FF] focus:outline-none"
+                    options={nationalityOptions}
+                    onChange={(v) => setFilters((f) => ({ ...f, nationality: v }))}
                   />
                 </div>
 
